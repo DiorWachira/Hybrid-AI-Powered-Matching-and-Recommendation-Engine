@@ -1,7 +1,9 @@
 alembic>=1.16,<2
 fastapi==0.115.0
+neo4j==5.27.0
 psycopg[binary]>=3.2,<4
 pydantic-settings==2.5.2
+pytest==8.3.3
 python-dotenv==1.0.1
 SQLAlchemy>=2.0.44,<3
 uvicorn[standard]==0.30.6
