@@ -1,0 +1,195 @@
+HYBRID AI-POWERED WORKFORCE PLACEMENT ENGINE
+PROJECT MILESTONE ROADMAP (8 WEEKS)
+Last updated: 2026-09-17
+
+Legend:  [x] done   [~] partially done   [ ] not started
+Note: academic documentation tasks (Chapter 5, UML write-ups, report) are
+owned by the student and are deliberately excluded from this roadmap.
+
+
+====================================================================
+CURRENT STATUS SNAPSHOT
+====================================================================
+[x] Git repository + remote on GitHub, branch/PR workflow in use
+[x] Docker Compose stack: PostgreSQL 16 (host port 5433), Neo4j 5 Community
+[x] PostgreSQL relational schema (users, candidates, employers,
+    job_postings, match_results) via SQLAlchemy + Alembic, migrated
+[x] FastAPI application shell with CORS + /api/health (verified 200 OK)
+[x] Python virtual environment with backend dependencies installed
+[x] Environment configuration via .env / pydantic-settings
+[x] docs/WORKFLOW.md (branching, commit convention, increment plan)
+[ ] Everything below in Weeks 1-8 that is not ticked
+
+Known gaps to close early:
+ - No Neo4j Python driver or connection module yet (app/db/neo4j_db.py)
+ - No auth dependencies (passlib/bcrypt, PyJWT) or auth endpoints
+ - No ML dependencies (transformers, torch, scikit-learn, pandas, numpy)
+ - No frontend project
+ - No data_pipeline/ or notebooks/ directories
+ - No automated tests and no CI workflow
+ - Dataset decision still open
+
+
+====================================================================
+MONTH 1 - INFRASTRUCTURE, BACKEND CORE, FRONTEND SHELL, DATA
+====================================================================
+
+--------------------------------------------------------------------
+WEEK 1  Foundations and Database Architecture
+--------------------------------------------------------------------
+[x] Initialise Git repository and project directory structure
+[x] Define and migrate the PostgreSQL relational schema
+[x] Run PostgreSQL and Neo4j locally via Docker Compose
+[x] Verify the full local stack (containers healthy, migrations, API)
+[ ] Add the Neo4j Bolt driver and a connection module (app/db/neo4j_db.py)
+    with a /api/health/db readiness check covering both databases
+[ ] Create the baseline Neo4j ontology: constraints/indexes plus seed
+    Cypher for Skill, Certification, JobRole, Industry nodes and the
+    HAS_SKILL / HOLDS_CERTIFICATE / SKILL_REQUIRED / REQUIRES_CERT /
+    RELATED_TO relationships
+[ ] Decide and record the dataset strategy (synthetic vs. sourced),
+    using the notes already gathered in Dataset_sourcing/
+[ ] Add pytest and a first smoke test; add a GitHub Actions CI workflow
+    that runs compile checks, migrations and tests
+Exit criterion: both databases reachable from the API, ontology seed
+script re-runnable, CI green on every push.
+
+--------------------------------------------------------------------
+WEEK 2  Backend Core, Authentication and Rule Engine
+--------------------------------------------------------------------
+[x] FastAPI routing, CORS and settings layer
+[ ] Password hashing (bcrypt) and JWT issuing/verification utilities
+[ ] FR-01: /api/auth/register and /api/auth/login with role separation
+    (candidate, recruiter, admin) and a role-based access dependency
+[ ] Pydantic request/response schemas and a shared error format
+[ ] FR-03 (first pass): job posting CRUD endpoints with hard-filter
+    criteria and skill weights
+[ ] Tier 1 rule engine (app/core/rule_filter.py): mandatory
+    certifications, minimum years of experience, location, salary ceiling
+[ ] Unit tests for the rule engine covering pass and fail paths
+Exit criterion: a recruiter can register, log in, create a job, and the
+rule filter correctly eliminates ineligible sample candidates.
+
+--------------------------------------------------------------------
+WEEK 3  Frontend Shell and Resume Parsing
+--------------------------------------------------------------------
+[ ] Scaffold the React frontend (Vite) with routing and an API client
+[ ] Auth pages, token storage and protected routes
+[ ] Candidate dashboard (profile + resume upload) and recruiter
+    dashboard (job creation form) as functional shells
+[ ] FR-02: /api/candidates/upload-resume with PDF/DOCX text extraction
+[ ] Section extraction routine for education, experience and skills
+[ ] Persist parsed resume text to PostgreSQL and project extracted
+    skills into Neo4j nodes and edges
+[ ] File-upload hardening: size limit, MIME/extension allow-list,
+    filename sanitisation, no execution of uploaded content
+Exit criterion: uploading a real CV through the UI produces stored
+parsed text plus skill nodes in the graph.
+
+--------------------------------------------------------------------
+WEEK 4  Dataset Preparation and Anti-Bias Pipeline
+--------------------------------------------------------------------
+[ ] data_pipeline/generate_synthetic_data.py producing realistic Kenyan
+    market candidate profiles and job postings (KLMIS-aligned roles,
+    counties, salary bands, certifications)
+[ ] Text pre-processing utilities: normalisation, tokenisation,
+    stop-word removal, de-duplication
+[ ] Anti-bias anonymisation routine stripping names, gender, age,
+    contact details and fine-grained location before scoring
+[ ] Export cleaned datasets to data_pipeline/dataset/ as CSV/JSON with
+    a documented schema and a fixed random seed for reproducibility
+[ ] Seed script that loads the synthetic data into PostgreSQL and Neo4j
+[ ] Define the labelled ground-truth set used later for precision,
+    recall and F1
+Exit criterion: one command regenerates and loads a complete, anonymised
+dataset into both databases.
+
+
+====================================================================
+MONTH 2 - MODEL TRAINING, INTEGRATION, EVALUATION
+====================================================================
+
+--------------------------------------------------------------------
+WEEK 5  Model Work on Google Colab
+--------------------------------------------------------------------
+[ ] Create notebooks/ in the repo and mirror it to Google Drive
+[ ] Colab notebook with GPU runtime, pinned library versions and a
+    requirements cell that matches the backend
+[ ] Load a pre-trained BERT model, tokenise CV and job description text,
+    generate embeddings (start with bert-base-uncased; benchmark a
+    sentence-transformers model such as all-MiniLM-L6-v2 as a faster
+    alternative before committing)
+[ ] Compute cosine similarity between candidate and job vectors and
+    sanity-check ranking quality on the synthetic set
+[ ] Fine-tune only if the baseline is insufficient; record the decision
+[ ] Export model artifacts and the embedding pipeline back to the repo
+    or Drive, with a documented load path for the backend
+[ ] Decide embedding storage: JSONB column now, pgvector later if needed
+Exit criterion: a reproducible notebook that turns raw text into
+embeddings and produces a ranked candidate list offline.
+
+--------------------------------------------------------------------
+WEEK 6  Hybrid Engine Integration and Graph Linking
+--------------------------------------------------------------------
+[ ] app/core/bert_embedder.py: load the model once at startup and expose
+    a batch embedding interface
+[ ] app/core/graph_service.py: Cypher queries for direct skill matches
+    and 2-hop RELATED_TO traversal, returning a weighted overlap score
+[ ] app/core/ml_matcher.py: cosine similarity plus the growth-potential
+    score
+[ ] app/core/hybrid_engine.py: Tier 1 filter then Tier 2 scoring, with
+    the weighted final score (default w1=0.45, w2=0.40, w3=0.15 kept
+    configurable)
+[ ] FR-04: /api/match/evaluate/{job_id} persisting rows to match_results
+[ ] FR-05: /api/match/results/{job_id} returning ranked cards with
+    confidence scores, verified hard filters and skill-gap breakdown
+[ ] Wire the React dashboards to the live endpoints; end-to-end run from
+    upload to ranked results
+Exit criterion: a full matching run completes from the UI and results
+persist to the database.
+
+--------------------------------------------------------------------
+WEEK 7  Theme, Explainability, Testing and Tuning
+--------------------------------------------------------------------
+[ ] Finalise the frontend visual theme, layout and candidate card design
+[ ] Explainability UI: match confidence, matched skills, missing skills
+    chart, and which hard filters were verified
+[ ] Functional testing across candidate and recruiter workflows
+[ ] Performance testing against NFR-02 (2-5 s per matching request);
+    add batching/caching of embeddings if the target is missed
+[ ] Security pass: parameterised queries, bcrypt hashing, JWT expiry,
+    CORS allow-list, secrets only in .env, dependency vulnerability check
+[ ] data_pipeline/evaluate_model.py reporting precision, recall and F1
+[ ] Tune scoring weights and thresholds using the evaluation output
+Exit criterion: measured precision/recall/F1 recorded, and matching
+latency within the stated performance target.
+
+--------------------------------------------------------------------
+WEEK 8  Hardening, Cleanup and Demonstration
+--------------------------------------------------------------------
+[ ] Repository cleanup: remove dead code, confirm directory structure,
+    verify .gitignore, ensure no secrets are tracked
+[ ] Verify a clean-machine setup path (clone, .env, compose up,
+    migrations, seed, run) end to end
+[ ] Fix outstanding bugs from Week 7 testing
+[ ] Final sanity run of the whole prototype with the demo dataset
+[ ] Prepare demonstration assets: seeded demo accounts, sample jobs,
+    sample CVs and a scripted walkthrough of the two-tier pipeline
+[ ] Tag a release commit for the supervisor evaluation build
+Exit criterion: the prototype runs from a clean checkout and the demo
+walkthrough is rehearsed end to end.
+
+
+====================================================================
+RISK WATCHLIST
+====================================================================
+ - Dataset access: fall back to the synthetic generator early rather
+   than waiting on external data approvals.
+ - Model size vs. latency: a large BERT model on CPU may breach the
+   2-5 s target; pre-compute embeddings and consider a smaller model.
+ - Python 3.14 compatibility: torch/transformers wheels may lag; be
+   ready to run the backend on a 3.12 environment if installs fail.
+ - Scope creep on the frontend theme: keep Week 3 shells minimal and
+   defer all styling to Week 7.
+ - Neo4j ontology breadth: seed only the skill families needed by the
+   demo domains (software, data, accounting).
