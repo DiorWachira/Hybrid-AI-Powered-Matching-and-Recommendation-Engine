@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     api_prefix: str = "/api"
     cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:5173"])
 
-    database_url: str = "postgresql+psycopg://workforce:workforce@localhost:5432/workforce"
+    database_url: str = "postgresql+psycopg://workforce:workforce@localhost:5433/workforce"
 
     neo4j_uri: str = "bolt://localhost:7687"
     neo4j_user: str = "neo4j"
