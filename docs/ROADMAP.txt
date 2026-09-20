@@ -1,6 +1,6 @@
 HYBRID AI-POWERED WORKFORCE PLACEMENT ENGINE
 PROJECT MILESTONE ROADMAP (8 WEEKS)
-Last updated: 2026-09-20 (afternoon)
+Last updated: 2026-09-20 (evening, after first Colab training run)
 
 Legend:  [x] done   [~] partially done   [ ] not started
 Note: academic documentation tasks (Chapter 5, UML write-ups, report) are
@@ -35,8 +35,45 @@ CLIENT ALIGNMENT NOTES (2026-09-20)
    validation, text cleaning, MiniLM embeddings, graph-overlap + growth
    scoring, leakage-safe splitting, CV-tuned logistic regression with
    overfitting/underfitting diagnostics, evaluation, top-k inference and
-   artifact export. Not yet executed against a live GPU/Colab run or wired
-   into the backend -- that remains Week 5/6 work.
+   artifact export. EXECUTED on Colab 2026-09-20 -- see the results
+   section below.
+
+
+====================================================================
+FIRST TRAINING RUN RESULTS (Colab, 2026-09-20)
+====================================================================
+Artifacts: data_pipeline/artifacts/hybrid_match_weights.json
+Evidence:  data_pipeline/reports/overfitting_diagnostics.png
+           data_pipeline/reports/test_evaluation.png
+Data:      800 candidates x 100 jobs -> 4,000 pairs (2400/800/800 split)
+
+Test metrics (learned logistic regression, threshold 0.40):
+  precision 0.935 | recall 0.929 | F1 0.932 | ROC-AUC 0.979
+  precision@3 0.812 | recall@3 0.800 | NDCG@3 0.992
+Baselines:
+  fixed-weight rule (0.45/0.40/0.15): F1 0.772 | ROC-AUC 0.859
+  BERT-similarity only:               F1 0.745 | ROC-AUC 0.605
+
+Overfitting check: PASSED. At the selected C=1.0 the train/CV-validation
+accuracy gap is ~0.0007 (0.9186 vs 0.9179) and the learning curve has
+converged, so the model is bias-limited, not variance-limited. There is
+no overfitting; if anything the linear model underfits the label rule.
+
+*** CRITICAL CAVEAT -- THESE METRICS DO NOT MEASURE MATCHING QUALITY ***
+The training label is currently defined as
+    is_match = (S_graph >= 0.6) AND (years_experience >= required_years)
+S_graph is itself one of the three input features, and S_growth encodes
+experience_fit, so the label is very close to a deterministic function of
+the model's own inputs. Verified empirically on all 15,996 same-role
+pairs: a hand-written two-threshold rule using only the model's own
+features reproduces the label with 97.5% accuracy, which is BETTER than
+the trained model's 92.1% test accuracy. The model is therefore
+rediscovering the labelling rule, not learning to predict placement
+success. The 0.979 ROC-AUC must NOT be reported as evidence of matching
+accuracy. The learned coefficient ordering (S_growth > S_graph >> S_bert)
+is likewise an artifact of the label definition ignoring text entirely,
+not a finding about which signal matters in real hiring.
+Corrective tasks are listed under Week 7 below.
 
 
 ====================================================================
@@ -160,11 +197,9 @@ MONTH 2 - MODEL TRAINING, INTEGRATION, EVALUATION
 WEEK 5  Model Work on Google Colab
 --------------------------------------------------------------------
 [x] notebooks/hybrid_matching_model_training.ipynb created and Colab-ready
-    (Drive mount, pinned deps, seed generation and reproducibility handled) --
-    written early to unblock iteration; still needs a real run-through on
-    Colab/GPU and a review of the resulting metrics
-[ ] Run the notebook end-to-end on Colab against a larger synthetic sample
-    (or real BrighterMonday jobs once available) and record the metrics
+    (Drive mount, pinned deps, seed generation and reproducibility handled)
+[x] Run the notebook end-to-end on Colab and record the metrics
+    (done 2026-09-20 -- see FIRST TRAINING RUN RESULTS above)
 [x] Load a pre-trained sentence-transformer (all-MiniLM-L6-v2), tokenise CV
     and job description text, generate embeddings
 [x] Compute cosine similarity between candidate and job vectors and
@@ -174,13 +209,13 @@ WEEK 5  Model Work on Google Colab
     only the score-combination logistic regression is trained/tuned, since
     3 features over a few thousand rows does not justify a bigger model
 [x] Export model artifacts and the embedding pipeline back to the repo
-    (data_pipeline/artifacts/hybrid_match_weights.json +
-    hybrid_match_pipeline.joblib), with a documented load path for the
-    backend (see the notebook's Section 16 and Summary)
+    (data_pipeline/artifacts/hybrid_match_weights.json is committed;
+    the .joblib/.npy/.parquet outputs stay gitignored and regenerable)
 [x] Embedding storage decision: JSONB column now (per the existing
     candidates/job_postings schema); pgvector deferred until proven needed
-Exit criterion: a reproducible notebook that turns raw text into
-embeddings and produces a ranked candidate list offline.
+Exit criterion: MET for the pipeline mechanics -- a reproducible notebook
+turns raw text into embeddings and produces a ranked candidate list. NOT
+met for matching quality, which is blocked on the label fix in Week 7.
 
 --------------------------------------------------------------------
 WEEK 6  Hybrid Engine Integration and Graph Linking
@@ -217,8 +252,33 @@ WEEK 7  Theme, Explainability, Testing and Tuning
     this doubles as the "simulation mode" (seeded run of the hybrid engine
     over the synthetic dataset, independent of live user traffic)
 [ ] Tune scoring weights and thresholds using the evaluation output
-Exit criterion: measured precision/recall/F1 recorded, and matching
-latency within the stated performance target.
+
+    LABEL-VALIDITY CORRECTIONS (blocking any quality claim in the report):
+[ ] Replace the circular weak label. Add a hidden "true fit" latent to
+    generate_synthetic_data.py (driven by factors the model does NOT get
+    as features, plus noise) and derive is_match from that latent, so
+    S_bert/S_graph/S_growth become noisy proxies the model must actually
+    learn from rather than the label's own definition
+[ ] Re-tune the baseline thresholds on the validation split, exactly as
+    the learned model's threshold is tuned. The current fixed-weight
+    baseline scores ~0.72 on average against a 0.5 cut-off, so it predicts
+    almost everything positive (recall 1.000, precision 0.629) -- the
+    comparison as it stands is not a fair fight and will not survive review
+[ ] Add a job-disjoint split alongside the candidate-disjoint one. All 100
+    jobs currently appear in train, validation and test, so cold-start
+    performance on a newly posted job -- the actual product scenario -- is
+    completely untested
+[ ] Enrich job/CV text before trusting S_bert. Descriptions are currently
+    templated ("We are hiring a {role} to work on {skills}..."), so
+    embeddings carry little signal within a role, which is the likely
+    cause of the near-chance 0.605 BERT-only ROC-AUC. Real BrighterMonday
+    postings or LLM-varied text should be in place before drawing any
+    conclusion about semantic matching
+[ ] Hand-label a small gold slice (100-200 pairs) as an independent check
+    on whatever synthetic label scheme replaces the current one
+Exit criterion: measured precision/recall/F1 recorded against a label that
+is NOT a function of the model's own features, and matching latency within
+the stated performance target.
 
 --------------------------------------------------------------------
 WEEK 8  Hardening, Cleanup and Demonstration

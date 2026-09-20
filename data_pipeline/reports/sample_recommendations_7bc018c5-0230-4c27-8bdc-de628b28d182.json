@@ -1,0 +1,60 @@
+[
+  {
+    "job_id":"c38e15ee-9cc1-476d-b0c0-874fa8589982",
+    "title":"Data Analyst",
+    "S_bert":0.7165302038,
+    "S_graph":1.0,
+    "S_growth":0.9,
+    "final_score":0.9996656504,
+    "missing_skills":[
+
+    ]
+  },
+  {
+    "job_id":"d6ce254e-1457-4842-b026-e2e02ba334d3",
+    "title":"Data Analyst",
+    "S_bert":0.7258042693,
+    "S_graph":0.6,
+    "S_growth":0.9,
+    "final_score":0.9662758354,
+    "missing_skills":[
+      "Excel",
+      "Power BI"
+    ]
+  },
+  {
+    "job_id":"733a95cb-9277-4714-baa6-c54b8367fb94",
+    "title":"Data Analyst",
+    "S_bert":0.6276314259,
+    "S_graph":0.6666666667,
+    "S_growth":0.9,
+    "final_score":0.9658048368,
+    "missing_skills":[
+      "Power BI"
+    ]
+  },
+  {
+    "job_id":"40cf81f0-00aa-4768-958f-897dbab7e7d0",
+    "title":"Data Analyst",
+    "S_bert":0.6648780107,
+    "S_graph":0.6,
+    "S_growth":0.9,
+    "final_score":0.9457183168,
+    "missing_skills":[
+      "Excel",
+      "Power BI"
+    ]
+  },
+  {
+    "job_id":"79641dc1-7b5e-431b-8f2d-66ae242b1ac3",
+    "title":"Data Analyst",
+    "S_bert":0.6159149408,
+    "S_graph":0.6,
+    "S_growth":0.9,
+    "final_score":0.9211418441,
+    "missing_skills":[
+      "Excel",
+      "Power BI"
+    ]
+  }
+]

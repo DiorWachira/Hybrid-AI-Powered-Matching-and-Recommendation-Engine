@@ -39,6 +39,13 @@ prompt content and context.txt
 
 # Generated data, model artifacts and reports (regenerate via data_pipeline/ scripts)
 data_pipeline/dataset/
-data_pipeline/artifacts/
-data_pipeline/reports/
+data_pipeline/artifacts/*
+data_pipeline/reports/*
 .ipynb_checkpoints/
+
+# Keep the small, human-readable artifacts the backend and the report depend on.
+# The .joblib pickle is deliberately NOT tracked: the backend loads the JSON weights
+# instead, to avoid deserialising a pickle at runtime.
+!data_pipeline/artifacts/hybrid_match_weights.json
+!data_pipeline/reports/*.json
+!data_pipeline/reports/*.png

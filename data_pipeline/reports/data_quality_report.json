@@ -1,0 +1,33 @@
+{
+  "candidates": {
+    "row_count": 800,
+    "duplicate_ids": 0,
+    "missing_values_by_column": {
+      "candidate_id": 0,
+      "target_role": 0,
+      "location": 0,
+      "years_experience": 0,
+      "education": 0,
+      "skills": 0,
+      "certifications": 0,
+      "expected_salary_kes": 0,
+      "resume_text": 0
+    },
+    "negative_experience_rows": 0
+  },
+  "jobs": {
+    "row_count": 100,
+    "duplicate_ids": 0,
+    "missing_values_by_column": {
+      "job_id": 0,
+      "title": 0,
+      "location": 0,
+      "required_experience_years": 0,
+      "required_skills": 0,
+      "mandatory_certifications": 0,
+      "salary_range_max": 0,
+      "description": 0
+    },
+    "negative_experience_rows": 0
+  }
+}
