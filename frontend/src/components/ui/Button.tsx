@@ -7,13 +7,13 @@ const base =
   "transition-all duration-200 ease-out hover:-translate-y-0.5 active:translate-y-0 " +
   "disabled:pointer-events-none disabled:opacity-60";
 
-// Gold is a surface only: it fails contrast as text on the light canvas, so every
-// gold variant pairs it with ink.
+// Gold still carries dark ink: it is bright enough to read on the dark canvas as
+// text, but CTAs stay ink-on-gold for the strongest contrast.
 const variants: Record<Variant, string> = {
   gold: `${base} bg-gold text-ink shadow-sm hover:bg-gold-bright hover:shadow-md`,
-  emerald: `${base} bg-emerald text-canvas hover:bg-emerald-soft`,
-  ghost: `${base} text-emerald hover:bg-canvas-sunk`,
-  onEmerald: `${base} border border-canvas/25 text-canvas hover:border-gold hover:text-gold-bright`,
+  emerald: `${base} bg-surface-strong text-fg hover:bg-emerald`,
+  ghost: `${base} text-fg hover:bg-surface`,
+  onEmerald: `${base} border border-fg/25 text-fg hover:border-gold hover:text-gold-bright`,
 };
 
 type Props = ButtonHTMLAttributes<HTMLButtonElement> & {

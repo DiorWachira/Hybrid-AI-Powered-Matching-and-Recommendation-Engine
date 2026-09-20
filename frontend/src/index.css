@@ -1,24 +1,32 @@
 @import "tailwindcss";
 
 /*
-  60-30-10 palette. Contrast ratios measured against WCAG 2.1:
-    emerald on canvas ......... 8.47:1  (AAA)
-    canvas on emerald ......... 8.47:1  (AAA)
-    muted on canvas ........... 5.54:1  (AA)
-    ink on gold ............... 6.90:1  (AA)
-    gold on canvas ............ 2.03:1  -> FAILS. Gold is a surface/border only,
-                                          never text on the light canvas.
+  Dark 60-30-10 palette, same emerald + gold identity inverted onto a dark canvas.
+  Contrast ratios measured against WCAG 2.1:
+    fg on canvas .............. 16.0:1  (AAA)
+    muted on canvas ...........  8.2:1  (AAA)
+    gold on canvas ............  8.5:1  (AAA) -- gold becomes usable as text on
+                                          dark, unlike the light theme where it
+                                          measured 2.03:1 and failed
+    fg on surface ............. 13.6:1  (AAA)
+    ink on gold ...............  6.9:1  (AA)  -- CTAs keep dark text on gold
 */
 @theme {
   /* 60% — the canvas */
-  --color-canvas: #fdfbf7;
-  --color-canvas-sunk: #f6f1e7;
+  --color-canvas: #071a1c;
+  --color-canvas-sunk: #050f11;
 
-  /* 30% — structure, headers, cards, primary type */
-  --color-emerald: #0f5257;
-  --color-emerald-deep: #0a3b3f;
-  --color-emerald-soft: #17696f;
-  --color-muted: #4a6c6f;
+  /* 30% — structure: headers, cards, panels */
+  --color-surface: #0c2a2d;
+  --color-surface-strong: #103a3e;
+  --color-emerald: #17696f;
+  --color-emerald-deep: #0a2c2f;
+  --color-emerald-soft: #1d8189;
+  --color-line: #1c4a4e;
+
+  /* foreground */
+  --color-fg: #f5f2ea;
+  --color-muted: #9fb3b2;
 
   /* 10% — accents, CTAs, badges */
   --color-gold: #d4af37;
@@ -34,11 +42,12 @@
 @layer base {
   html {
     scroll-behavior: smooth;
+    color-scheme: dark;
   }
 
   body {
     background-color: var(--color-canvas);
-    color: var(--color-emerald);
+    color: var(--color-fg);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
   }

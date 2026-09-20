@@ -9,7 +9,7 @@ export function Hero() {
       {/* Warm canvas wash keeps the 60% neutral dominant while hinting at the gold accent. */}
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-0 bg-[radial-gradient(60%_50%_at_15%_0%,rgba(212,175,55,0.12),transparent_70%)]"
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(60%_50%_at_15%_0%,rgba(212,175,55,0.10),transparent_70%)]"
       />
       <div className="relative mx-auto grid max-w-6xl items-center gap-12 px-5 py-16 lg:grid-cols-[1.05fr_1fr] lg:py-24">
         <div>
@@ -18,7 +18,7 @@ export function Hero() {
             Rule-based precision + machine learning
           </Badge>
 
-          <h1 className="mt-5 text-4xl leading-[1.08] font-bold text-emerald sm:text-5xl lg:text-6xl">
+          <h1 className="mt-5 text-4xl leading-[1.08] font-bold text-fg sm:text-5xl lg:text-6xl">
             Talent matching that reads past the keywords.
           </h1>
 
@@ -37,14 +37,14 @@ export function Hero() {
             <Button variant="emerald">Request Team Access</Button>
           </div>
 
-          <dl className="mt-10 grid max-w-md grid-cols-3 gap-6 border-t border-emerald/15 pt-6">
+          <dl className="mt-10 grid max-w-md grid-cols-3 gap-6 border-t border-line pt-6">
             {[
               { v: "2", l: "tier pipeline" },
               { v: "5", l: "role families" },
               { v: "KES", l: "salary aware" },
             ].map((item) => (
               <div key={item.l}>
-                <dt className="font-mono text-2xl font-semibold text-emerald">{item.v}</dt>
+                <dt className="font-mono text-2xl font-semibold text-gold">{item.v}</dt>
                 <dd className="mt-0.5 text-xs text-muted">{item.l}</dd>
               </div>
             ))}

@@ -13,7 +13,7 @@ export function Header() {
   const [open, setOpen] = useState(false);
 
   return (
-    <header className="sticky top-0 z-50 border-b border-emerald-deep/40 bg-emerald text-canvas">
+    <header className="sticky top-0 z-50 border-b border-line bg-surface/95 text-fg backdrop-blur">
       <nav
         aria-label="Primary"
         className="mx-auto flex max-w-6xl items-center justify-between gap-6 px-5 py-3.5"
@@ -23,7 +23,7 @@ export function Header() {
             <Terminal className="h-4.5 w-4.5" aria-hidden />
           </span>
           <span className="text-lg font-bold">JobBridge</span>
-          <span className="ml-1 hidden items-center gap-1.5 rounded-full border border-canvas/25 px-2.5 py-1 font-mono text-[10px] tracking-wide uppercase sm:inline-flex">
+          <span className="ml-1 hidden items-center gap-1.5 rounded-full border border-line px-2.5 py-1 font-mono text-[10px] tracking-wide uppercase sm:inline-flex">
             <span className="animate-status h-1.5 w-1.5 rounded-full bg-gold" aria-hidden />
             System Live
           </span>
@@ -34,7 +34,7 @@ export function Header() {
             <li key={link.href}>
               <a
                 href={link.href}
-                className="whitespace-nowrap text-canvas/80 transition-colors hover:text-gold-bright"
+                className="whitespace-nowrap text-muted transition-colors hover:text-gold-bright"
               >
                 {link.label}
               </a>
@@ -45,7 +45,7 @@ export function Header() {
         <div className="hidden items-center gap-4 lg:flex">
           <a
             href="#signin"
-            className="whitespace-nowrap text-sm text-canvas/80 transition-colors hover:text-gold-bright"
+            className="whitespace-nowrap text-sm text-muted transition-colors hover:text-gold-bright"
           >
             Sign In
           </a>
@@ -54,7 +54,7 @@ export function Header() {
 
         <button
           type="button"
-          className="text-canvas lg:hidden"
+          className="text-fg lg:hidden"
           aria-expanded={open}
           aria-controls="mobile-nav"
           aria-label={open ? "Close menu" : "Open menu"}
@@ -65,14 +65,14 @@ export function Header() {
       </nav>
 
       {open && (
-        <div id="mobile-nav" className="border-t border-canvas/15 px-5 pb-5 lg:hidden">
+        <div id="mobile-nav" className="border-t border-line px-5 pb-5 lg:hidden">
           <ul className="flex flex-col gap-1 py-3 text-sm">
             {links.map((link) => (
               <li key={link.href}>
                 <a
                   href={link.href}
                   onClick={() => setOpen(false)}
-                  className="block rounded-lg px-2 py-2 text-canvas/85 hover:bg-canvas/10"
+                  className="block rounded-lg px-2 py-2 text-muted hover:bg-fg/10"
                 >
                   {link.label}
                 </a>

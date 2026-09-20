@@ -17,15 +17,15 @@ const columns = [
 
 export function Footer() {
   return (
-    <footer className="border-t border-emerald/15 bg-canvas-sunk">
+    <footer className="border-t border-line bg-canvas-sunk">
       <div className="mx-auto max-w-6xl px-5 py-12">
         <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-[1.4fr_repeat(3,1fr)]">
           <div>
             <div className="flex items-center gap-2.5">
-              <span className="grid h-9 w-9 place-items-center rounded-lg bg-emerald text-canvas">
+              <span className="grid h-9 w-9 place-items-center rounded-lg bg-emerald text-fg">
                 <Terminal className="h-4.5 w-4.5" aria-hidden />
               </span>
-              <span className="text-lg font-bold text-emerald">JobBridge</span>
+              <span className="text-lg font-bold text-fg">JobBridge</span>
             </div>
             <p className="mt-4 max-w-xs text-sm leading-relaxed text-muted">
               A hybrid matching and recommendation engine for intelligent
@@ -39,13 +39,13 @@ export function Footer() {
 
           {columns.map((col) => (
             <nav key={col.title} aria-label={col.title}>
-              <h3 className="text-sm font-semibold text-emerald">{col.title}</h3>
+              <h3 className="text-sm font-semibold text-fg">{col.title}</h3>
               <ul className="mt-3 space-y-2">
                 {col.links.map((link) => (
                   <li key={link}>
                     <a
                       href="#top"
-                      className="text-sm text-muted transition-colors hover:text-emerald"
+                      className="text-sm text-muted transition-colors hover:text-gold-bright"
                     >
                       {link}
                     </a>
@@ -56,7 +56,7 @@ export function Footer() {
           ))}
         </div>
 
-        <div className="mt-10 flex flex-wrap items-center justify-between gap-3 border-t border-emerald/12 pt-6">
+        <div className="mt-10 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-6">
           <p className="font-mono text-[11px] text-muted">
             © {new Date().getFullYear()} JobBridge — academic project build
           </p>

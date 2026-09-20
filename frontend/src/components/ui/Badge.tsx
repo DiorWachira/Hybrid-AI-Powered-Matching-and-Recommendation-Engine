@@ -8,8 +8,8 @@ type Props = {
 
 const tones = {
   gold: "bg-gold text-ink",
-  emerald: "bg-emerald text-canvas",
-  outline: "border border-gold/60 text-emerald",
+  emerald: "bg-surface-strong text-fg",
+  outline: "border border-gold/60 text-gold",
 };
 
 export function Badge({ children, tone = "outline", className = "" }: Props) {

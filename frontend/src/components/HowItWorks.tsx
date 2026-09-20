@@ -46,7 +46,7 @@ export function HowItWorks() {
     <section id="how-it-works" className="mx-auto max-w-6xl px-5 py-16 lg:py-24">
       <div className="max-w-2xl">
         <Badge tone="outline">How it works</Badge>
-        <h2 className="mt-4 text-3xl font-bold text-emerald sm:text-4xl">
+        <h2 className="mt-4 text-3xl font-bold text-fg sm:text-4xl">
           Four stages, and you can audit every one.
         </h2>
         <p className="mt-4 text-muted">
@@ -59,17 +59,17 @@ export function HowItWorks() {
         {steps.map((step) => (
           <li
             key={step.n}
-            className="group flex flex-col rounded-card border border-emerald/12 bg-canvas-sunk/70 p-5 transition-all duration-200 hover:-translate-y-1 hover:border-gold/50 hover:shadow-lg"
+            className="group flex flex-col rounded-card border border-line bg-surface p-5 transition-all duration-200 hover:-translate-y-1 hover:border-gold/50 hover:shadow-lg"
           >
             <div className="flex items-center justify-between">
-              <span className="grid h-10 w-10 place-items-center rounded-xl bg-emerald text-canvas transition-colors group-hover:bg-gold group-hover:text-ink">
+              <span className="grid h-10 w-10 place-items-center rounded-xl bg-emerald text-fg transition-colors group-hover:bg-gold group-hover:text-ink">
                 <step.icon className="h-5 w-5" aria-hidden />
               </span>
-              <span className="font-mono text-2xl font-semibold text-emerald/25">{step.n}</span>
+              <span className="font-mono text-2xl font-semibold text-fg/20">{step.n}</span>
             </div>
-            <h3 className="mt-4 text-base font-semibold text-emerald">{step.title}</h3>
+            <h3 className="mt-4 text-base font-semibold text-fg">{step.title}</h3>
             <p className="mt-2 text-sm leading-relaxed text-muted">{step.body}</p>
-            <p className="mt-auto pt-4 font-mono text-[10px] tracking-wide text-emerald/55 uppercase">
+            <p className="mt-auto pt-4 font-mono text-[10px] tracking-wide text-muted uppercase">
               {step.tag}
             </p>
           </li>

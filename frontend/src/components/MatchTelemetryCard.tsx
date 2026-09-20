@@ -12,11 +12,11 @@ function ScoreBar({ label, value, blurb }: { label: string; value: number; blurb
   return (
     <div>
       <div className="flex items-baseline justify-between gap-3">
-        <span className="text-xs font-medium text-canvas/85">{label}</span>
+        <span className="text-xs font-medium text-fg/85">{label}</span>
         <span className="font-mono text-xs text-gold-bright">{value.toFixed(2)}</span>
       </div>
       <div
-        className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-canvas/15"
+        className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-fg/12"
         role="meter"
         aria-valuenow={pct}
         aria-valuemin={0}
@@ -25,29 +25,29 @@ function ScoreBar({ label, value, blurb }: { label: string; value: number; blurb
       >
         <div className="h-full rounded-full bg-gold" style={{ width: `${pct}%` }} />
       </div>
-      <p className="mt-1.5 text-[11px] leading-relaxed text-canvas/55">{blurb}</p>
+      <p className="mt-1.5 text-[11px] leading-relaxed text-muted">{blurb}</p>
     </div>
   );
 }
 
 export function MatchTelemetryCard() {
   return (
-    <article className="rounded-card border border-gold/25 bg-emerald p-5 text-canvas shadow-xl sm:p-6">
+    <article className="rounded-card border border-line bg-surface-strong p-5 text-fg shadow-xl sm:p-6">
       <header className="flex items-center justify-between gap-3">
-        <span className="inline-flex items-center gap-1.5 font-mono text-[10px] tracking-wide text-canvas/60 uppercase">
+        <span className="inline-flex items-center gap-1.5 font-mono text-[10px] tracking-wide text-muted uppercase">
           <Sparkles className="h-3.5 w-3.5 text-gold" aria-hidden />
           Live match preview
         </span>
-        <span className="font-mono text-[10px] text-canvas/45">demo data</span>
+        <span className="font-mono text-[10px] text-muted/70">demo data</span>
       </header>
 
       <div className="mt-5 grid items-stretch gap-3 sm:grid-cols-[1fr_auto_1fr]">
         {/* Candidate */}
-        <section className="rounded-xl border border-canvas/15 bg-emerald-deep/60 p-4">
-          <p className="font-mono text-[10px] text-canvas/50">{demoCandidate.reference}</p>
+        <section className="rounded-xl border border-line bg-canvas/60 p-4">
+          <p className="font-mono text-[10px] text-muted/80">{demoCandidate.reference}</p>
           <h3 className="mt-1 text-sm font-semibold">{demoCandidate.role}</h3>
-          <p className="text-xs text-canvas/60">{demoCandidate.specialisation}</p>
-          <dl className="mt-3 space-y-1.5 font-mono text-[11px] text-canvas/70">
+          <p className="text-xs text-muted">{demoCandidate.specialisation}</p>
+          <dl className="mt-3 space-y-1.5 font-mono text-[11px] text-muted">
             <div className="flex justify-between gap-2">
               <dt>Experience</dt>
               <dd>{demoCandidate.yearsExperience} yrs</dd>
@@ -65,7 +65,7 @@ export function MatchTelemetryCard() {
             {demoCandidate.skills.slice(0, 4).map((skill) => (
               <li
                 key={skill}
-                className="rounded-md bg-canvas/10 px-1.5 py-0.5 font-mono text-[10px] text-canvas/75"
+                className="rounded-md bg-fg/10 px-1.5 py-0.5 font-mono text-[10px] text-fg/80"
               >
                 {skill}
               </li>
@@ -75,17 +75,17 @@ export function MatchTelemetryCard() {
 
         {/* Pipeline */}
         <div className="flex items-center justify-center sm:flex-col sm:gap-2">
-          <div className="animate-pipeline relative h-0.5 w-full overflow-hidden rounded-full bg-canvas/20 sm:h-24 sm:w-0.5" />
+          <div className="animate-pipeline relative h-0.5 w-full overflow-hidden rounded-full bg-fg/15 sm:h-24 sm:w-0.5" />
           <span className="sr-only">matched to</span>
           <ArrowRight className="h-4 w-4 shrink-0 text-gold sm:rotate-90" aria-hidden />
         </div>
 
         {/* Role */}
-        <section className="rounded-xl border border-gold/30 bg-emerald-deep/60 p-4">
-          <p className="font-mono text-[10px] text-canvas/50">{demoRole.reference}</p>
+        <section className="rounded-xl border border-gold/30 bg-canvas/60 p-4">
+          <p className="font-mono text-[10px] text-muted/80">{demoRole.reference}</p>
           <h3 className="mt-1 text-sm font-semibold">{demoRole.title}</h3>
-          <p className="text-xs text-canvas/60">{demoRole.company}</p>
-          <dl className="mt-3 space-y-1.5 font-mono text-[11px] text-canvas/70">
+          <p className="text-xs text-muted">{demoRole.company}</p>
+          <dl className="mt-3 space-y-1.5 font-mono text-[11px] text-muted">
             <div className="flex justify-between gap-2">
               <dt>Requires</dt>
               <dd>{demoRole.requiredExperience}+ yrs</dd>
@@ -100,13 +100,13 @@ export function MatchTelemetryCard() {
             </div>
           </dl>
           <ul className="mt-3 flex flex-wrap gap-1.5">
-            {demoRole.requiredSkills.slice(0, 4).map((skill) => (
+            {demoRole.requiredSkills.map((skill) => (
               <li
                 key={skill}
                 className={`rounded-md px-1.5 py-0.5 font-mono text-[10px] ${
                   demoMatch.missingSkills.includes(skill)
                     ? "bg-gold/20 text-gold-bright"
-                    : "bg-canvas/10 text-canvas/75"
+                    : "bg-fg/10 text-fg/80"
                 }`}
               >
                 {skill}
@@ -126,7 +126,7 @@ export function MatchTelemetryCard() {
 
       {/* Sub-scores */}
       <div className="mt-5 space-y-4">
-        <p className="flex items-center gap-1.5 font-mono text-[10px] tracking-wide text-canvas/55 uppercase">
+        <p className="flex items-center gap-1.5 font-mono text-[10px] tracking-wide text-muted uppercase">
           <Layers className="h-3.5 w-3.5 text-gold" aria-hidden />
           Tier 2 — weighted sub-scores
         </p>
@@ -141,15 +141,15 @@ export function MatchTelemetryCard() {
       </div>
 
       {/* Tier 1 + skill gap */}
-      <div className="mt-5 grid gap-4 border-t border-canvas/15 pt-4 sm:grid-cols-2">
+      <div className="mt-5 grid gap-4 border-t border-line pt-4 sm:grid-cols-2">
         <div>
-          <p className="flex items-center gap-1.5 font-mono text-[10px] tracking-wide text-canvas/55 uppercase">
+          <p className="flex items-center gap-1.5 font-mono text-[10px] tracking-wide text-muted uppercase">
             <ShieldCheck className="h-3.5 w-3.5 text-gold" aria-hidden />
             Tier 1 — hard filters
           </p>
           <ul className="mt-2.5 space-y-1.5">
             {demoMatch.hardFilters.map((filter) => (
-              <li key={filter.label} className="flex items-center gap-2 text-[11px] text-canvas/75">
+              <li key={filter.label} className="flex items-center gap-2 text-[11px] text-fg/80">
                 <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-gold" aria-hidden />
                 {filter.label}
               </li>
@@ -157,8 +157,8 @@ export function MatchTelemetryCard() {
           </ul>
         </div>
         <div>
-          <p className="font-mono text-[10px] tracking-wide text-canvas/55 uppercase">Skill gap</p>
-          <p className="mt-2.5 text-[11px] text-canvas/75">
+          <p className="font-mono text-[10px] tracking-wide text-muted uppercase">Skill gap</p>
+          <p className="mt-2.5 text-[11px] text-fg/80">
             <span className="font-mono text-gold-bright">
               {demoMatch.matchedSkills.length}/{demoRole.requiredSkills.length}
             </span>{" "}
