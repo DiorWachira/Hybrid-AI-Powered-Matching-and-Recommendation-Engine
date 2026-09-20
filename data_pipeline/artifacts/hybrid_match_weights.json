@@ -7,57 +7,83 @@
     "S_growth"
   ],
   "scaler_mean": [
-    0.6325091918557882,
-    0.86025,
-    0.5925831018518518
+    0.6166779884447654,
+    0.8442934027777778,
+    0.5914736689814813
   ],
   "scaler_scale": [
-    0.07756615869655677,
-    0.20103846715934187,
-    0.24751220620324285
+    0.11050622443346166,
+    0.20211047533189383,
+    0.2584060398006264
   ],
   "logistic_regression": {
     "coefficients": [
-      0.6333453655884945,
-      2.3740024797828063,
-      4.241531457147818
+      0.7701000237895778,
+      0.6810432153680174,
+      0.7928352481175592
     ],
-    "intercept": 0.3985751668995503,
-    "C": 1.0
+    "intercept": -0.08975265629388679,
+    "C": 0.03
   },
-  "decision_threshold": 0.4,
+  "decision_threshold": 0.36999999999999994,
+  "label_scheme": {
+    "type": "latent-driven Bernoulli outcome",
+    "hidden_drivers": [
+      "latent_competence",
+      "latent_quality_bar",
+      "latent_adaptability"
+    ],
+    "noise_sd": 0.35,
+    "bayes_accuracy_ceiling": 0.7985728762161989,
+    "note": "Labels are sampled from a probability that depends on hidden candidate/job traits the model never sees, so metrics are bounded by the Bayes ceiling and are not reproducible by thresholding the input features."
+  },
   "test_metrics": {
-    "precision": 0.9352051835853131,
-    "recall": 0.9291845493562232,
-    "f1": 0.9321851453175457,
-    "roc_auc": 0.9794980853743157,
-    "precision@3": 0.8115942028985508,
-    "recall@3": 0.8003623188405796,
-    "ndcg@3": 0.992224722206792
+    "threshold": 0.36999999999999994,
+    "precision": 0.6630901287553648,
+    "recall": 0.9307228915662651,
+    "f1": 0.7744360902255639,
+    "roc_auc": 0.8338483805351274,
+    "accuracy": 0.71875,
+    "precision@3": 0.6459770114942529,
+    "recall@3": 0.8856321839080459,
+    "ndcg@3": 0.9104990092048116
+  },
+  "cold_start_metrics": {
+    "precision": 0.6816326530612244,
+    "recall": 0.907608695652174,
+    "f1": 0.7785547785547785,
+    "roc_auc": 0.7991927749360614,
+    "accuracy": 0.703125,
+    "precision@3": 1.0,
+    "recall@3": 1.0,
+    "ndcg@3": 1.0
   },
   "baseline_metrics": {
     "fixed_weight_rule": {
-      "precision": 0.6288798920377868,
-      "recall": 1.0,
-      "f1": 0.772162386081193,
-      "roc_auc": 0.8586068206933772,
-      "precision@3": 0.7898550724637681,
-      "recall@3": 0.7719806763285024,
-      "ndcg@3": 0.9411057838833894
+      "threshold": 0.69,
+      "precision": 0.6488888888888888,
+      "recall": 0.8795180722891566,
+      "f1": 0.7468030690537084,
+      "roc_auc": 0.8099280237834454,
+      "precision@3": 0.6344827586206897,
+      "recall@3": 0.8637931034482759,
+      "ndcg@3": 0.8936162848229424
     },
     "bert_only": {
-      "precision": 0.6145251396648045,
-      "recall": 0.944206008583691,
-      "f1": 0.7445008460236887,
-      "roc_auc": 0.6049060676929403,
-      "precision@3": 0.7101449275362319,
-      "recall@3": 0.6602657004830919,
-      "ndcg@3": 0.793220457784549
+      "threshold": 0.48999999999999994,
+      "precision": 0.5383304940374787,
+      "recall": 0.9518072289156626,
+      "f1": 0.6877040261153428,
+      "roc_auc": 0.6914410890314505,
+      "precision@3": 0.6275862068965518,
+      "recall@3": 0.8557471264367815,
+      "ndcg@3": 0.8819281411986213
     }
   },
   "trained_on_rows": {
-    "train": 2400,
-    "val": 800,
-    "test": 800
+    "train": 1920,
+    "val": 640,
+    "test_warm": 640,
+    "test_cold": 320
   }
 }
