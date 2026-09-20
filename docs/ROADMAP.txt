@@ -148,7 +148,19 @@ rule filter correctly eliminates ineligible sample candidates.
 --------------------------------------------------------------------
 WEEK 3  Frontend Shell and Resume Parsing
 --------------------------------------------------------------------
-[ ] Scaffold the React frontend (Vite) with routing and an API client
+[x] Scaffold the React frontend (Vite + TypeScript + Tailwind v4) with a
+    design-token layer enforcing the 60-30-10 palette
+    (60% #FDFBF7 canvas / 30% #0F5257 emerald / 10% #D4AF37 gold)
+[x] Public landing page (frontend/src/components/): header, hero with a
+    live match-telemetry card, 4-step pipeline, engine metrics, scenarios,
+    final CTA and footer. The telemetry card mirrors the real FR-05
+    explainability payload (tier-1 filters, the three tier-2 sub-scores,
+    matched vs missing skills) rather than a decorative score
+[x] Accessibility baseline: skip link, focus-visible rings, ARIA meters on
+    score bars, prefers-reduced-motion honoured. Gold is a surface-only
+    colour because #D4AF37 on the cream canvas measures 2.03:1 and fails
+    WCAG for text; CTAs use ink-on-gold at 6.90:1
+[ ] Client-side routing and a typed API client
 [ ] Auth pages, token storage and protected routes
 [ ] Candidate dashboard (profile + resume upload) and recruiter
     dashboard (job creation form) as functional shells
@@ -158,6 +170,8 @@ WEEK 3  Frontend Shell and Resume Parsing
     skills into Neo4j nodes and edges
 [ ] File-upload hardening: size limit, MIME/extension allow-list,
     filename sanitisation, no execution of uploaded content
+[ ] Replace demo content in frontend/src/lib/demoMatch.ts with live API
+    data once FR-04/FR-05 land
 Exit criterion: uploading a real CV through the UI produces stored
 parsed text plus skill nodes in the graph.
 

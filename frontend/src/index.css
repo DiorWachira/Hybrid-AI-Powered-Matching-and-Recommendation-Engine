@@ -1,0 +1,122 @@
+@import "tailwindcss";
+
+/*
+  60-30-10 palette. Contrast ratios measured against WCAG 2.1:
+    emerald on canvas ......... 8.47:1  (AAA)
+    canvas on emerald ......... 8.47:1  (AAA)
+    muted on canvas ........... 5.54:1  (AA)
+    ink on gold ............... 6.90:1  (AA)
+    gold on canvas ............ 2.03:1  -> FAILS. Gold is a surface/border only,
+                                          never text on the light canvas.
+*/
+@theme {
+  /* 60% — the canvas */
+  --color-canvas: #fdfbf7;
+  --color-canvas-sunk: #f6f1e7;
+
+  /* 30% — structure, headers, cards, primary type */
+  --color-emerald: #0f5257;
+  --color-emerald-deep: #0a3b3f;
+  --color-emerald-soft: #17696f;
+  --color-muted: #4a6c6f;
+
+  /* 10% — accents, CTAs, badges */
+  --color-gold: #d4af37;
+  --color-gold-bright: #e6c65c;
+  --color-ink: #0a2e31;
+
+  --font-sans: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", monospace;
+
+  --radius-card: 1.125rem;
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: var(--color-canvas);
+    color: var(--color-emerald);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1,
+  h2,
+  h3 {
+    letter-spacing: -0.02em;
+  }
+
+  /* Keep anchor targets clear of the sticky header. */
+  section[id] {
+    scroll-margin-top: 5.5rem;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-gold);
+    outline-offset: 3px;
+    border-radius: 4px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+@layer utilities {
+  /* Emerald pipeline connecting candidate -> role in the hero telemetry card. */
+  @keyframes pulse-along {
+    0% {
+      transform: translateX(-100%);
+      opacity: 0;
+    }
+    35% {
+      opacity: 1;
+    }
+    100% {
+      transform: translateX(100%);
+      opacity: 0;
+    }
+  }
+
+  .animate-pipeline::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      var(--color-gold-bright),
+      transparent
+    );
+    animation: pulse-along 2.6s ease-in-out infinite;
+  }
+
+  @keyframes status-ping {
+    0%,
+    100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 0.45;
+      transform: scale(0.82);
+    }
+  }
+
+  .animate-status {
+    animation: status-ping 2s ease-in-out infinite;
+  }
+}
