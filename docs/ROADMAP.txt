@@ -1,10 +1,29 @@
 HYBRID AI-POWERED WORKFORCE PLACEMENT ENGINE
 PROJECT MILESTONE ROADMAP (8 WEEKS)
-Last updated: 2026-09-17
+Last updated: 2026-09-20
 
 Legend:  [x] done   [~] partially done   [ ] not started
 Note: academic documentation tasks (Chapter 5, UML write-ups, report) are
 owned by the student and are deliberately excluded from this roadmap.
+
+
+====================================================================
+CLIENT ALIGNMENT NOTES (2026-09-20)
+====================================================================
+ - Backend stays FastAPI (Python). The client mentioned NestJS, but the
+   repo already has a working FastAPI backend and the ML/NLP pipeline
+   (BERT, Neo4j) is Python-native; migrating would be pure rework.
+ - Scope stays the matching/recommendation engine only. The client's
+   apply/accept/contract/project/milestone/payment flow is a separate
+   freelance-marketplace layer and is deliberately deferred -- see
+   docs/extras/marketplace_features.txt for the captured requirements.
+ - "Simulate but also be a web app": resolved as a seeded demo/evaluation
+   mode inside the web app (data_pipeline/evaluate_model.py running the
+   same hybrid engine over the synthetic dataset), not a separate program.
+ - Mobile is out of scope entirely.
+ - Dataset strategy decided -- see docs/DATASET_STRATEGY.md for the full
+   rationale (synthetic Kenyan candidates, real BrighterMonday job posts,
+   ESCO skill ontology, optional CDACC mapping).
 
 
 ====================================================================
@@ -18,16 +37,18 @@ CURRENT STATUS SNAPSHOT
 [x] Python virtual environment with backend dependencies installed
 [x] Environment configuration via .env / pydantic-settings
 [x] docs/WORKFLOW.md (branching, commit convention, increment plan)
+[x] Neo4j Bolt driver, connection module and combined /api/health check
+[x] Baseline Neo4j ontology seed (Skill/Certification/JobRole/Industry)
+[x] pytest smoke tests for database health and the ontology seed
+[x] Dataset strategy decided and documented (docs/DATASET_STRATEGY.md)
 [ ] Everything below in Weeks 1-8 that is not ticked
 
 Known gaps to close early:
- - No Neo4j Python driver or connection module yet (app/db/neo4j_db.py)
  - No auth dependencies (passlib/bcrypt, PyJWT) or auth endpoints
  - No ML dependencies (transformers, torch, scikit-learn, pandas, numpy)
  - No frontend project
  - No data_pipeline/ or notebooks/ directories
- - No automated tests and no CI workflow
- - Dataset decision still open
+ - No GitHub Actions CI workflow yet (tests exist locally only)
 
 
 ====================================================================
@@ -41,16 +62,17 @@ WEEK 1  Foundations and Database Architecture
 [x] Define and migrate the PostgreSQL relational schema
 [x] Run PostgreSQL and Neo4j locally via Docker Compose
 [x] Verify the full local stack (containers healthy, migrations, API)
-[ ] Add the Neo4j Bolt driver and a connection module (app/db/neo4j_db.py)
-    with a /api/health/db readiness check covering both databases
-[ ] Create the baseline Neo4j ontology: constraints/indexes plus seed
-    Cypher for Skill, Certification, JobRole, Industry nodes and the
-    HAS_SKILL / HOLDS_CERTIFICATE / SKILL_REQUIRED / REQUIRES_CERT /
-    RELATED_TO relationships
-[ ] Decide and record the dataset strategy (synthetic vs. sourced),
-    using the notes already gathered in Dataset_sourcing/
-[ ] Add pytest and a first smoke test; add a GitHub Actions CI workflow
-    that runs compile checks, migrations and tests
+[x] Add the Neo4j Bolt driver and a connection module (app/db/neo4j_db.py)
+    with a combined /api/health readiness check covering both databases
+[x] Create the baseline Neo4j ontology: constraints plus seed Cypher for
+    Skill, Certification, JobRole, Industry nodes and the RELATED_TO /
+    SKILL_REQUIRED / REQUIRES_CERT relationships
+[x] Decide and record the dataset strategy (docs/DATASET_STRATEGY.md):
+    synthetic Kenyan candidates + real BrighterMonday job posts + ESCO
+    ontology, with CDACC mapped onto ESCO for local relevance
+[x] Add pytest and a first smoke test (backend/tests/test_database_health.py)
+[ ] Add a GitHub Actions CI workflow that runs compile checks, migrations
+    and pytest on every push
 Exit criterion: both databases reachable from the API, ontology seed
 script re-runnable, CI green on every push.
 
@@ -89,9 +111,16 @@ parsed text plus skill nodes in the graph.
 --------------------------------------------------------------------
 WEEK 4  Dataset Preparation and Anti-Bias Pipeline
 --------------------------------------------------------------------
-[ ] data_pipeline/generate_synthetic_data.py producing realistic Kenyan
-    market candidate profiles and job postings (KLMIS-aligned roles,
-    counties, salary bands, certifications)
+[ ] data_pipeline/generate_synthetic_data.py: synthetic Kenyan candidate
+    profiles via Faker('en_KE') + the ESCO/CDACC-derived skill and
+    certification pool (per docs/DATASET_STRATEGY.md)
+[ ] data_pipeline/import_brightermonday_jobs.py (optional): load a
+    BrighterMonday Kenya Jobs export into the job_postings shape; fall
+    back to synthetic job postings if the scraper isn't used
+[ ] data_pipeline/load_esco_ontology.py: ingest a trimmed ESCO CSV export
+    into Neo4j Skill nodes and RELATED_TO edges, extending the Week 1 seed
+[ ] A small CDACC-to-ESCO mapping table (JSON, <100 rows) for the
+    certification families already seeded (software, data, accounting)
 [ ] Text pre-processing utilities: normalisation, tokenisation,
     stop-word removal, de-duplication
 [ ] Anti-bias anonymisation routine stripping names, gender, age,
@@ -159,7 +188,9 @@ WEEK 7  Theme, Explainability, Testing and Tuning
     add batching/caching of embeddings if the target is missed
 [ ] Security pass: parameterised queries, bcrypt hashing, JWT expiry,
     CORS allow-list, secrets only in .env, dependency vulnerability check
-[ ] data_pipeline/evaluate_model.py reporting precision, recall and F1
+[ ] data_pipeline/evaluate_model.py reporting precision, recall and F1 --
+    this doubles as the "simulation mode" (seeded run of the hybrid engine
+    over the synthetic dataset, independent of live user traffic)
 [ ] Tune scoring weights and thresholds using the evaluation output
 Exit criterion: measured precision/recall/F1 recorded, and matching
 latency within the stated performance target.
@@ -183,8 +214,9 @@ walkthrough is rehearsed end to end.
 ====================================================================
 RISK WATCHLIST
 ====================================================================
- - Dataset access: fall back to the synthetic generator early rather
-   than waiting on external data approvals.
+ - Dataset access: BrighterMonday scraper runs cost money and are capped
+   per run; keep the synthetic generator as the default path and treat
+   scraped jobs as an enrichment, not a hard dependency.
  - Model size vs. latency: a large BERT model on CPU may breach the
    2-5 s target; pre-compute embeddings and consider a smaller model.
  - Python 3.14 compatibility: torch/transformers wheels may lag; be
@@ -193,3 +225,6 @@ RISK WATCHLIST
    defer all styling to Week 7.
  - Neo4j ontology breadth: seed only the skill families needed by the
    demo domains (software, data, accounting).
+ - Marketplace scope creep: apply/accept/contract/project/milestone/
+   payment features stay in docs/extras/marketplace_features.txt and
+   are out of this roadmap until the core engine is done.

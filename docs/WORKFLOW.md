@@ -2,6 +2,14 @@
 
 Living document. Update it whenever the process or the increment status changes.
 
+Related documents:
+
+- [ROADMAP.txt](ROADMAP.txt) - the 8-week milestone plan, with current status.
+- [DATASET_STRATEGY.md](DATASET_STRATEGY.md) - the decided dataset sourcing approach.
+- [extras/marketplace_features.txt](extras/marketplace_features.txt) - client-requested
+  marketplace features (apply/accept/contract/project/milestone/payment) deferred
+  outside the core matching engine scope.
+
 ## 1. Environment
 
 | Component | Where it runs | Notes |
