@@ -36,3 +36,9 @@ neo4j-plugins/
 # Local research and planning notes
 Dataset_sourcing/
 prompt content and context.txt
+
+# Generated data, model artifacts and reports (regenerate via data_pipeline/ scripts)
+data_pipeline/dataset/
+data_pipeline/artifacts/
+data_pipeline/reports/
+.ipynb_checkpoints/
