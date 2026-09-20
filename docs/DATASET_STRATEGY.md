@@ -8,7 +8,7 @@ and `Dataset_sourcing/kenya_specific_datasets.txt` (local, gitignored).
 
 | Layer | Source | Why |
 | --- | --- | --- |
-| Candidate CVs | **Synthetic**, generated with `Faker('en_KE')` + a curated skill/certification pool (ESCO + CDACC + common industry certs) | Real resumes carry consent/privacy risk and bias; synthetic data can be produced at 10k-100k scale, is free, and lets us control class balance for the anti-bias pipeline. |
+| Candidate CVs | **Synthetic**, from a seeded deterministic generator with a curated skill/certification pool (ESCO + CDACC + common industry certs) | Real resumes carry consent/privacy risk and bias; synthetic data can be produced at 10k-100k scale, is free, and lets us control class balance for the anti-bias pipeline. |
 | Job postings | **Real, scraped**: BrighterMonday Kenya Jobs (Apify), Kenya-filtered, small paid runs (~500-800 jobs) | Gives authentic KES salary bands, Kenyan locations and natural job-description text for BERT embeddings, at low cost (~$0.001/job). Synthetic job postings (same generator style) are the fallback if the scraper budget/access is unavailable. |
 | Skill ontology | **ESCO v1.2.1** (CC BY 4.0) as the Neo4j skill graph backbone | Free, structured, 13k+ skills with `broader_skill` / `narrower_skill` / `related_skill` already modelled — ingest almost directly into the `RELATED_TO` edges. |
 | Local skill alignment | A **curated subset** of TVET CDACC occupational standards mapped onto ESCO skills via a `MAPS_TO`-style edge | Keeps certifications and hard-filter criteria meaningful for the Kenyan market (e.g. CDACC "Apply Digital Literacy" -> ESCO "ICT literacy"), without ingesting all 50+ CDACC PDFs. |
@@ -26,6 +26,31 @@ and `Dataset_sourcing/kenya_specific_datasets.txt` (local, gitignored).
 - ESCO gives a ready-made, licensable graph structure instead of hand-building an
   ontology from scratch, while the CDACC mapping keeps it locally relevant for the
   report's Kenyan-labour-market framing.
+
+## Generator design (updated 2026-09-20)
+
+Two properties were added after the first training run exposed problems:
+
+**In-role specialisations.** Every role carries three specialisations (e.g. Data
+Analyst -> financial reporting / marketing analytics / health informatics), each
+with its own vocabulary, and job/CV text is rendered from several sentence
+templates. The first run produced near-identical text within a role, which left
+the embedding model nothing to learn and drove BERT-only ROC-AUC down to 0.605.
+The regenerated set yields 800/800 distinct resumes and 99/100 distinct job posts.
+
+**Hidden latent traits.** Candidates carry `latent_competence` and
+`latent_adaptability`; jobs carry `latent_quality_bar`. These are *never* exposed
+to the model as features. Pair labels are sampled as a Bernoulli outcome from a
+probability that depends on both observable signal and these hidden traits plus
+Gaussian noise.
+
+This replaced the original weak label
+`is_match = (S_graph >= 0.6) AND (years_experience >= required_years)`, which was
+circular: `S_graph` is itself a model input, so a two-threshold rule over the
+model's own features reproduced that label with 97.5% accuracy. Metrics from that
+scheme measured rule reconstruction, not matching quality, and must not be
+reported as accuracy. The replacement has a finite Bayes ceiling, so results are
+compared against that ceiling rather than against 1.0.
 
 ## Where this lands in the pipeline
 

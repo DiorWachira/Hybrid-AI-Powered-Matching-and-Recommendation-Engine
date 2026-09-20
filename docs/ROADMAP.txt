@@ -254,28 +254,31 @@ WEEK 7  Theme, Explainability, Testing and Tuning
 [ ] Tune scoring weights and thresholds using the evaluation output
 
     LABEL-VALIDITY CORRECTIONS (blocking any quality claim in the report):
-[ ] Replace the circular weak label. Add a hidden "true fit" latent to
-    generate_synthetic_data.py (driven by factors the model does NOT get
-    as features, plus noise) and derive is_match from that latent, so
-    S_bert/S_graph/S_growth become noisy proxies the model must actually
-    learn from rather than the label's own definition
-[ ] Re-tune the baseline thresholds on the validation split, exactly as
-    the learned model's threshold is tuned. The current fixed-weight
-    baseline scores ~0.72 on average against a 0.5 cut-off, so it predicts
-    almost everything positive (recall 1.000, precision 0.629) -- the
-    comparison as it stands is not a fair fight and will not survive review
-[ ] Add a job-disjoint split alongside the candidate-disjoint one. All 100
-    jobs currently appear in train, validation and test, so cold-start
-    performance on a newly posted job -- the actual product scenario -- is
-    completely untested
-[ ] Enrich job/CV text before trusting S_bert. Descriptions are currently
-    templated ("We are hiring a {role} to work on {skills}..."), so
-    embeddings carry little signal within a role, which is the likely
-    cause of the near-chance 0.605 BERT-only ROC-AUC. Real BrighterMonday
-    postings or LLM-varied text should be in place before drawing any
-    conclusion about semantic matching
+    CODE COMPLETE 2026-09-20 -- all four land in the next Colab re-run.
+[x] Replace the circular weak label. generate_synthetic_data.py now emits
+    hidden latents (latent_competence, latent_adaptability on candidates;
+    latent_quality_bar on jobs) that are never model features, and the
+    notebook samples is_match as a Bernoulli outcome from a logit built
+    from observable signal + those latents + Gaussian noise, giving a
+    finite Bayes ceiling that is printed alongside accuracy
+[x] Re-tune the baseline thresholds on the validation split, exactly as
+    the learned model's threshold is tuned (shared tune_threshold helper;
+    the old flat 0.5 cut-off made the fixed-weight baseline a near-constant
+    classifier at recall 1.000 / precision 0.629)
+[x] Add a job-disjoint split alongside the candidate-disjoint one. 20% of
+    job postings are held out entirely before splitting, giving a cold-start
+    test of unseen jobs AND unseen candidates; the warm->cold F1 drop is
+    reported and both ROC curves are plotted together
+[x] Enrich job/CV text before trusting S_bert. Each role now has three
+    specialisations with distinct vocabulary, rendered through four sentence
+    templates: 800/800 distinct resumes and 99/100 distinct job posts, and
+    specialisation match feeds the label so semantic signal genuinely matters
+[ ] RE-RUN the notebook on Colab against the regenerated dataset and record
+    the new metrics (the committed artifact is still from the circular-label
+    run and its numbers must not be quoted)
 [ ] Hand-label a small gold slice (100-200 pairs) as an independent check
-    on whatever synthetic label scheme replaces the current one
+    on the new label scheme -- deferred until the re-run confirms the scheme
+    behaves as intended
 Exit criterion: measured precision/recall/F1 recorded against a label that
 is NOT a function of the model's own features, and matching latency within
 the stated performance target.
