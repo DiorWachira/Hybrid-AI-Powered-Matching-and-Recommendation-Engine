@@ -259,8 +259,16 @@ WEEK 7  Theme, Explainability, Testing and Tuning
     hidden latents (latent_competence, latent_adaptability on candidates;
     latent_quality_bar on jobs) that are never model features, and the
     notebook samples is_match as a Bernoulli outcome from a logit built
-    from observable signal + those latents + Gaussian noise, giving a
-    finite Bayes ceiling that is printed alongside accuracy
+    from observable signal + those latents + Gaussian noise. Every driver
+    is centred on its own mean, and the weights were calibrated empirically
+    rather than guessed. Measured over the 4,000 pairs:
+        quantity                                   old      new
+        positive rate                              0.644    0.502
+        best 2-threshold rule over own features    0.975    0.694
+        Bayes accuracy ceiling                     ~1.00    0.799
+    So results are now read against a ~0.80 ceiling and a ~0.50 floor,
+    with a ~0.30 usable band, instead of against a label the model could
+    simply reconstruct.
 [x] Re-tune the baseline thresholds on the validation split, exactly as
     the learned model's threshold is tuned (shared tune_threshold helper;
     the old flat 0.5 cut-off made the fixed-weight baseline a near-constant
