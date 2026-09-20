@@ -14,6 +14,7 @@ and `Dataset_sourcing/kenya_specific_datasets.txt` (local, gitignored).
 | Local skill alignment | A **curated subset** of TVET CDACC occupational standards mapped onto ESCO skills via a `MAPS_TO`-style edge | Keeps certifications and hard-filter criteria meaningful for the Kenyan market (e.g. CDACC "Apply Digital Literacy" -> ESCO "ICT literacy"), without ingesting all 50+ CDACC PDFs. |
 | Optional validation | JobSearch-XS, PJB Benchmark | Reserved as an **optional, later** cross-check (Week 7 stretch) for ranking quality — not a core dependency. Non-Kenyan, and PJB's redistribution terms need re-checking before any use. |
 | Excluded | Freehire Jobs, Zalize Tech Jobs | Non-Kenyan, no strong reason to prefer over BrighterMonday for this project; Zalize is CC BY-NC which complicates reuse. Skip unless a specific gap appears later. |
+| Methodology check only | Kaggle "Profile Matching and Recommendation Dataset" (`users.csv` + `feedback.csv`, MIT) | **Not** job/skill data — generic profile-to-profile matching with demographic/personality/free-text fields. Its `feedback.csv` has real accept/reject labels, which the project's own synthetic data doesn't have on its own. Used only in `notebooks/hybrid_matching_model_training.ipynb` (Section 17) to confirm the train/val/test-split + regularized-logistic-regression training procedure works on independently-labelled data, kept fully separate from the exported production artifact. |
 
 ## Rationale
 
