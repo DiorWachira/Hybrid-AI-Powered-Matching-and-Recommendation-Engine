@@ -20,6 +20,7 @@ node_modules/
 dist/
 build/
 .vite/
+*.tsbuildinfo
 
 # IDE / OS
 .vscode/settings.json
