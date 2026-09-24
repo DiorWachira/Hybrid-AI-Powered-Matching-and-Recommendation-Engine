@@ -26,6 +26,7 @@ def create_job(
         location=payload.location,
         required_experience_years=payload.required_experience_years,
         salary_range_max=payload.salary_range_max,
+        required_skills=payload.required_skills or None,
         mandatory_certifications=payload.mandatory_certifications or None,
     )
     db.add(job)

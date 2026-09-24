@@ -53,6 +53,8 @@ class Candidate(Base):
     current_salary: Mapped[Optional[Decimal]] = mapped_column(Numeric(12, 2))
     expected_salary: Mapped[Optional[Decimal]] = mapped_column(Numeric(12, 2))
     parsed_resume_text: Mapped[Optional[str]] = mapped_column(Text)
+    skills: Mapped[Optional[list[str]]] = mapped_column(ARRAY(String(120)))
+    certifications: Mapped[Optional[list[str]]] = mapped_column(ARRAY(String(120)))
     embedding_vector: Mapped[Optional[dict]] = mapped_column(JSONB)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("CURRENT_TIMESTAMP"))
 
@@ -87,6 +89,7 @@ class JobPosting(Base):
     required_experience_years: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     salary_range_max: Mapped[Optional[Decimal]] = mapped_column(Numeric(12, 2))
     location: Mapped[Optional[str]] = mapped_column(String(120))
+    required_skills: Mapped[Optional[list[str]]] = mapped_column(ARRAY(String(120)))
     mandatory_certifications: Mapped[Optional[list[str]]] = mapped_column(ARRAY(String(120)))
     embedding_vector: Mapped[Optional[dict]] = mapped_column(JSONB)
     status: Mapped[JobStatus] = mapped_column(

@@ -4,7 +4,7 @@ import { Play, Plus, SlidersHorizontal } from "lucide-react";
 import { PageTitle } from "../components/PageTitle";
 import { api, type JobInput } from "../lib/api";
 
-const initialJob: JobInput = { title: "Senior DevOps Engineer", description: "Own platform reliability, CI/CD delivery and cloud operations for a Nairobi fintech team.", location: "Nairobi", requiredExperienceYears: 5, salaryRangeMax: 250000, mandatoryCertifications: ["AWS Certified Cloud Practitioner"] };
+const initialJob: JobInput = { title: "Senior DevOps Engineer", description: "Own platform reliability, CI/CD delivery and cloud operations for a Nairobi fintech team.", location: "Nairobi", requiredExperienceYears: 5, salaryRangeMax: 250000, requiredSkills: ["CI/CD", "AWS", "Kubernetes", "Docker"], mandatoryCertifications: ["AWS Certified Cloud Practitioner"] };
 
 export function RecruiterPage() {
   const navigate = useNavigate();

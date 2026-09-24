@@ -38,9 +38,10 @@ class JobCreateRequest(BaseModel):
     location: str | None = Field(default=None, max_length=120)
     required_experience_years: int = Field(default=0, ge=0, le=60)
     salary_range_max: Decimal | None = Field(default=None, ge=0, max_digits=12, decimal_places=2)
+    required_skills: list[str] = Field(default_factory=list, max_length=50)
     mandatory_certifications: list[str] = Field(default_factory=list, max_length=20)
 
-    @field_validator("mandatory_certifications")
+    @field_validator("required_skills", "mandatory_certifications")
     @classmethod
     def tidy_certifications(cls, values: list[str]) -> list[str]:
         return list(dict.fromkeys(value.strip() for value in values if value.strip()))
@@ -55,6 +56,7 @@ class JobResponse(BaseModel):
     location: str | None
     required_experience_years: int
     salary_range_max: Decimal | None
+    required_skills: list[str] | None
     mandatory_certifications: list[str] | None
     status: str
 
@@ -63,3 +65,40 @@ class ProfileResponse(BaseModel):
     user_id: UUID
     email: EmailStr
     role: UserRole
+
+
+class CandidateProfileUpdate(BaseModel):
+    full_name: str = Field(min_length=2, max_length=255)
+    location: str | None = Field(default=None, max_length=120)
+    years_experience: int = Field(default=0, ge=0, le=60)
+    expected_salary: Decimal | None = Field(default=None, ge=0, max_digits=12, decimal_places=2)
+    parsed_resume_text: str | None = Field(default=None, max_length=20_000)
+    skills: list[str] = Field(default_factory=list, max_length=50)
+    certifications: list[str] = Field(default_factory=list, max_length=20)
+
+    @field_validator("skills", "certifications")
+    @classmethod
+    def tidy_profile_values(cls, values: list[str]) -> list[str]:
+        return list(dict.fromkeys(value.strip() for value in values if value.strip()))
+
+
+class CandidateProfileResponse(CandidateProfileUpdate):
+    candidate_id: UUID
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class MatchCandidateResponse(BaseModel):
+    candidate_id: UUID
+    full_name: str
+    hard_rule_passed: bool
+    rule_reasons: list[str]
+    skill_overlap: float
+    semantic_score: float
+    growth_score: float
+    final_score: float
+
+
+class MatchEvaluationResponse(BaseModel):
+    job_id: UUID
+    candidates: list[MatchCandidateResponse]
