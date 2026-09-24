@@ -59,8 +59,10 @@ export type AdminOverview = {
 const API_PREFIX = "/api";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const headers = new Headers(init?.headers);
+  if (!(init?.body instanceof FormData)) headers.set("Content-Type", "application/json");
   const response = await fetch(`${API_PREFIX}${path}`, {
-    headers: { "Content-Type": "application/json", ...init?.headers },
+    headers,
     ...init,
   });
 
@@ -107,6 +109,15 @@ export const api = {
       headers: { Authorization: `Bearer ${token}` },
       body: JSON.stringify(profile),
     }),
+  uploadResume: (file: File, token: string) => {
+    const body = new FormData();
+    body.append("resume", file);
+    return request<CandidateProfileInput>("/candidates/upload-resume", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body,
+    });
+  },
   evaluateMatches: (jobId: string, token: string) =>
     request<{ job_id: string; candidates: MatchCandidate[] }>(`/matches/evaluate/${jobId}`, {
       method: "POST",
