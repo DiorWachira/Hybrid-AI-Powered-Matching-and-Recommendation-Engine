@@ -109,12 +109,13 @@ CURRENT STATUS SNAPSHOT
 [ ] Everything below in Weeks 1-8 that is not ticked
 
 Known gaps to close early:
- - Auth, job CRUD and Tier 1 rule gate are implemented; full candidate
-     resume ingestion and match-evaluation endpoints remain pending
+ - Auth, job CRUD, candidate profile updates and match-evaluation endpoints
+     are implemented; file-based resume ingestion remains pending
  - ML dependencies and the Colab/local training pipeline are complete;
      live backend embedding and scoring integration remains pending
- - Frontend routes and demo workspaces are implemented; live API wiring
-     remains pending until FR-02, FR-04 and FR-05 endpoints land
+ - Frontend routes, authentication, job payload wiring and local match flow
+     are implemented; resume upload and live ranked-result rendering remain
+     pending
  - ESCO/CDACC ingestion and one-command dataset seeding remain pending
 
 
@@ -183,6 +184,10 @@ WEEK 3  Frontend Shell and Resume Parsing
 [x] Candidate dashboard (profile + PDF/DOCX resume intake validation) and
     recruiter dashboard (job creation form + hard-filter criteria) as
     functional shells
+[x] Candidate profile API stores structured skills, certifications, experience
+    and resume text in PostgreSQL
+[x] FR-04 first pass: /api/matches/evaluate/{job_id} applies Tier 1 rules,
+    local scoring and persists match results with skill-gap explanations
 [ ] FR-02: /api/candidates/upload-resume with PDF/DOCX text extraction
 [ ] Section extraction routine for education, experience and skills
 [ ] Persist parsed resume text to PostgreSQL and project extracted
@@ -262,7 +267,8 @@ WEEK 6  Hybrid Engine Integration and Graph Linking
 [ ] app/core/hybrid_engine.py: Tier 1 filter then Tier 2 scoring, with
     the weighted final score (default w1=0.45, w2=0.40, w3=0.15 kept
     configurable)
-[ ] FR-04: /api/match/evaluate/{job_id} persisting rows to match_results
+[x] FR-04 first pass: /api/matches/evaluate/{job_id} persists rows to
+    match_results using local rule, skill and text scoring
 [ ] FR-05: /api/match/results/{job_id} returning ranked cards with
     confidence scores, verified hard filters and skill-gap breakdown
 [ ] Wire the React dashboards to the live endpoints; end-to-end run from
