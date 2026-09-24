@@ -37,6 +37,7 @@ neo4j-plugins/
 # Local research and planning notes
 Dataset_sourcing/
 prompt content and context.txt
+docs/extras/Chapt5 documentation.txt
 
 # Generated data, model artifacts and reports (regenerate via data_pipeline/ scripts)
 data_pipeline/dataset/
