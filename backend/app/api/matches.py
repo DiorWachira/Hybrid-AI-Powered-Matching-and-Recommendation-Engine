@@ -5,7 +5,6 @@ from sqlalchemy.orm import Session
 from app.api.dependencies import require_roles
 from app.core.rule_filter import CandidateRuleData, JobRuleData, RuleBasedMatcher
 from app.db.models import Candidate, JobPosting, MatchResult, User, UserRole
-from app.db.neo4j_db import graph_skill_overlap
 from app.core.hybrid_matcher import calibrated_score, semantic_similarity
 from app.db.postgres import get_db
 from app.schemas import MatchCandidateResponse, MatchEvaluationResponse
@@ -34,17 +33,13 @@ def _score_candidate(candidate: Candidate, job: JobPosting) -> MatchCandidateRes
             mandatory_certifications=frozenset(job.mandatory_certifications or []),
         ),
     )
-    try:
-        graph_score = graph_skill_overlap(str(candidate.candidate_id), job.required_skills or [])
-    except Exception:
-        graph_score = overlap
-    final_score, _ = calibrated_score(semantic_score, graph_score, growth_score)
+    final_score, _ = calibrated_score(semantic_score, overlap, growth_score)
     return MatchCandidateResponse(
         candidate_id=candidate.candidate_id,
         full_name=candidate.full_name,
         hard_rule_passed=rule_result.passed,
         rule_reasons=list(rule_result.reasons),
-        skill_overlap=round(graph_score, 4),
+        skill_overlap=round(overlap, 4),
         semantic_score=round(semantic_score, 4),
         growth_score=round(growth_score, 4),
         final_score=final_score,
