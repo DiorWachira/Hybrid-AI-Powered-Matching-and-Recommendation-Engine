@@ -71,6 +71,11 @@
   .line-a { left: 22%; top: 34%; width: 28%; transform: rotate(19deg); }
   .line-b { left: 51%; top: 37%; width: 30%; transform: rotate(-20deg); }
   .line-c { left: 23%; top: 60%; width: 28%; transform: rotate(-19deg); }
+  .field { display: block; }
+  .field > span { display: block; margin-bottom: 0.45rem; color: rgba(255, 255, 255, 0.5); font-family: var(--font-mono); font-size: 0.625rem; letter-spacing: 0.09em; text-transform: uppercase; }
+  .field input, .field textarea { width: 100%; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 0.65rem; background: rgba(0, 0, 0, 0.2); padding: 0.7rem 0.75rem; color: white; font-size: 0.875rem; outline: none; transition: border-color 180ms, background-color 180ms; }
+  .field input:focus, .field textarea:focus { border-color: rgba(0, 245, 212, 0.6); background: rgba(0, 245, 212, 0.03); }
+  .field small { display: block; margin-top: 0.4rem; color: rgba(255, 255, 255, 0.32); font-size: 0.7rem; }
   @keyframes status-ping { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.45; transform: scale(0.82); } }
   .animate-status { animation: status-ping 2s ease-in-out infinite; }
 }
