@@ -109,11 +109,13 @@ CURRENT STATUS SNAPSHOT
 [ ] Everything below in Weeks 1-8 that is not ticked
 
 Known gaps to close early:
- - No auth dependencies (passlib/bcrypt, PyJWT) or auth endpoints
- - No ML dependencies (transformers, torch, scikit-learn, pandas, numpy)
- - No frontend project
- - No data_pipeline/ or notebooks/ directories
- - No GitHub Actions CI workflow yet (tests exist locally only)
+ - Auth, job CRUD and Tier 1 rule gate are implemented; full candidate
+     resume ingestion and match-evaluation endpoints remain pending
+ - ML dependencies and the Colab/local training pipeline are complete;
+     live backend embedding and scoring integration remains pending
+ - Frontend routes and demo workspaces are implemented; live API wiring
+     remains pending until FR-02, FR-04 and FR-05 endpoints land
+ - ESCO/CDACC ingestion and one-command dataset seeding remain pending
 
 
 ====================================================================
