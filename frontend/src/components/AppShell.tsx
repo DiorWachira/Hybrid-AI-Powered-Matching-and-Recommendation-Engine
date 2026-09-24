@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Bell, LayoutDashboard, Menu, Network, Settings2, ShieldCheck, Target, Users, X } from "lucide-react";
 import { Link, NavLink } from "react-router-dom";
 import { api, type ApiHealth } from "../lib/api";
+import { getSessionRole } from "../lib/session";
 
 const navigation = [
   { to: "/recruiter", label: "Recruiter workspace", icon: LayoutDashboard },
@@ -18,6 +19,8 @@ export function AppShell({ children }: { children: ReactNode }) {
   }, []);
 
   const status = health?.status === "ok" ? "connected" : health ? "degraded" : "demo";
+  const sessionRole = getSessionRole();
+  const visibleNavigation = sessionRole === "admin" ? [...navigation, { to: "/admin", label: "Admin overview", icon: ShieldCheck }] : navigation;
 
   return (
     <div className="min-h-screen bg-obsidian text-white">
@@ -31,7 +34,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
         <p className="mt-10 px-2 font-mono text-[9px] uppercase tracking-[0.2em] text-white/30">Workspace</p>
         <nav className="mt-3 space-y-1" aria-label="Primary workspace">
-          {navigation.map(({ to, label, icon: Icon }) => <NavLink key={to} to={to} onClick={() => setMobileNav(false)} className={({ isActive }) => `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors ${isActive ? "bg-spectral-emerald/10 text-spectral-emerald" : "text-white/55 hover:bg-white/5 hover:text-white"}`}><Icon className="h-4 w-4" />{label}</NavLink>)}
+          {visibleNavigation.map(({ to, label, icon: Icon }) => <NavLink key={to} to={to} onClick={() => setMobileNav(false)} className={({ isActive }) => `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors ${isActive ? "bg-spectral-emerald/10 text-spectral-emerald" : "text-white/55 hover:bg-white/5 hover:text-white"}`}><Icon className="h-4 w-4" />{label}</NavLink>)}
         </nav>
         <p className="mt-8 px-2 font-mono text-[9px] uppercase tracking-[0.2em] text-white/30">System</p>
         <div className="mt-3 space-y-1 text-xs text-white/55"><div className="flex items-center gap-3 px-3 py-2"><ShieldCheck className="h-3.5 w-3.5 text-spectral-amber" />Rule gate</div><div className="flex items-center gap-3 px-3 py-2"><Network className="h-3.5 w-3.5 text-spectral-violet" />Skill graph</div><div className="flex items-center gap-3 px-3 py-2"><Settings2 className="h-3.5 w-3.5 text-spectral-emerald" />Engine settings</div></div>

@@ -14,6 +14,8 @@ router = APIRouter(prefix="/auth", tags=["authentication"])
 
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
 def register(payload: RegisterRequest, db: Session = Depends(get_db)) -> TokenResponse:
+    if payload.role == UserRole.admin:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Administrator accounts must be created by the administrator bootstrap command")
     if payload.role == UserRole.candidate and not payload.full_name:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Candidate registration requires full_name")
     if payload.role == UserRole.recruiter and not payload.company_name:

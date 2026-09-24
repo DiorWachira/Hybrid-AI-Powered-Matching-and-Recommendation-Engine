@@ -151,6 +151,12 @@ WEEK 2  Backend Core, Authentication and Rule Engine
 [x] Password hashing (bcrypt) and JWT issuing/verification utilities
 [x] FR-01: /api/auth/register and /api/auth/login with role separation
     (candidate, recruiter, admin) and a role-based access dependency
+[x] Public candidate/recruiter signup, JWT login, and role-protected frontend
+    dashboards for candidate, recruiter, and administrator sessions
+[x] Protected /api/admin/overview endpoint with user, profile, job, and match
+    activity counts plus recent records
+[x] Administrator bootstrap command (backend/create_admin.py); public signup
+    cannot create admin accounts
 [x] Pydantic request/response schemas and a shared error format
 [x] FR-03 (first pass): job creation and open-job listing endpoints with
     hard-filter criteria and recruiter/admin role protection
