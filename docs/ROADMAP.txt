@@ -109,12 +109,12 @@ CURRENT STATUS SNAPSHOT
 [ ] Everything below in Weeks 1-8 that is not ticked
 
 Known gaps to close early:
- - Auth, job CRUD, candidate profile updates and match-evaluation endpoints
-     are implemented; file-based resume ingestion remains pending
+ - Auth, job CRUD, candidate profile updates, resume ingestion and
+     match-evaluation endpoints are implemented
  - ML dependencies and the Colab/local training pipeline are complete;
      live backend embedding and scoring integration remains pending
- - Frontend routes, authentication, job payload wiring and local match flow
-     are implemented; resume upload and live ranked-result rendering remain
+ - Frontend routes, authentication, resume upload and live ranked-result
+     rendering are implemented; richer trained-model explainability remains
      pending
  - ESCO/CDACC ingestion and one-command dataset seeding remain pending
 
@@ -194,14 +194,13 @@ WEEK 3  Frontend Shell and Resume Parsing
     and resume text in PostgreSQL
 [x] FR-04 first pass: /api/matches/evaluate/{job_id} applies Tier 1 rules,
     local scoring and persists match results with skill-gap explanations
-[ ] FR-02: /api/candidates/upload-resume with PDF/DOCX text extraction
-[ ] Section extraction routine for education, experience and skills
-[ ] Persist parsed resume text to PostgreSQL and project extracted
-    skills into Neo4j nodes and edges
-[ ] File-upload hardening: size limit, MIME/extension allow-list,
-    filename sanitisation, no execution of uploaded content
-[ ] Replace demo content in frontend/src/lib/demoMatch.ts with live API
-    data once FR-04/FR-05 land
+[x] FR-02: /api/candidates/upload-resume with PDF/DOCX text extraction
+[x] Basic section text extraction and known-skill detection from uploaded files
+[~] Persist parsed resume text and extracted skills to PostgreSQL; Neo4j
+    candidate skill projection remains pending
+[x] File-upload hardening: 10 MB limit, PDF/DOCX allow-list, no file storage
+    or execution of uploaded content
+[x] Replace demo match results with live API evaluation results
 Exit criterion: uploading a real CV through the UI produces stored
 parsed text plus skill nodes in the graph.
 
@@ -275,10 +274,10 @@ WEEK 6  Hybrid Engine Integration and Graph Linking
     configurable)
 [x] FR-04 first pass: /api/matches/evaluate/{job_id} persists rows to
     match_results using local rule, skill and text scoring
-[ ] FR-05: /api/match/results/{job_id} returning ranked cards with
-    confidence scores, verified hard filters and skill-gap breakdown
-[ ] Wire the React dashboards to the live endpoints; end-to-end run from
-    upload to ranked results
+[~] FR-05: live ranked evaluation response includes confidence scores,
+    verified hard filters and skill-gap breakdown; a separate cached-results
+    GET endpoint remains pending
+[x] Wire the React dashboards to the live upload, job and evaluation APIs
 Exit criterion: a full matching run completes from the UI and results
 persist to the database.
 

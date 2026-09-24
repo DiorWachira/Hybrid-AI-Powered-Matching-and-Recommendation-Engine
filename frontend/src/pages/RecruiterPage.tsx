@@ -21,6 +21,10 @@ export function RecruiterPage() {
 
     const payload = { ...job, mandatoryCertifications: certText.split(",").map((item) => item.trim()).filter(Boolean) };
     localStorage.setItem("jobbridge_active_job", JSON.stringify(payload));
+    if (!localStorage.getItem("jobbridge_job_id")) {
+      setNotice("Publish the role first. Live matching requires a saved job in PostgreSQL.");
+      return;
+    }
     navigate("/matches");
   };
 
@@ -34,7 +38,8 @@ export function RecruiterPage() {
       return;
     }
     try {
-      await api.createJob(payload, token);
+      const response = await api.createJob(payload, token);
+      localStorage.setItem("jobbridge_job_id", response.job_id);
       setNotice("Job created successfully.");
     } catch {
       setNotice("The job could not be created. Please check your sign-in and try again.");
