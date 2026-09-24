@@ -5,6 +5,16 @@ export type ApiHealth = {
 
 export type UserRole = "candidate" | "recruiter" | "admin";
 
+export type RegisterInput = {
+  email: string;
+  password: string;
+  role: Exclude<UserRole, "admin">;
+  full_name?: string;
+  company_name?: string;
+  industry?: string;
+  location?: string;
+};
+
 export type JobInput = {
   title: string;
   description: string;
@@ -31,7 +41,11 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const api = {
   health: () => request<ApiHealth>("/health"),
-  // Planned contracts: enabled when the corresponding FastAPI routes land.
+  register: (payload: RegisterInput) =>
+    request<{ access_token: string; role: UserRole }>("/auth/register", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
   login: (email: string, password: string) =>
     request<{ access_token: string; role: UserRole }>("/auth/login", {
       method: "POST",
