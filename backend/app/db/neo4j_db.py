@@ -32,19 +32,19 @@ def project_candidate_skills(candidate_id: str, skills: list[str], certification
     driver = get_neo4j_driver()
     try:
         with driver.session(database="neo4j") as session:
-            session.run("MERGE (c:Candidate {id: $candidate_id})", {"candidate_id": candidate_id})
+            session.run("MERGE (c:Candidate {id: $candidate_id})", {"candidate_id": candidate_id}).consume()
             for skill in skills:
                 session.run(
                     "MERGE (s:Skill {name: $skill}) SET s.category = coalesce(s.category, 'Extracted') "
                     "WITH s MATCH (c:Candidate {id: $candidate_id}) MERGE (c)-[:HAS_SKILL]->(s)",
                     {"candidate_id": candidate_id, "skill": skill},
-                )
+                ).consume()
             for certification in certifications:
                 session.run(
                     "MERGE (cert:Certification {name: $certification}) "
                     "WITH cert MATCH (c:Candidate {id: $candidate_id}) MERGE (c)-[:HOLDS_CERTIFICATE]->(cert)",
                     {"candidate_id": candidate_id, "certification": certification},
-                )
+                ).consume()
     finally:
         driver.close()
 
@@ -74,19 +74,19 @@ def project_job_requirements(job_title: str, required_skills: list[str], certifi
     driver = get_neo4j_driver()
     try:
         with driver.session(database="neo4j") as session:
-            session.run("MERGE (j:JobRole {title: $title, name: $title, category: 'Role'})", {"title": job_title})
+            session.run("MERGE (j:JobRole {title: $title, name: $title, category: 'Role'})", {"title": job_title}).consume()
             for skill in required_skills:
                 session.run(
                     "MERGE (s:Skill {name: $skill}) SET s.category = coalesce(s.category, 'Required') "
                     "WITH s MATCH (j:JobRole {title: $title}) MERGE (j)-[:SKILL_REQUIRED]->(s)",
                     {"title": job_title, "skill": skill},
-                )
+                ).consume()
             for certification in certifications:
                 session.run(
                     "MERGE (cert:Certification {name: $certification}) "
                     "WITH cert MATCH (j:JobRole {title: $title}) MERGE (j)-[:REQUIRES_CERT]->(cert)",
                     {"title": job_title, "certification": certification},
-                )
+                ).consume()
     finally:
         driver.close()
 

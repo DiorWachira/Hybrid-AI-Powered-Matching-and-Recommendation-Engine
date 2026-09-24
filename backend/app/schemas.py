@@ -84,8 +84,15 @@ class CandidateProfileUpdate(BaseModel):
 
 class CandidateProfileResponse(CandidateProfileUpdate):
     candidate_id: UUID
+    skills: list[str] = Field(default_factory=list)
+    certifications: list[str] = Field(default_factory=list)
 
     model_config = ConfigDict(from_attributes=True)
+
+    @field_validator("skills", "certifications", mode="before")
+    @classmethod
+    def normalise_nullable_arrays(cls, value: list[str] | None) -> list[str]:
+        return value or []
 
 
 class MatchCandidateResponse(BaseModel):
