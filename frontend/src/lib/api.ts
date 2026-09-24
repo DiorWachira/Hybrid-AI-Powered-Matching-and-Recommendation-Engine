@@ -21,7 +21,29 @@ export type JobInput = {
   location: string;
   requiredExperienceYears: number;
   salaryRangeMax: number;
+  requiredSkills: string[];
   mandatoryCertifications: string[];
+};
+
+export type CandidateProfileInput = {
+  full_name: string;
+  location?: string;
+  years_experience: number;
+  expected_salary?: number;
+  parsed_resume_text?: string;
+  skills: string[];
+  certifications: string[];
+};
+
+export type MatchCandidate = {
+  candidate_id: string;
+  full_name: string;
+  hard_rule_passed: boolean;
+  rule_reasons: string[];
+  skill_overlap: number;
+  semantic_score: number;
+  growth_score: number;
+  final_score: number;
 };
 
 const API_PREFIX = "/api";
@@ -52,9 +74,32 @@ export const api = {
       body: JSON.stringify({ email, password }),
     }),
   createJob: (job: JobInput, token: string) =>
-    request<{ jobId: string }>("/jobs/create", {
+    request<{ job_id: string }>("/jobs/create", {
       method: "POST",
       headers: { Authorization: `Bearer ${token}` },
-      body: JSON.stringify(job),
+      body: JSON.stringify({
+        title: job.title,
+        description: job.description,
+        location: job.location,
+        required_experience_years: job.requiredExperienceYears,
+        salary_range_max: job.salaryRangeMax,
+        required_skills: job.requiredSkills,
+        mandatory_certifications: job.mandatoryCertifications,
+      }),
+    }),
+  getCandidateProfile: (token: string) =>
+    request<CandidateProfileInput>("/candidates/me", {
+      headers: { Authorization: `Bearer ${token}` },
+    }),
+  updateCandidateProfile: (profile: CandidateProfileInput, token: string) =>
+    request<CandidateProfileInput>("/candidates/me", {
+      method: "PUT",
+      headers: { Authorization: `Bearer ${token}` },
+      body: JSON.stringify(profile),
+    }),
+  evaluateMatches: (jobId: string, token: string) =>
+    request<{ job_id: string; candidates: MatchCandidate[] }>(`/matches/evaluate/${jobId}`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
     }),
 };
