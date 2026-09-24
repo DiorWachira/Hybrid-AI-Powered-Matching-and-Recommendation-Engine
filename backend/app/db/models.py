@@ -45,7 +45,7 @@ class Candidate(Base):
     candidate_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")
     )
-    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.user_id", ondelete="CASCADE"), unique=True, nullable=False)
     full_name: Mapped[str] = mapped_column(String(255), nullable=False)
     phone: Mapped[Optional[str]] = mapped_column(String(50))
     location: Mapped[Optional[str]] = mapped_column(String(120))
@@ -66,7 +66,7 @@ class Employer(Base):
     employer_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")
     )
-    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.user_id", ondelete="CASCADE"), unique=True, nullable=False)
     company_name: Mapped[str] = mapped_column(String(255), nullable=False)
     industry: Mapped[Optional[str]] = mapped_column(String(120))
     location: Mapped[Optional[str]] = mapped_column(String(120))
@@ -92,6 +92,7 @@ class JobPosting(Base):
     status: Mapped[JobStatus] = mapped_column(
         Enum(JobStatus, name="job_status"), default=JobStatus.open, nullable=False
     )
+    posted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("CURRENT_TIMESTAMP"))
 
     employer = relationship("Employer", back_populates="job_postings")
     matches = relationship("MatchResult", back_populates="job")

@@ -17,6 +17,10 @@ depends_on: str | Sequence[str] | None = None
 
 user_role = postgresql.ENUM("candidate", "recruiter", "admin", name="user_role")
 job_status = postgresql.ENUM("open", "closed", name="job_status")
+user_role_column = postgresql.ENUM(
+    "candidate", "recruiter", "admin", name="user_role", create_type=False
+)
+job_status_column = postgresql.ENUM("open", "closed", name="job_status", create_type=False)
 
 
 def upgrade() -> None:
@@ -29,7 +33,7 @@ def upgrade() -> None:
         sa.Column("user_id", postgresql.UUID(as_uuid=True), server_default=sa.text("gen_random_uuid()"), nullable=False),
         sa.Column("email", sa.String(length=255), nullable=False),
         sa.Column("password_hash", sa.String(length=255), nullable=False),
-        sa.Column("role", user_role, nullable=False),
+        sa.Column("role", user_role_column, nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False),
         sa.PrimaryKeyConstraint("user_id"),
         sa.UniqueConstraint("email"),
@@ -75,7 +79,7 @@ def upgrade() -> None:
         sa.Column("location", sa.String(length=120), nullable=True),
         sa.Column("mandatory_certifications", postgresql.ARRAY(sa.String(length=120)), nullable=True),
         sa.Column("embedding_vector", postgresql.JSONB(astext_type=sa.Text()), nullable=True),
-        sa.Column("status", job_status, server_default="open", nullable=False),
+        sa.Column("status", job_status_column, server_default="open", nullable=False),
         sa.ForeignKeyConstraint(["employer_id"], ["employers.employer_id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("job_id"),
     )

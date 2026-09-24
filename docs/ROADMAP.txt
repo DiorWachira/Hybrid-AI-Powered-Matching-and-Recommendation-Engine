@@ -145,15 +145,15 @@ script re-runnable, CI green on every push.
 WEEK 2  Backend Core, Authentication and Rule Engine
 --------------------------------------------------------------------
 [x] FastAPI routing, CORS and settings layer
-[ ] Password hashing (bcrypt) and JWT issuing/verification utilities
-[ ] FR-01: /api/auth/register and /api/auth/login with role separation
+[x] Password hashing (bcrypt) and JWT issuing/verification utilities
+[x] FR-01: /api/auth/register and /api/auth/login with role separation
     (candidate, recruiter, admin) and a role-based access dependency
-[ ] Pydantic request/response schemas and a shared error format
-[ ] FR-03 (first pass): job posting CRUD endpoints with hard-filter
-    criteria and skill weights
-[ ] Tier 1 rule engine (app/core/rule_filter.py): mandatory
+[x] Pydantic request/response schemas and a shared error format
+[x] FR-03 (first pass): job creation and open-job listing endpoints with
+    hard-filter criteria and recruiter/admin role protection
+[x] Tier 1 rule engine (app/core/rule_filter.py): mandatory
     certifications, minimum years of experience, location, salary ceiling
-[ ] Unit tests for the rule engine covering pass and fail paths
+[x] Unit tests for the rule engine covering pass and fail paths
 Exit criterion: a recruiter can register, log in, create a job, and the
 rule filter correctly eliminates ineligible sample candidates.
 

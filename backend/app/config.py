@@ -16,6 +16,10 @@ class Settings(BaseSettings):
     neo4j_user: str = "neo4j"
     neo4j_password: str = "workforce-password"
 
+    jwt_secret: str = "replace-this-development-secret-before-production"
+    jwt_algorithm: str = "HS256"
+    jwt_expire_minutes: int = 60
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
 
