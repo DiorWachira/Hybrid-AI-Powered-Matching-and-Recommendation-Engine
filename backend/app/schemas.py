@@ -102,3 +102,13 @@ class MatchCandidateResponse(BaseModel):
 class MatchEvaluationResponse(BaseModel):
     job_id: UUID
     candidates: list[MatchCandidateResponse]
+
+
+class AdminOverviewResponse(BaseModel):
+    users_count: int
+    candidates_count: int
+    employers_count: int
+    jobs_count: int
+    match_results_count: int
+    recent_users: list[ProfileResponse]
+    recent_jobs: list[JobResponse]

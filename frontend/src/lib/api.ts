@@ -46,6 +46,16 @@ export type MatchCandidate = {
   final_score: number;
 };
 
+export type AdminOverview = {
+  users_count: number;
+  candidates_count: number;
+  employers_count: number;
+  jobs_count: number;
+  match_results_count: number;
+  recent_users: Array<{ user_id: string; email: string; role: UserRole }>;
+  recent_jobs: Array<{ job_id: string; title: string; status: string; location?: string; required_experience_years: number; salary_range_max?: number; required_skills?: string[]; mandatory_certifications?: string[]; description: string }>;
+};
+
 const API_PREFIX = "/api";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -100,6 +110,10 @@ export const api = {
   evaluateMatches: (jobId: string, token: string) =>
     request<{ job_id: string; candidates: MatchCandidate[] }>(`/matches/evaluate/${jobId}`, {
       method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+    }),
+  adminOverview: (token: string) =>
+    request<AdminOverview>("/admin/overview", {
       headers: { Authorization: `Bearer ${token}` },
     }),
 };

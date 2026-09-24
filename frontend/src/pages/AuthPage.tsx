@@ -21,7 +21,7 @@ export function AuthPage() {
         ? await api.login(email, password)
         : await api.register({ email, password, role, full_name: fullName || undefined, company_name: companyName || undefined, location });
       localStorage.setItem("jobbridge_token", response.access_token);
-      navigate(response.role === "candidate" ? "/candidate" : "/recruiter");
+      navigate(response.role === "candidate" ? "/candidate" : response.role === "admin" ? "/admin" : "/recruiter");
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "Authentication failed. Check your details and try again.");
     }
