@@ -56,11 +56,16 @@ def graph_skill_overlap(candidate_id: str, required_skills: list[str]) -> float:
     try:
         with driver.session(database="neo4j") as session:
             result = session.run(
-                "MATCH (c:Candidate {id: $candidate_id})-[:HAS_SKILL]->(s:Skill) "
-                "WHERE s.name IN $required_skills RETURN count(DISTINCT s) AS direct_matches",
+                "UNWIND $required_skills AS required_name "
+                "MATCH (required:Skill {name: required_name}) "
+                "OPTIONAL MATCH (c:Candidate {id: $candidate_id})-[:HAS_SKILL]->(source:Skill) "
+                "OPTIONAL MATCH path = (source)-[rels:RELATED_TO*0..2]-(required) "
+                "WITH required_name, max(CASE WHEN path IS NULL THEN 0.0 ELSE "
+                "reduce(weight = 1.0, rel IN rels | weight * coalesce(rel.weight, 0.5)) END) AS best_score "
+                "RETURN avg(best_score) AS overlap",
                 {"candidate_id": candidate_id, "required_skills": required_skills},
             ).single()
-            return round(int(result["direct_matches"] if result else 0) / len(required_skills), 4)
+            return round(float(result["overlap"] if result and result["overlap"] is not None else 0.0), 4)
     finally:
         driver.close()
 

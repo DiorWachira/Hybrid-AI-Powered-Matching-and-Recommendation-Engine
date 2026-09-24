@@ -266,8 +266,8 @@ WEEK 6  Hybrid Engine Integration and Graph Linking
 --------------------------------------------------------------------
 [x] backend/app/core/hybrid_matcher.py: load all-MiniLM-L6-v2 lazily and
     apply the committed scaler and logistic-regression calibration artifact
-[~] Neo4j graph scoring: direct candidate-skill overlap is live; weighted
-    2-hop RELATED_TO traversal remains pending
+[x] Neo4j graph scoring: direct and weighted 2-hop RELATED_TO traversal are
+    live, with path weights multiplied across hops
 [x] Hybrid scoring: MiniLM semantic similarity, graph overlap and growth
     score are combined after the Tier 1 rule gate
 [x] FR-04 first pass: /api/matches/evaluate/{job_id} persists rows to
