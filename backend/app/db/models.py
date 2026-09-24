@@ -24,6 +24,12 @@ class JobStatus(str, enum.Enum):
     closed = "closed"
 
 
+class OpportunityStatus(str, enum.Enum):
+    saved = "saved"
+    applied = "applied"
+    viewed = "viewed"
+
+
 class User(Base):
     __tablename__ = "users"
 
@@ -60,6 +66,7 @@ class Candidate(Base):
 
     user = relationship("User", back_populates="candidate_profile")
     matches = relationship("MatchResult", back_populates="candidate")
+    opportunity_activity = relationship("CandidateOpportunity", back_populates="candidate")
 
 
 class Employer(Base):
@@ -99,6 +106,23 @@ class JobPosting(Base):
 
     employer = relationship("Employer", back_populates="job_postings")
     matches = relationship("MatchResult", back_populates="job")
+    opportunity_activity = relationship("CandidateOpportunity", back_populates="job")
+
+
+class CandidateOpportunity(Base):
+    __tablename__ = "candidate_opportunities"
+
+    activity_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")
+    )
+    candidate_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("candidates.candidate_id", ondelete="CASCADE"), nullable=False)
+    job_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("job_postings.job_id", ondelete="CASCADE"), nullable=False)
+    status: Mapped[OpportunityStatus] = mapped_column(Enum(OpportunityStatus, name="opportunity_status"), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("CURRENT_TIMESTAMP"))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("CURRENT_TIMESTAMP"))
+
+    candidate = relationship("Candidate", back_populates="opportunity_activity")
+    job = relationship("JobPosting", back_populates="opportunity_activity")
 
 
 class MatchResult(Base):

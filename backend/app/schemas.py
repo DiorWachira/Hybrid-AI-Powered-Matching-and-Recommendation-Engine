@@ -3,7 +3,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
-from app.db.models import UserRole
+from app.db.models import OpportunityStatus, UserRole
 
 
 class RegisterRequest(BaseModel):
@@ -93,6 +93,30 @@ class CandidateProfileResponse(CandidateProfileUpdate):
     @classmethod
     def normalise_nullable_arrays(cls, value: list[str] | None) -> list[str]:
         return value or []
+
+
+class OpportunityResponse(BaseModel):
+    job_id: UUID
+    title: str
+    company_name: str
+    description: str
+    location: str | None
+    salary_range_max: Decimal | None
+    required_experience_years: int
+    required_skills: list[str]
+    mandatory_certifications: list[str]
+    match_score: float
+    status: OpportunityStatus | None
+
+
+class CandidateDashboardResponse(BaseModel):
+    available_opportunities: list[OpportunityResponse]
+    for_you: list[OpportunityResponse]
+    history: list[OpportunityResponse]
+
+
+class OpportunityActionRequest(BaseModel):
+    status: OpportunityStatus
 
 
 class MatchCandidateResponse(BaseModel):

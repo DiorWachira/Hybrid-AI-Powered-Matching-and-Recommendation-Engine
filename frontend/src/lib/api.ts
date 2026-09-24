@@ -56,6 +56,26 @@ export type AdminOverview = {
   recent_jobs: Array<{ job_id: string; title: string; status: string; location?: string; required_experience_years: number; salary_range_max?: number; required_skills?: string[]; mandatory_certifications?: string[]; description: string }>;
 };
 
+export type Opportunity = {
+  job_id: string;
+  title: string;
+  company_name: string;
+  description: string;
+  location?: string;
+  salary_range_max?: number;
+  required_experience_years: number;
+  required_skills: string[];
+  mandatory_certifications: string[];
+  match_score: number;
+  status?: "saved" | "applied" | "viewed";
+};
+
+export type CandidateDashboard = {
+  available_opportunities: Opportunity[];
+  for_you: Opportunity[];
+  history: Opportunity[];
+};
+
 const API_PREFIX = "/api";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -118,6 +138,16 @@ export const api = {
       body,
     });
   },
+  candidateDashboard: (token: string) =>
+    request<CandidateDashboard>("/candidates/dashboard", {
+      headers: { Authorization: `Bearer ${token}` },
+    }),
+  updateOpportunityStatus: (jobId: string, status: "saved" | "applied" | "viewed", token: string) =>
+    request<Opportunity>(`/candidates/opportunities/${jobId}`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ status }),
+    }),
   evaluateMatches: (jobId: string, token: string) =>
     request<{ job_id: string; candidates: MatchCandidate[] }>(`/matches/evaluate/${jobId}`, {
       method: "POST",

@@ -193,6 +193,11 @@ WEEK 3  Frontend Shell and Resume Parsing
     functional shells
 [x] Candidate profile API stores structured skills, certifications, experience
     and resume text in PostgreSQL
+[x] Candidate opportunity activity table stores saved/applied/viewed job
+    relationships and supports candidate history
+[x] Candidate dashboard API returns available jobs, ranked For You jobs, and
+    saved/applied history; generated demo data can be loaded with
+    data_pipeline/seed_database.py
 [x] FR-04 first pass: /api/matches/evaluate/{job_id} applies Tier 1 rules,
     local scoring and persists match results with skill-gap explanations
 [x] FR-02: /api/candidates/upload-resume with PDF/DOCX text extraction
