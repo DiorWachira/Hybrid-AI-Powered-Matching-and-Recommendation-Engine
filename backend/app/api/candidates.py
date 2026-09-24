@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.api.dependencies import require_roles
 from app.db.models import Candidate, User, UserRole
+from app.db.neo4j_db import project_candidate_skills
 from app.db.postgres import get_db
 from app.schemas import CandidateProfileResponse, CandidateProfileUpdate
 
@@ -84,6 +85,7 @@ async def upload_resume(
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="The resume contains no readable text")
     candidate.parsed_resume_text = text[:20_000]
     candidate.skills = _skills_from_text(text)
+    project_candidate_skills(str(candidate.candidate_id), candidate.skills, candidate.certifications or [])
     db.commit()
     db.refresh(candidate)
     return candidate

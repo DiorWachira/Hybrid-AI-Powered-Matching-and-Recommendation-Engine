@@ -111,8 +111,9 @@ CURRENT STATUS SNAPSHOT
 Known gaps to close early:
  - Auth, job CRUD, candidate profile updates, resume ingestion and
      match-evaluation endpoints are implemented
- - ML dependencies and the Colab/local training pipeline are complete;
-     live backend embedding and scoring integration remains pending
+ - ML dependencies, trained artifact loading, live MiniLM embeddings and
+     calibrated scoring are complete; richer 2-hop graph traversal remains
+     pending
  - Frontend routes, authentication, resume upload and live ranked-result
      rendering are implemented; richer trained-model explainability remains
      pending
@@ -196,8 +197,8 @@ WEEK 3  Frontend Shell and Resume Parsing
     local scoring and persists match results with skill-gap explanations
 [x] FR-02: /api/candidates/upload-resume with PDF/DOCX text extraction
 [x] Basic section text extraction and known-skill detection from uploaded files
-[~] Persist parsed resume text and extracted skills to PostgreSQL; Neo4j
-    candidate skill projection remains pending
+[x] Persist parsed resume text and extracted skills to PostgreSQL and project
+    candidate skills/certifications into Neo4j
 [x] File-upload hardening: 10 MB limit, PDF/DOCX allow-list, no file storage
     or execution of uploaded content
 [x] Replace demo match results with live API evaluation results
@@ -263,15 +264,12 @@ met for matching quality, which is blocked on the label fix in Week 7.
 --------------------------------------------------------------------
 WEEK 6  Hybrid Engine Integration and Graph Linking
 --------------------------------------------------------------------
-[ ] app/core/bert_embedder.py: load the model once at startup and expose
-    a batch embedding interface
-[ ] app/core/graph_service.py: Cypher queries for direct skill matches
-    and 2-hop RELATED_TO traversal, returning a weighted overlap score
-[ ] app/core/ml_matcher.py: cosine similarity plus the growth-potential
-    score
-[ ] app/core/hybrid_engine.py: Tier 1 filter then Tier 2 scoring, with
-    the weighted final score (default w1=0.45, w2=0.40, w3=0.15 kept
-    configurable)
+[x] backend/app/core/hybrid_matcher.py: load all-MiniLM-L6-v2 lazily and
+    apply the committed scaler and logistic-regression calibration artifact
+[~] Neo4j graph scoring: direct candidate-skill overlap is live; weighted
+    2-hop RELATED_TO traversal remains pending
+[x] Hybrid scoring: MiniLM semantic similarity, graph overlap and growth
+    score are combined after the Tier 1 rule gate
 [x] FR-04 first pass: /api/matches/evaluate/{job_id} persists rows to
     match_results using local rule, skill and text scoring
 [~] FR-05: live ranked evaluation response includes confidence scores,

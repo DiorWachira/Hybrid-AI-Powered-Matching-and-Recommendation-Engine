@@ -1,5 +1,3 @@
-import re
-
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -7,23 +5,19 @@ from sqlalchemy.orm import Session
 from app.api.dependencies import require_roles
 from app.core.rule_filter import CandidateRuleData, JobRuleData, RuleBasedMatcher
 from app.db.models import Candidate, JobPosting, MatchResult, User, UserRole
+from app.db.neo4j_db import graph_skill_overlap
+from app.core.hybrid_matcher import calibrated_score, semantic_similarity
 from app.db.postgres import get_db
 from app.schemas import MatchCandidateResponse, MatchEvaluationResponse
 
 router = APIRouter(prefix="/matches", tags=["matches"])
 
 
-def _tokens(value: str) -> set[str]:
-    return {token for token in re.findall(r"[a-z0-9+#.]+", value.casefold()) if len(token) > 2}
-
-
 def _score_candidate(candidate: Candidate, job: JobPosting) -> MatchCandidateResponse:
     candidate_skills = {skill.casefold() for skill in (candidate.skills or [])}
     required_skills = {skill.casefold() for skill in (job.required_skills or [])}
     overlap = len(candidate_skills & required_skills) / len(required_skills) if required_skills else 0.0
-    text_overlap = len(_tokens(candidate.parsed_resume_text or "") & _tokens(job.description))
-    text_union = len(_tokens(candidate.parsed_resume_text or "") | _tokens(job.description))
-    semantic_score = text_overlap / text_union if text_union else 0.0
+    semantic_score = semantic_similarity(candidate.parsed_resume_text or "", job.description)
     experience_score = min(candidate.years_experience / max(job.required_experience_years, 1), 1.0)
     growth_score = (experience_score + min(len(candidate.certifications or []) / 2, 1.0)) / 2
     rule_result = RuleBasedMatcher().check_hard_filters(
@@ -40,13 +34,17 @@ def _score_candidate(candidate: Candidate, job: JobPosting) -> MatchCandidateRes
             mandatory_certifications=frozenset(job.mandatory_certifications or []),
         ),
     )
-    final_score = round((overlap * 0.45 + semantic_score * 0.25 + growth_score * 0.30) * (1 if rule_result.passed else 0.35), 4)
+    try:
+        graph_score = graph_skill_overlap(str(candidate.candidate_id), job.required_skills or [])
+    except Exception:
+        graph_score = overlap
+    final_score, _ = calibrated_score(semantic_score, graph_score, growth_score)
     return MatchCandidateResponse(
         candidate_id=candidate.candidate_id,
         full_name=candidate.full_name,
         hard_rule_passed=rule_result.passed,
         rule_reasons=list(rule_result.reasons),
-        skill_overlap=round(overlap, 4),
+        skill_overlap=round(graph_score, 4),
         semantic_score=round(semantic_score, 4),
         growth_score=round(growth_score, 4),
         final_score=final_score,

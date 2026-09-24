@@ -28,6 +28,64 @@ def verify_neo4j_connection() -> bool:
         driver.close()
 
 
+def project_candidate_skills(candidate_id: str, skills: list[str], certifications: list[str]) -> None:
+    driver = get_neo4j_driver()
+    try:
+        with driver.session(database="neo4j") as session:
+            session.run("MERGE (c:Candidate {id: $candidate_id})", {"candidate_id": candidate_id})
+            for skill in skills:
+                session.run(
+                    "MERGE (s:Skill {name: $skill}) SET s.category = coalesce(s.category, 'Extracted') "
+                    "WITH s MATCH (c:Candidate {id: $candidate_id}) MERGE (c)-[:HAS_SKILL]->(s)",
+                    {"candidate_id": candidate_id, "skill": skill},
+                )
+            for certification in certifications:
+                session.run(
+                    "MERGE (cert:Certification {name: $certification}) "
+                    "WITH cert MATCH (c:Candidate {id: $candidate_id}) MERGE (c)-[:HOLDS_CERTIFICATE]->(cert)",
+                    {"candidate_id": candidate_id, "certification": certification},
+                )
+    finally:
+        driver.close()
+
+
+def graph_skill_overlap(candidate_id: str, required_skills: list[str]) -> float:
+    if not required_skills:
+        return 0.0
+    driver = get_neo4j_driver()
+    try:
+        with driver.session(database="neo4j") as session:
+            result = session.run(
+                "MATCH (c:Candidate {id: $candidate_id})-[:HAS_SKILL]->(s:Skill) "
+                "WHERE s.name IN $required_skills RETURN count(DISTINCT s) AS direct_matches",
+                {"candidate_id": candidate_id, "required_skills": required_skills},
+            ).single()
+            return round(int(result["direct_matches"] if result else 0) / len(required_skills), 4)
+    finally:
+        driver.close()
+
+
+def project_job_requirements(job_title: str, required_skills: list[str], certifications: list[str]) -> None:
+    driver = get_neo4j_driver()
+    try:
+        with driver.session(database="neo4j") as session:
+            session.run("MERGE (j:JobRole {title: $title, name: $title, category: 'Role'})", {"title": job_title})
+            for skill in required_skills:
+                session.run(
+                    "MERGE (s:Skill {name: $skill}) SET s.category = coalesce(s.category, 'Required') "
+                    "WITH s MATCH (j:JobRole {title: $title}) MERGE (j)-[:SKILL_REQUIRED]->(s)",
+                    {"title": job_title, "skill": skill},
+                )
+            for certification in certifications:
+                session.run(
+                    "MERGE (cert:Certification {name: $certification}) "
+                    "WITH cert MATCH (j:JobRole {title: $title}) MERGE (j)-[:REQUIRES_CERT]->(cert)",
+                    {"title": job_title, "certification": certification},
+                )
+    finally:
+        driver.close()
+
+
 def seed_neo4j_ontology() -> dict[str, int]:
     driver = get_neo4j_driver()
     try:
