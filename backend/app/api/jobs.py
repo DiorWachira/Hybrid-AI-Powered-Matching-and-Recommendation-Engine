@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.api.dependencies import require_roles
 from app.db.models import Employer, JobPosting, User, UserRole
+from app.db.neo4j_db import project_job_requirements
 from app.db.postgres import get_db
 from app.schemas import JobCreateRequest, JobResponse
 
@@ -32,6 +33,7 @@ def create_job(
     db.add(job)
     db.commit()
     db.refresh(job)
+    project_job_requirements(job.title, job.required_skills or [], job.mandatory_certifications or [])
     return job
 
 
