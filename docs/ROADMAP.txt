@@ -1,0 +1,359 @@
+HYBRID AI-POWERED WORKFORCE PLACEMENT ENGINE
+PROJECT MILESTONE ROADMAP (8 WEEKS)
+Last updated: 2026-09-20 (evening, after first Colab training run)
+
+Legend:  [x] done   [~] partially done   [ ] not started
+Note: academic documentation tasks (Chapter 5, UML write-ups, report) are
+owned by the student and are deliberately excluded from this roadmap.
+
+
+====================================================================
+CLIENT ALIGNMENT NOTES (2026-09-20)
+====================================================================
+ - Backend stays FastAPI (Python). The client mentioned NestJS, but the
+   repo already has a working FastAPI backend and the ML/NLP pipeline
+   (BERT, Neo4j) is Python-native; migrating would be pure rework.
+ - Scope stays the matching/recommendation engine only. The client's
+   apply/accept/contract/project/milestone/payment flow is a separate
+   freelance-marketplace layer and is deliberately deferred -- see
+   docs/extras/marketplace_features.txt for the captured requirements.
+ - "Simulate but also be a web app": resolved as a seeded demo/evaluation
+   mode inside the web app (data_pipeline/evaluate_model.py running the
+   same hybrid engine over the synthetic dataset), not a separate program.
+ - Mobile is out of scope entirely.
+ - Dataset strategy decided -- see docs/DATASET_STRATEGY.md for the full
+   rationale (synthetic Kenyan candidates, real BrighterMonday job posts,
+   ESCO skill ontology, optional CDACC mapping).
+ - Kaggle "Profile Matching and Recommendation Dataset" (users.csv +
+   feedback.csv) added as a methodology-validation-only auxiliary set --
+   not job/skill data, used solely to confirm the training procedure works
+   on independently-labelled accept/reject data. See
+   notebooks/hybrid_matching_model_training.ipynb Section 17.
+ - Model training notebook started early (normally Week 5/6): a Colab-ready
+   end-to-end pipeline already exists at
+   notebooks/hybrid_matching_model_training.ipynb covering data load,
+   validation, text cleaning, MiniLM embeddings, graph-overlap + growth
+   scoring, leakage-safe splitting, CV-tuned logistic regression with
+   overfitting/underfitting diagnostics, evaluation, top-k inference and
+   artifact export. EXECUTED on Colab 2026-09-20 -- see the results
+   section below.
+
+
+====================================================================
+TRAINING RUN RESULTS (local, 2026-09-20, recalibrated labels)
+====================================================================
+Run headlessly via nbclient on the local venv (torch 2.14.0+cpu), not Colab.
+Artifacts: data_pipeline/artifacts/hybrid_match_weights.json
+Evidence:  data_pipeline/reports/overfitting_diagnostics.png
+           data_pipeline/reports/test_evaluation.png
+Data:      800 candidates x 100 jobs -> 4,000 pairs
+Splits:    1920 train / 640 val / 640 warm test / 320 cold test
+
+Read every accuracy against the Bayes ceiling of 0.799, not against 1.0,
+and against a majority-class floor of ~0.50.
+
+Warm test (unseen candidates, seen jobs), threshold 0.37:
+  precision 0.663 | recall 0.931 | F1 0.774 | ROC-AUC 0.834
+  accuracy 0.719  -> 90% of the Bayes ceiling; captures ~73% of the
+                     available signal between floor and ceiling
+  NDCG@3 0.910
+
+Cold start (unseen jobs AND unseen candidates):
+  precision 0.682 | recall 0.908 | F1 0.779 | ROC-AUC 0.799
+  warm->cold F1 change: +0.004. Essentially no degradation, so the model
+  generalises to new postings rather than memorising specific ones.
+  CAVEAT: the cold precision@3 / recall@3 / NDCG@3 all read 1.000 because
+  most cold candidates have <= 3 held-out jobs, making top-3 degenerate.
+  Do not quote the cold ranking metrics; the classification metrics are sound.
+
+Baselines (thresholds now tuned on validation, same as the learned model):
+  fixed-weight rule (0.45/0.40/0.15): F1 0.747 | ROC-AUC 0.810
+  BERT-similarity only:               F1 0.688 | ROC-AUC 0.691
+
+Learned coefficients on standardised features (C=0.03):
+  S_bert 0.770 | S_graph 0.681 | S_growth 0.793
+
+Two findings worth reporting:
+ 1. The three signals now contribute almost equally. In the circular-label
+    run the ordering was S_growth 4.24 >> S_bert 0.63, i.e. text was nearly
+    irrelevant. Once job/CV text carried real specialisation signal, semantic
+    similarity became as important as skill-graph overlap -- direct support
+    for the hybrid design rather than a graph-only or keyword-only engine.
+ 2. BERT-only ROC-AUC rose from 0.605 (near chance) to 0.691 purely from
+    enriching the generated text, confirming the earlier diagnosis that
+    templated descriptions, not the model, were the bottleneck.
+
+The learned model beats the fixed-weight baseline by +0.027 F1 and
++0.024 ROC-AUC -- a modest, believable margin, unlike the inflated gap the
+circular label produced.
+
+
+====================================================================
+CURRENT STATUS SNAPSHOT
+====================================================================
+[x] Git repository + remote on GitHub, branch/PR workflow in use
+[x] Docker Compose stack: PostgreSQL 16 (host port 5433), Neo4j 5 Community
+[x] PostgreSQL relational schema (users, candidates, employers,
+    job_postings, match_results) via SQLAlchemy + Alembic, migrated
+[x] FastAPI application shell with CORS + /api/health (verified 200 OK)
+[x] Python virtual environment with backend dependencies installed
+[x] Environment configuration via .env / pydantic-settings
+[x] docs/WORKFLOW.md (branching, commit convention, increment plan)
+[x] Neo4j Bolt driver, connection module and combined /api/health check
+[x] Baseline Neo4j ontology seed (Skill/Certification/JobRole/Industry)
+[x] pytest smoke tests for database health and the ontology seed
+[x] Dataset strategy decided and documented (docs/DATASET_STRATEGY.md)
+[x] GitHub Actions CI workflow (.github/workflows/backend-ci.yml) running
+    compile checks, docker-compose validation, migrations and pytest
+    against Postgres + Neo4j service containers
+[ ] Everything below in Weeks 1-8 that is not ticked
+
+Known gaps to close early:
+ - Auth, job CRUD and Tier 1 rule gate are implemented; full candidate
+     resume ingestion and match-evaluation endpoints remain pending
+ - ML dependencies and the Colab/local training pipeline are complete;
+     live backend embedding and scoring integration remains pending
+ - Frontend routes and demo workspaces are implemented; live API wiring
+     remains pending until FR-02, FR-04 and FR-05 endpoints land
+ - ESCO/CDACC ingestion and one-command dataset seeding remain pending
+
+
+====================================================================
+MONTH 1 - INFRASTRUCTURE, BACKEND CORE, FRONTEND SHELL, DATA
+====================================================================
+
+--------------------------------------------------------------------
+WEEK 1  Foundations and Database Architecture
+--------------------------------------------------------------------
+[x] Initialise Git repository and project directory structure
+[x] Define and migrate the PostgreSQL relational schema
+[x] Run PostgreSQL and Neo4j locally via Docker Compose
+[x] Verify the full local stack (containers healthy, migrations, API)
+[x] Add the Neo4j Bolt driver and a connection module (app/db/neo4j_db.py)
+    with a combined /api/health readiness check covering both databases
+[x] Create the baseline Neo4j ontology: constraints plus seed Cypher for
+    Skill, Certification, JobRole, Industry nodes and the RELATED_TO /
+    SKILL_REQUIRED / REQUIRES_CERT relationships
+[x] Decide and record the dataset strategy (docs/DATASET_STRATEGY.md):
+    synthetic Kenyan candidates + real BrighterMonday job posts + ESCO
+    ontology, with CDACC mapped onto ESCO for local relevance
+[x] Add pytest and a first smoke test (backend/tests/test_database_health.py)
+[x] Add a GitHub Actions CI workflow that runs compile checks, migrations
+    and pytest on every push (.github/workflows/backend-ci.yml)
+Exit criterion: both databases reachable from the API, ontology seed
+script re-runnable, CI green on every push.
+
+--------------------------------------------------------------------
+WEEK 2  Backend Core, Authentication and Rule Engine
+--------------------------------------------------------------------
+[x] FastAPI routing, CORS and settings layer
+[x] Password hashing (bcrypt) and JWT issuing/verification utilities
+[x] FR-01: /api/auth/register and /api/auth/login with role separation
+    (candidate, recruiter, admin) and a role-based access dependency
+[x] Pydantic request/response schemas and a shared error format
+[x] FR-03 (first pass): job creation and open-job listing endpoints with
+    hard-filter criteria and recruiter/admin role protection
+[x] Tier 1 rule engine (app/core/rule_filter.py): mandatory
+    certifications, minimum years of experience, location, salary ceiling
+[x] Unit tests for the rule engine covering pass and fail paths
+Exit criterion: a recruiter can register, log in, create a job, and the
+rule filter correctly eliminates ineligible sample candidates.
+
+--------------------------------------------------------------------
+WEEK 3  Frontend Shell and Resume Parsing
+--------------------------------------------------------------------
+[x] Scaffold the React frontend (Vite + TypeScript + Tailwind v4) with a
+    design-token layer enforcing the 60-30-10 palette
+    (60% #FDFBF7 canvas / 30% #0F5257 emerald / 10% #D4AF37 gold)
+[x] Public landing page (frontend/src/components/): header, hero with a
+    live match-telemetry card, 4-step pipeline, engine metrics, scenarios,
+    final CTA and footer. The telemetry card mirrors the real FR-05
+    explainability payload (tier-1 filters, the three tier-2 sub-scores,
+    matched vs missing skills) rather than a decorative score
+[x] Accessibility baseline: skip link, focus-visible rings, ARIA meters on
+    score bars, prefers-reduced-motion honoured. Gold is a surface-only
+    colour because #D4AF37 on the cream canvas measures 2.03:1 and fails
+    WCAG for text; CTAs use ink-on-gold at 6.90:1
+[x] Client-side routing and a typed API client
+    (React Router routes: /recruiter, /candidate, /matches, /auth; typed
+    frontend/lib/api.ts contract with live /api/health and planned endpoint
+    methods; API-unavailable state explicitly falls back to demo mode)
+[x] Auth page, token-storage-ready login contract and protected-route-ready
+    application shell (final JWT handling remains blocked on FR-01)
+[x] Candidate dashboard (profile + PDF/DOCX resume intake validation) and
+    recruiter dashboard (job creation form + hard-filter criteria) as
+    functional shells
+[ ] FR-02: /api/candidates/upload-resume with PDF/DOCX text extraction
+[ ] Section extraction routine for education, experience and skills
+[ ] Persist parsed resume text to PostgreSQL and project extracted
+    skills into Neo4j nodes and edges
+[ ] File-upload hardening: size limit, MIME/extension allow-list,
+    filename sanitisation, no execution of uploaded content
+[ ] Replace demo content in frontend/src/lib/demoMatch.ts with live API
+    data once FR-04/FR-05 land
+Exit criterion: uploading a real CV through the UI produces stored
+parsed text plus skill nodes in the graph.
+
+--------------------------------------------------------------------
+WEEK 4  Dataset Preparation and Anti-Bias Pipeline
+--------------------------------------------------------------------
+[x] data_pipeline/generate_synthetic_data.py: synthetic Kenyan candidate
+    profiles for Data Analyst, DevOps Engineer, Software Engineer,
+    Accountant and Business Analyst roles, with a matching job generator
+    (started early to unblock the Week 5/6 training notebook)
+[ ] data_pipeline/import_brightermonday_jobs.py (optional): load a
+    BrighterMonday Kenya Jobs export into the job_postings shape; fall
+    back to synthetic job postings if the scraper isn't used
+[ ] data_pipeline/load_esco_ontology.py: ingest a trimmed ESCO CSV export
+    into Neo4j Skill nodes and RELATED_TO edges, extending the Week 1 seed
+[ ] A small CDACC-to-ESCO mapping table (JSON, <100 rows) for the
+    certification families already seeded (software, data, accounting)
+[x] Text pre-processing utilities: normalisation, tokenisation,
+    stop-word removal (implemented in the training notebook, Section 5;
+    move into a shared data_pipeline module when the API needs it too)
+[ ] Anti-bias anonymisation routine stripping names, gender, age,
+    contact details and fine-grained location before scoring
+[ ] Export cleaned datasets to data_pipeline/dataset/ as CSV/JSON with
+    a documented schema and a fixed random seed for reproducibility
+[ ] Seed script that loads the synthetic data into PostgreSQL and Neo4j
+[ ] Define the labelled ground-truth set used later for precision,
+    recall and F1
+Exit criterion: one command regenerates and loads a complete, anonymised
+dataset into both databases.
+
+
+====================================================================
+MONTH 2 - MODEL TRAINING, INTEGRATION, EVALUATION
+====================================================================
+
+--------------------------------------------------------------------
+WEEK 5  Model Work on Google Colab
+--------------------------------------------------------------------
+[x] notebooks/hybrid_matching_model_training.ipynb created and Colab-ready
+    (Drive mount, pinned deps, seed generation and reproducibility handled)
+[x] Run the notebook end-to-end on Colab and record the metrics
+    (done 2026-09-20 -- see FIRST TRAINING RUN RESULTS above)
+[x] Load a pre-trained sentence-transformer (all-MiniLM-L6-v2), tokenise CV
+    and job description text, generate embeddings
+[x] Compute cosine similarity between candidate and job vectors and
+    sanity-check ranking quality on the synthetic set (precision@k,
+    recall@k, NDCG@k against a rule-based weak label)
+[x] Decision recorded: fine-tuning the embedding model itself is deferred;
+    only the score-combination logistic regression is trained/tuned, since
+    3 features over a few thousand rows does not justify a bigger model
+[x] Export model artifacts and the embedding pipeline back to the repo
+    (data_pipeline/artifacts/hybrid_match_weights.json is committed;
+    the .joblib/.npy/.parquet outputs stay gitignored and regenerable)
+[x] Embedding storage decision: JSONB column now (per the existing
+    candidates/job_postings schema); pgvector deferred until proven needed
+Exit criterion: MET for the pipeline mechanics -- a reproducible notebook
+turns raw text into embeddings and produces a ranked candidate list. NOT
+met for matching quality, which is blocked on the label fix in Week 7.
+
+--------------------------------------------------------------------
+WEEK 6  Hybrid Engine Integration and Graph Linking
+--------------------------------------------------------------------
+[ ] app/core/bert_embedder.py: load the model once at startup and expose
+    a batch embedding interface
+[ ] app/core/graph_service.py: Cypher queries for direct skill matches
+    and 2-hop RELATED_TO traversal, returning a weighted overlap score
+[ ] app/core/ml_matcher.py: cosine similarity plus the growth-potential
+    score
+[ ] app/core/hybrid_engine.py: Tier 1 filter then Tier 2 scoring, with
+    the weighted final score (default w1=0.45, w2=0.40, w3=0.15 kept
+    configurable)
+[ ] FR-04: /api/match/evaluate/{job_id} persisting rows to match_results
+[ ] FR-05: /api/match/results/{job_id} returning ranked cards with
+    confidence scores, verified hard filters and skill-gap breakdown
+[ ] Wire the React dashboards to the live endpoints; end-to-end run from
+    upload to ranked results
+Exit criterion: a full matching run completes from the UI and results
+persist to the database.
+
+--------------------------------------------------------------------
+WEEK 7  Theme, Explainability, Testing and Tuning
+--------------------------------------------------------------------
+[ ] Finalise the frontend visual theme, layout and candidate card design
+[ ] Explainability UI: match confidence, matched skills, missing skills
+    chart, and which hard filters were verified
+[ ] Functional testing across candidate and recruiter workflows
+[ ] Performance testing against NFR-02 (2-5 s per matching request);
+    add batching/caching of embeddings if the target is missed
+[ ] Security pass: parameterised queries, bcrypt hashing, JWT expiry,
+    CORS allow-list, secrets only in .env, dependency vulnerability check
+[ ] data_pipeline/evaluate_model.py reporting precision, recall and F1 --
+    this doubles as the "simulation mode" (seeded run of the hybrid engine
+    over the synthetic dataset, independent of live user traffic)
+[ ] Tune scoring weights and thresholds using the evaluation output
+
+    LABEL-VALIDITY CORRECTIONS (blocking any quality claim in the report):
+    CODE COMPLETE 2026-09-20 -- all four land in the next Colab re-run.
+[x] Replace the circular weak label. generate_synthetic_data.py now emits
+    hidden latents (latent_competence, latent_adaptability on candidates;
+    latent_quality_bar on jobs) that are never model features, and the
+    notebook samples is_match as a Bernoulli outcome from a logit built
+    from observable signal + those latents + Gaussian noise. Every driver
+    is centred on its own mean, and the weights were calibrated empirically
+    rather than guessed. Measured over the 4,000 pairs:
+        quantity                                   old      new
+        positive rate                              0.644    0.502
+        best 2-threshold rule over own features    0.975    0.694
+        Bayes accuracy ceiling                     ~1.00    0.799
+    So results are now read against a ~0.80 ceiling and a ~0.50 floor,
+    with a ~0.30 usable band, instead of against a label the model could
+    simply reconstruct.
+[x] Re-tune the baseline thresholds on the validation split, exactly as
+    the learned model's threshold is tuned (shared tune_threshold helper;
+    the old flat 0.5 cut-off made the fixed-weight baseline a near-constant
+    classifier at recall 1.000 / precision 0.629)
+[x] Add a job-disjoint split alongside the candidate-disjoint one. 20% of
+    job postings are held out entirely before splitting, giving a cold-start
+    test of unseen jobs AND unseen candidates; the warm->cold F1 drop is
+    reported and both ROC curves are plotted together
+[x] Enrich job/CV text before trusting S_bert. Each role now has three
+    specialisations with distinct vocabulary, rendered through four sentence
+    templates: 800/800 distinct resumes and 99/100 distinct job posts, and
+    specialisation match feeds the label so semantic signal genuinely matters
+[x] RE-RUN the notebook against the regenerated dataset and record the new
+    metrics (done locally via nbclient 2026-09-20 -- see TRAINING RUN
+    RESULTS above; the committed artifact is now from this run)
+[ ] Hand-label a small gold slice (100-200 pairs) as an independent check
+    on the new label scheme -- deferred until the re-run confirms the scheme
+    behaves as intended
+Exit criterion: measured precision/recall/F1 recorded against a label that
+is NOT a function of the model's own features, and matching latency within
+the stated performance target.
+
+--------------------------------------------------------------------
+WEEK 8  Hardening, Cleanup and Demonstration
+--------------------------------------------------------------------
+[ ] Repository cleanup: remove dead code, confirm directory structure,
+    verify .gitignore, ensure no secrets are tracked
+[ ] Verify a clean-machine setup path (clone, .env, compose up,
+    migrations, seed, run) end to end
+[ ] Fix outstanding bugs from Week 7 testing
+[ ] Final sanity run of the whole prototype with the demo dataset
+[ ] Prepare demonstration assets: seeded demo accounts, sample jobs,
+    sample CVs and a scripted walkthrough of the two-tier pipeline
+[ ] Tag a release commit for the supervisor evaluation build
+Exit criterion: the prototype runs from a clean checkout and the demo
+walkthrough is rehearsed end to end.
+
+
+====================================================================
+RISK WATCHLIST
+====================================================================
+ - Dataset access: BrighterMonday scraper runs cost money and are capped
+   per run; keep the synthetic generator as the default path and treat
+   scraped jobs as an enrichment, not a hard dependency.
+ - Model size vs. latency: a large BERT model on CPU may breach the
+   2-5 s target; pre-compute embeddings and consider a smaller model.
+ - Python 3.14 compatibility: torch/transformers wheels may lag; be
+   ready to run the backend on a 3.12 environment if installs fail.
+ - Scope creep on the frontend theme: keep Week 3 shells minimal and
+   defer all styling to Week 7.
+ - Neo4j ontology breadth: seed only the skill families needed by the
+   demo domains (software, data, accounting).
+ - Marketplace scope creep: apply/accept/contract/project/milestone/
+   payment features stay in docs/extras/marketplace_features.txt and
+   are out of this roadmap until the core engine is done.

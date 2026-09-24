@@ -1,0 +1,81 @@
+@import "tailwindcss";
+
+@theme {
+  --color-obsidian: #070a0f;
+  --color-obsidian-surface: #0d131f;
+  --color-obsidian-card: #141e30;
+  --color-obsidian-border: #233148;
+  --color-obsidian-hover: #1c293e;
+  --color-spectral-emerald: #00f5d4;
+  --color-spectral-mint: #10b981;
+  --color-spectral-amber: #f59e0b;
+  --color-spectral-coral: #ff6b6b;
+  --color-spectral-violet: #8b5cf6;
+  --color-spectral-indigo: #6366f1;
+  --font-sans: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", monospace;
+  --radius-card: 0.875rem;
+  --shadow-glow-emerald: 0 0 20px -5px rgba(0, 245, 212, 0.3);
+  --shadow-glow-amber: 0 0 20px -5px rgba(245, 158, 11, 0.3);
+  --shadow-glow-violet: 0 0 20px -5px rgba(139, 92, 246, 0.3);
+}
+
+@utility bg-grid-pattern {
+  background-image: radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.05) 1px, transparent 0);
+}
+
+@utility bg-grid-sm { background-size: 24px 24px; }
+
+@layer base {
+  html { scroll-behavior: smooth; color-scheme: dark; }
+  body { background: #070a0f; color: #f8fafc; font-family: var(--font-sans); -webkit-font-smoothing: antialiased; }
+  h1, h2, h3 { letter-spacing: -0.02em; }
+  section[id] { scroll-margin-top: 5.5rem; }
+  :focus-visible { outline: 2px solid #00f5d4; outline-offset: 3px; border-radius: 4px; }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+  }
+}
+
+@layer components {
+  .glass-panel { background: linear-gradient(180deg, rgba(20, 30, 48, 0.76), rgba(13, 19, 31, 0.9)); border: 1px solid rgba(255, 255, 255, 0.1); backdrop-filter: blur(14px); }
+  .wave-primary { background-image: linear-gradient(135deg, rgba(0, 245, 212, 0.14), rgba(16, 185, 129, 0.04)); }
+  .wave-amber { background-image: linear-gradient(135deg, rgba(245, 158, 11, 0.14), rgba(255, 107, 107, 0.04)); }
+  .wave-violet { background-image: linear-gradient(135deg, rgba(139, 92, 246, 0.14), rgba(99, 102, 241, 0.04)); }
+  .metric-label, .section-label { display: flex; align-items: center; gap: 0.45rem; color: rgba(255, 255, 255, 0.38); font-family: var(--font-mono); font-size: 0.625rem; letter-spacing: 0.12em; text-transform: uppercase; }
+  .metric-value { margin-top: 0.5rem; color: white; font-family: var(--font-mono); font-size: 1.45rem; font-weight: 600; }
+  .metric-note { margin-top: 0.3rem; font-family: var(--font-mono); font-size: 0.625rem; }
+  .semantic-label, .latent-label { color: #00f5d4; }
+  .compliance-label { color: #f59e0b; }
+  .status-chip { display: inline-flex; align-items: center; gap: 0.4rem; border-radius: 999px; padding: 0.28rem 0.55rem; font-family: var(--font-mono); font-size: 0.59rem; letter-spacing: 0.08em; text-transform: uppercase; }
+  .status-chip.semantic { border: 1px solid rgba(0, 245, 212, 0.35); background: rgba(0, 245, 212, 0.08); color: #00f5d4; }
+  .status-chip.compliance { border: 1px solid rgba(245, 158, 11, 0.35); background: rgba(245, 158, 11, 0.08); color: #f59e0b; }
+  .candidate-row { display: flex; width: 100%; align-items: center; gap: 0.65rem; border-radius: 0.65rem; padding: 0.7rem 0.55rem; transition: background-color 180ms, border-color 180ms; }
+  .candidate-row:hover { background: rgba(255, 255, 255, 0.05); }
+  .candidate-row.selected { border: 1px solid rgba(0, 245, 212, 0.28); background: rgba(0, 245, 212, 0.08); }
+  .avatar { display: grid; height: 2rem; width: 2rem; flex: none; place-items: center; border-radius: 0.55rem; font-family: var(--font-mono); font-size: 0.6rem; font-weight: 600; }
+  .avatar.emerald { background: rgba(0, 245, 212, 0.18); color: #00f5d4; }
+  .avatar.violet { background: rgba(139, 92, 246, 0.2); color: #b7a1ff; }
+  .avatar.amber { background: rgba(245, 158, 11, 0.2); color: #fbbf24; }
+  .avatar.slate { background: rgba(148, 163, 184, 0.16); color: #cbd5e1; }
+  .activity-bar { width: 0.5rem; border-radius: 0.15rem 0.15rem 0 0; background: rgba(245, 158, 11, 0.38); }
+  .activity-bar.active { background: linear-gradient(180deg, #f59e0b, #ff6b6b); box-shadow: 0 0 12px rgba(245, 158, 11, 0.3); }
+  .graph-node { position: absolute; display: grid; place-items: center; border: 1px solid rgba(0, 245, 212, 0.35); border-radius: 999px; background: #141e30; padding: 0.4rem 0.55rem; color: #9fffee; font-family: var(--font-mono); font-size: 0.55rem; box-shadow: 0 0 14px rgba(0, 245, 212, 0.18); }
+  .node-main { left: 39%; top: 38%; border-color: #00f5d4; background: rgba(0, 245, 212, 0.13); }
+  .node-one { left: 8%; top: 15%; }
+  .node-two { right: 8%; top: 15%; }
+  .node-three { bottom: 14%; left: 12%; }
+  .node-four { bottom: 14%; right: 10%; }
+  .graph-line { position: absolute; height: 1px; transform-origin: left center; background: linear-gradient(90deg, rgba(0, 245, 212, 0.1), rgba(0, 245, 212, 0.65)); }
+  .line-a { left: 22%; top: 34%; width: 28%; transform: rotate(19deg); }
+  .line-b { left: 51%; top: 37%; width: 30%; transform: rotate(-20deg); }
+  .line-c { left: 23%; top: 60%; width: 28%; transform: rotate(-19deg); }
+  .field { display: block; }
+  .field > span { display: block; margin-bottom: 0.45rem; color: rgba(255, 255, 255, 0.5); font-family: var(--font-mono); font-size: 0.625rem; letter-spacing: 0.09em; text-transform: uppercase; }
+  .field input, .field textarea { width: 100%; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 0.65rem; background: rgba(0, 0, 0, 0.2); padding: 0.7rem 0.75rem; color: white; font-size: 0.875rem; outline: none; transition: border-color 180ms, background-color 180ms; }
+  .field input:focus, .field textarea:focus { border-color: rgba(0, 245, 212, 0.6); background: rgba(0, 245, 212, 0.03); }
+  .field small { display: block; margin-top: 0.4rem; color: rgba(255, 255, 255, 0.32); font-size: 0.7rem; }
+  @keyframes status-ping { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.45; transform: scale(0.82); } }
+  .animate-status { animation: status-ping 2s ease-in-out infinite; }
+}

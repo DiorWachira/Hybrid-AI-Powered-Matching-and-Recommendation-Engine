@@ -1,0 +1,62 @@
+HYBRID AI-POWERED WORKFORCE PLACEMENT ENGINE
+EXTRA SCOPE - MARKETPLACE FEATURES (DEFERRED)
+Recorded: 2026-09-20
+
+Purpose of this file
+--------------------
+The client also described a broader freelance-marketplace flow (job search,
+apply, admin accept, contract, project, milestone, payment). That is a
+significant scope addition beyond the core hybrid matching/recommendation
+engine (FR-01..FR-05) that this repo is currently built around.
+
+Decision: the matching engine stays the primary focus of the current
+increment. Everything below is captured here so it is not lost, and can be
+picked up as a later phase (or handed to a teammate) without changing the
+roadmap in docs/ROADMAP.txt.
+
+Client-described flow (as given, informal CRUD-level notes)
+-------------------------------------------------------------
+- Candidate searches and applies to a job.
+- Admin/recruiter reviews and accepts an application.
+- A contract is sent to the accepted candidate.
+- A project is created and linked to the contract.
+- The project is broken into milestones.
+- Payment is tracked per milestone.
+
+Suggested entities (PostgreSQL, additive to the existing schema)
+-------------------------------------------------------------------
+- APPLICATIONS: application_id (PK), job_id (FK), candidate_id (FK),
+  status ('applied' | 'accepted' | 'rejected'), applied_at
+- CONTRACTS: contract_id (PK), application_id (FK), terms_text,
+  status ('sent' | 'accepted' | 'declined'), sent_at
+- PROJECTS: project_id (PK), contract_id (FK), title, description,
+  status ('active' | 'completed' | 'cancelled'), created_at
+- MILESTONES: milestone_id (PK), project_id (FK), title, description,
+  due_date, status ('pending' | 'in_progress' | 'submitted' | 'approved')
+- PAYMENTS: payment_id (PK), milestone_id (FK), amount, currency,
+  status ('pending' | 'released' | 'failed'), created_at
+
+Explicit decisions already made
+--------------------------------
+- Payments: status tracking only in this project. No real payment gateway
+  (no Stripe/M-Pesa integration) unless scope changes later.
+- Backend framework: the client mentioned NestJS, but this repo keeps the
+  existing FastAPI (Python) backend, because the ML/NLP pipeline (BERT,
+  Neo4j graph scoring) is Python-native and already integrated. If a NestJS
+  service is ever added for this marketplace layer, it should call the
+  FastAPI matching service over REST rather than duplicating the ML code.
+- Mobile app: out of scope entirely per the user's instruction ("focusing
+  only on the web app").
+
+Suggested phase order if/when this is picked up
+--------------------------------------------------
+1. APPLICATIONS (candidate apply, recruiter accept/reject) - natural
+   extension of existing job_postings + candidates + match_results.
+2. CONTRACTS (generate from an accepted application).
+3. PROJECTS + MILESTONES (linked to a contract).
+4. PAYMENTS (status-only ledger against milestones).
+5. Only after all of the above: revisit whether a real payment sandbox
+   (Stripe test mode or M-Pesa Daraja sandbox) is worth adding.
+
+This file is intentionally kept outside docs/ROADMAP.txt so the 8-week
+milestone plan stays focused on the matching engine.

@@ -1,0 +1,52 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+venv/
+.venv/
+.env
+.env.*
+!.env.example
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Node
+node_modules/
+dist/
+build/
+.vite/
+*.tsbuildinfo
+
+# IDE / OS
+.vscode/settings.json
+.DS_Store
+Thumbs.db
+
+# Runtime data
+postgres-data/
+neo4j-data/
+neo4j-logs/
+neo4j-import/
+neo4j-plugins/
+
+# Local research and planning notes
+Dataset_sourcing/
+prompt content and context.txt
+
+# Generated data, model artifacts and reports (regenerate via data_pipeline/ scripts)
+data_pipeline/dataset/
+data_pipeline/artifacts/*
+data_pipeline/reports/*
+.ipynb_checkpoints/
+
+# Keep the small, human-readable artifacts the backend and the report depend on.
+# The .joblib pickle is deliberately NOT tracked: the backend loads the JSON weights
+# instead, to avoid deserialising a pickle at runtime.
+!data_pipeline/artifacts/hybrid_match_weights.json
+!data_pipeline/reports/*.json
+!data_pipeline/reports/*.png

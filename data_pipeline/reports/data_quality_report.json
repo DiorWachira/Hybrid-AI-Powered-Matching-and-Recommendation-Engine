@@ -1,0 +1,40 @@
+{
+  "candidates": {
+    "row_count": 800,
+    "duplicate_ids": 0,
+    "missing_values_by_column": {
+      "candidate_id": 0,
+      "target_role": 0,
+      "specialisation": 0,
+      "location": 0,
+      "years_experience": 0,
+      "education": 0,
+      "skills": 0,
+      "certifications": 0,
+      "expected_salary_kes": 0,
+      "resume_text": 0,
+      "latent_competence": 0,
+      "latent_adaptability": 0
+    },
+    "negative_experience_rows": 0,
+    "distinct_resume_texts": 800
+  },
+  "jobs": {
+    "row_count": 100,
+    "duplicate_ids": 0,
+    "missing_values_by_column": {
+      "job_id": 0,
+      "title": 0,
+      "specialisation": 0,
+      "location": 0,
+      "required_experience_years": 0,
+      "required_skills": 0,
+      "mandatory_certifications": 0,
+      "salary_range_max": 0,
+      "description": 0,
+      "latent_quality_bar": 0
+    },
+    "negative_experience_rows": 0,
+    "distinct_descriptions": 99
+  }
+}

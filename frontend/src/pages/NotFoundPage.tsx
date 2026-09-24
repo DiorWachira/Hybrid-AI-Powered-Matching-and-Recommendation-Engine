@@ -1,0 +1,2 @@
+import { Link } from "react-router-dom";
+export function NotFoundPage() { return <main className="grid min-h-screen place-items-center bg-obsidian p-5 text-center"><div><p className="font-mono text-sm text-spectral-violet">404 / route unavailable</p><h1 className="mt-3 text-3xl font-semibold">This workspace does not exist.</h1><Link to="/recruiter" className="mt-6 inline-block rounded-lg bg-spectral-emerald px-4 py-2 text-sm font-semibold text-obsidian">Return to match queue</Link></div></main>; }
