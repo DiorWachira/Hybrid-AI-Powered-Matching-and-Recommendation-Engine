@@ -202,7 +202,7 @@ def generate_candidate(rng: random.Random) -> dict[str, object]:
     )
 
     return {
-        "candidate_id": str(uuid.uuid4()),
+        "candidate_id": str(uuid.UUID(int=rng.getrandbits(128), version=4)),
         "target_role": role_name,
         "specialisation": specialisation,
         "location": city,
@@ -249,7 +249,7 @@ def generate_job(rng: random.Random) -> dict[str, object]:
     )
 
     return {
-        "job_id": str(uuid.uuid4()),
+        "job_id": str(uuid.UUID(int=rng.getrandbits(128), version=4)),
         "title": role_name,
         "specialisation": specialisation,
         "location": city,
@@ -268,6 +268,7 @@ def main() -> None:
     parser.add_argument("--candidates", type=int, default=500)
     parser.add_argument("--jobs", type=int, default=60)
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--output-dir", type=Path, default=OUTPUT_DIR)
     args = parser.parse_args()
 
     rng = random.Random(args.seed)
@@ -275,11 +276,11 @@ def main() -> None:
     candidates = [generate_candidate(rng) for _ in range(args.candidates)]
     jobs = [generate_job(rng) for _ in range(args.jobs)]
 
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    (OUTPUT_DIR / "candidates.json").write_text(json.dumps(candidates, indent=2), encoding="utf-8")
-    (OUTPUT_DIR / "jobs.json").write_text(json.dumps(jobs, indent=2), encoding="utf-8")
+    args.output_dir.mkdir(parents=True, exist_ok=True)
+    (args.output_dir / "candidates.json").write_text(json.dumps(candidates, indent=2), encoding="utf-8")
+    (args.output_dir / "jobs.json").write_text(json.dumps(jobs, indent=2), encoding="utf-8")
 
-    print(f"Wrote {len(candidates)} candidates and {len(jobs)} jobs to {OUTPUT_DIR}")
+    print(f"Wrote {len(candidates)} candidates and {len(jobs)} jobs to {args.output_dir}")
 
 
 if __name__ == "__main__":

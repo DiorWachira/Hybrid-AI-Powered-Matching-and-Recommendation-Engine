@@ -17,18 +17,19 @@ from app.db.models import Candidate, Employer, JobPosting, User, UserRole  # noq
 from app.db.neo4j_db import project_candidate_skills, project_job_requirements  # noqa: E402
 from app.db.postgres import SessionLocal  # noqa: E402
 from app.utils.security import hash_password  # noqa: E402
+from app.core.text_preprocessing import anonymize_resume_text  # noqa: E402
 
 DATASET = ROOT / "data_pipeline" / "dataset"
 SEED_PASSWORD = "SeedDataOnly123!"
 
 
-def load_json(name: str) -> list[dict[str, object]]:
-    return json.loads((DATASET / name).read_text(encoding="utf-8"))
+def load_json(path: Path) -> list[dict[str, object]]:
+    return json.loads(path.read_text(encoding="utf-8"))
 
 
-def seed(candidates_limit: int, jobs_limit: int, skip_graph: bool) -> tuple[int, int]:
-    candidates = load_json("candidates.json")[:candidates_limit]
-    jobs = load_json("jobs.json")[:jobs_limit]
+def seed(candidates_limit: int, jobs_limit: int, skip_graph: bool, data_dir: Path, jobs_file: Path | None) -> tuple[int, int]:
+    candidates = load_json(data_dir / "candidates.json")[:candidates_limit]
+    jobs = load_json(jobs_file or data_dir / "jobs.json")[:jobs_limit]
     with SessionLocal() as db:
         employer_user = db.scalar(select(User).where(User.email == "seed-recruiter@jobbridge.local"))
         if employer_user is None:
@@ -61,7 +62,7 @@ def seed(candidates_limit: int, jobs_limit: int, skip_graph: bool) -> tuple[int,
                 location=str(item.get("location") or ""),
                 years_experience=int(item.get("years_experience") or 0),
                 expected_salary=item.get("expected_salary_kes"),
-                parsed_resume_text=str(item.get("resume_text") or ""),
+                parsed_resume_text=anonymize_resume_text(str(item.get("resume_text") or "")),
                 skills=skills,
                 certifications=certifications,
             ))
@@ -73,11 +74,23 @@ def seed(candidates_limit: int, jobs_limit: int, skip_graph: bool) -> tuple[int,
             job_id = uuid.UUID(str(item["job_id"]))
             if db.get(JobPosting, job_id) is not None:
                 continue
+            company_name = str(item.get("company_name") or employer.company_name).strip()
+            job_employer = db.scalar(select(Employer).where(Employer.company_name == company_name))
+            if job_employer is None:
+                company_key = uuid.uuid5(uuid.NAMESPACE_URL, company_name.casefold()).hex[:16]
+                employer_user = db.scalar(select(User).where(User.email == f"seed-employer-{company_key}@jobbridge.local"))
+                if employer_user is None:
+                    employer_user = User(email=f"seed-employer-{company_key}@jobbridge.local", password_hash=hash_password(SEED_PASSWORD), role=UserRole.recruiter)
+                    db.add(employer_user)
+                    db.flush()
+                job_employer = Employer(user_id=employer_user.user_id, company_name=company_name, industry="Imported employer", location=str(item.get("location") or "Kenya"))
+                db.add(job_employer)
+                db.flush()
             required_skills = [str(value) for value in item.get("required_skills", [])]
             certifications = [str(value) for value in item.get("mandatory_certifications", [])]
             db.add(JobPosting(
                 job_id=job_id,
-                employer_id=employer.employer_id,
+                employer_id=job_employer.employer_id,
                 title=str(item.get("title") or "Untitled role"),
                 description=str(item.get("description") or ""),
                 location=str(item.get("location") or ""),
@@ -98,9 +111,11 @@ def main() -> None:
     parser.add_argument("--candidates", type=int, default=25)
     parser.add_argument("--jobs", type=int, default=20)
     parser.add_argument("--skip-graph", action="store_true")
+    parser.add_argument("--data-dir", type=Path, default=DATASET)
+    parser.add_argument("--jobs-file", type=Path, help="optional normalized jobs JSON, e.g. imported BrighterMonday export")
     args = parser.parse_args()
-    candidates, jobs = seed(args.candidates, args.jobs, args.skip_graph)
-    print(f"Seeded up to {candidates} candidates and {jobs} jobs. Seed password: {SEED_PASSWORD}")
+    candidates, jobs = seed(args.candidates, args.jobs, args.skip_graph, args.data_dir, args.jobs_file)
+    print(f"Seed processed up to {candidates} candidates and {jobs} jobs. Local-only demo accounts use the configured seed password.")
 
 
 if __name__ == "__main__":

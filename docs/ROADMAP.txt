@@ -1,6 +1,6 @@
 HYBRID AI-POWERED WORKFORCE PLACEMENT ENGINE
 PROJECT MILESTONE ROADMAP (8 WEEKS)
-Last updated: 2026-09-20 (evening, after first Colab training run)
+Last updated: 2026-10-01 (Week 4 preparation implementation pass)
 
 Legend:  [x] done   [~] partially done   [ ] not started
 Note: academic documentation tasks (Chapter 5, UML write-ups, report) are
@@ -112,12 +112,15 @@ Known gaps to close early:
  - Auth, job CRUD, candidate profile updates, resume ingestion and
      match-evaluation endpoints are implemented
  - ML dependencies, trained artifact loading, live MiniLM embeddings and
-     calibrated scoring are complete; richer 2-hop graph traversal remains
-     pending
+     calibrated scoring are complete; Neo4j weighted two-hop skill paths are
+     available for visualization/explanation, separate from trained S_graph
  - Frontend routes, authentication, resume upload and live ranked-result
      rendering are implemented; richer trained-model explainability remains
      pending
- - ESCO/CDACC ingestion and one-command dataset seeding remain pending
+ - Week 4 tooling supports local BrighterMonday JSON normalization, trimmed ESCO
+     CSV parsing and Neo4j loader code, provisional CDACC working mappings, anonymized exports,
+     and one-command preparation/seeding; live DB seeding needs Docker Desktop
+     verification and CDACC mappings need official-source review
 
 
 ====================================================================
@@ -210,32 +213,31 @@ WEEK 3  Frontend Shell and Resume Parsing
 Exit criterion: uploading a real CV through the UI produces stored
 parsed text plus skill nodes in the graph.
 
---------------------------------------------------------------------
 WEEK 4  Dataset Preparation and Anti-Bias Pipeline
---------------------------------------------------------------------
 [x] data_pipeline/generate_synthetic_data.py: synthetic Kenyan candidate
     profiles for Data Analyst, DevOps Engineer, Software Engineer,
     Accountant and Business Analyst roles, with a matching job generator
     (started early to unblock the Week 5/6 training notebook)
-[ ] data_pipeline/import_brightermonday_jobs.py (optional): load a
-    BrighterMonday Kenya Jobs export into the job_postings shape; fall
-    back to synthetic job postings if the scraper isn't used
-[ ] data_pipeline/load_esco_ontology.py: ingest a trimmed ESCO CSV export
-    into Neo4j Skill nodes and RELATED_TO edges, extending the Week 1 seed
-[ ] A small CDACC-to-ESCO mapping table (JSON, <100 rows) for the
-    certification families already seeded (software, data, accounting)
-[x] Text pre-processing utilities: normalisation, tokenisation,
-    stop-word removal (implemented in the training notebook, Section 5;
-    move into a shared data_pipeline module when the API needs it too)
-[ ] Anti-bias anonymisation routine stripping names, gender, age,
-    contact details and fine-grained location before scoring
-[ ] Export cleaned datasets to data_pipeline/dataset/ as CSV/JSON with
-    a documented schema and a fixed random seed for reproducibility
-[ ] Seed script that loads the synthetic data into PostgreSQL and Neo4j
-[ ] Define the labelled ground-truth set used later for precision,
-    recall and F1
-Exit criterion: one command regenerates and loads a complete, anonymised
-dataset into both databases.
+[x] data_pipeline/import_brightermonday_jobs.py normalizes a permitted local
+    BrighterMonday/Apify JSON export; it does not scrape or require a paid API
+[~] data_pipeline/load_esco_ontology.py parses trimmed ESCO skills CSV and
+    optional related-skill CSV data; live Neo4j import awaits Docker
+    verification
+[~] CDACC-to-ESCO JSON working mappings are included; examples are provisional
+    pending verification against the relevant official CDACC standards
+[x] Shared text preprocessing is used by resume ingestion, cleaned exports,
+    and semantic scoring to remove identifiers and fine-grained locations
+[x] Shared anonymization removes labeled/known names, gender, age, email, phone,
+    URL, and fine-grained Kenyan city from resume scoring text
+[x] data_pipeline/prepare_week4.py exports documented JSON with fixed seed,
+    quality checks, and hidden label-generation fields removed; raw training
+    data is preserved and generated exports stay local
+[~] data_pipeline/seed_database.py and prepare_week4.py can load candidates,
+    jobs, and graph projections; live Docker seed execution awaits verification
+[x] Training labels and leakage-safe train/validation/warm/cold splits are
+    defined and evaluated in notebooks/hybrid_matching_model_training.ipynb
+Exit criterion: [~] one command prepares cleaned data; integrated PostgreSQL
+and Neo4j seeding is implemented but awaits live Docker verification.
 
 
 ====================================================================

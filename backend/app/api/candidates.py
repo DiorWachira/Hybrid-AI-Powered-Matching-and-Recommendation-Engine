@@ -14,6 +14,7 @@ from app.db.neo4j_db import project_candidate_skills
 from app.db.postgres import get_db
 from app.schemas import CandidateDashboardResponse, CandidateProfileResponse, CandidateProfileUpdate, OpportunityActionRequest, OpportunityResponse
 from app.api.matches import _score_candidate
+from app.core.text_preprocessing import anonymize_resume_text
 
 router = APIRouter(prefix="/candidates", tags=["candidates"])
 MAX_RESUME_BYTES = 10 * 1024 * 1024
@@ -101,7 +102,7 @@ async def upload_resume(
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="The resume could not be read") from exc
     if not text:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="The resume contains no readable text")
-    candidate.parsed_resume_text = text[:20_000]
+    candidate.parsed_resume_text = anonymize_resume_text(text, (candidate.full_name,))[:20_000]
     candidate.skills = _skills_from_text(text)
     project_candidate_skills(str(candidate.candidate_id), candidate.skills, candidate.certifications or [])
     db.commit()

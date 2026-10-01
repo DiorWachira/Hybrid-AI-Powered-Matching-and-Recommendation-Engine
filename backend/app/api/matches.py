@@ -13,12 +13,6 @@ router = APIRouter(prefix="/matches", tags=["matches"])
 
 
 def _score_candidate(candidate: Candidate, job: JobPosting) -> MatchCandidateResponse:
-    candidate_skills = {skill.casefold() for skill in (candidate.skills or [])}
-    required_skills = {skill.casefold() for skill in (job.required_skills or [])}
-    overlap = len(candidate_skills & required_skills) / len(required_skills) if required_skills else 0.0
-    semantic_score = semantic_similarity(candidate.parsed_resume_text or "", job.description)
-    experience_score = min(candidate.years_experience / max(job.required_experience_years, 1), 1.0)
-    growth_score = (experience_score + min(len(candidate.certifications or []) / 2, 1.0)) / 2
     rule_result = RuleBasedMatcher().check_hard_filters(
         CandidateRuleData(
             years_experience=candidate.years_experience,
@@ -33,6 +27,24 @@ def _score_candidate(candidate: Candidate, job: JobPosting) -> MatchCandidateRes
             mandatory_certifications=frozenset(job.mandatory_certifications or []),
         ),
     )
+    if not rule_result.passed:
+        return MatchCandidateResponse(
+            candidate_id=candidate.candidate_id,
+            full_name=candidate.full_name,
+            hard_rule_passed=False,
+            rule_reasons=list(rule_result.reasons),
+            skill_overlap=0.0,
+            semantic_score=0.0,
+            growth_score=0.0,
+            final_score=0.0,
+        )
+
+    candidate_skills = {skill.casefold() for skill in (candidate.skills or [])}
+    required_skills = {skill.casefold() for skill in (job.required_skills or [])}
+    overlap = len(candidate_skills & required_skills) / len(required_skills) if required_skills else 0.0
+    semantic_score = semantic_similarity(candidate.parsed_resume_text or "", job.description)
+    experience_score = min(candidate.years_experience / max(job.required_experience_years, 1), 1.0)
+    growth_score = (experience_score + min(len(candidate.certifications or []) / 2, 1.0)) / 2
     final_score, _ = calibrated_score(semantic_score, overlap, growth_score)
     return MatchCandidateResponse(
         candidate_id=candidate.candidate_id,

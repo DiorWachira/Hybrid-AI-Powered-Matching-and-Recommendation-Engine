@@ -91,6 +91,39 @@ def project_job_requirements(job_title: str, required_skills: list[str], certifi
         driver.close()
 
 
+def load_skill_ontology(skills: list[dict[str, str]], relationships: list[dict[str, object]], cdacc_mappings: list[dict[str, str]]) -> dict[str, int]:
+    driver = get_neo4j_driver()
+    try:
+        with driver.session(database="neo4j") as session:
+            session.run("CREATE CONSTRAINT skill_name_unique IF NOT EXISTS FOR (s:Skill) REQUIRE s.name IS UNIQUE").consume()
+            session.run("CREATE CONSTRAINT cdacc_standard_name_unique IF NOT EXISTS FOR (c:CDACCStandard) REQUIRE c.name IS UNIQUE").consume()
+            for batch_start in range(0, len(skills), 500):
+                session.run(
+                    "UNWIND $rows AS row MERGE (s:Skill {name: row.name}) "
+                    "SET s.category = row.category, s.source = row.source",
+                    {"rows": skills[batch_start:batch_start + 500]},
+                ).consume()
+            for batch_start in range(0, len(relationships), 500):
+                session.run(
+                        "UNWIND $rows AS row MERGE (a:Skill {name: row.from_skill}) "
+                    "MERGE (b:Skill {name: row.target_skill}) "
+                        "MERGE (a)-[r:RELATED_TO]->(b) SET r.weight = row.weight, r.source = row.source",
+                    {"rows": relationships[batch_start:batch_start + 500]},
+                ).consume()
+            for mapping in cdacc_mappings:
+                session.run(
+                        "MERGE (c:CDACCStandard {name: $cdacc}) SET c.source_note = $source_note "
+                    "MERGE (s:Skill {name: $esco}) MERGE (c)-[:MAPS_TO]->(s)",
+                    {"cdacc": mapping["cdacc_name"], "esco": mapping["esco_skill"], "source_note": mapping.get("source_note", "")},
+                ).consume()
+            skill_count = session.run("MATCH (s:Skill) RETURN count(s) AS count").single()["count"]
+            relation_count = session.run("MATCH (:Skill)-[r:RELATED_TO]->(:Skill) RETURN count(r) AS count").single()["count"]
+            mapping_count = session.run("MATCH (:CDACCCertification)-[r:MAPS_TO]->(:Skill) RETURN count(r) AS count").single()["count"]
+            return {"skills": int(skill_count), "related_to": int(relation_count), "cdacc_mappings": int(mapping_count)}
+    finally:
+        driver.close()
+
+
 def seed_neo4j_ontology() -> dict[str, int]:
     driver = get_neo4j_driver()
     try:
