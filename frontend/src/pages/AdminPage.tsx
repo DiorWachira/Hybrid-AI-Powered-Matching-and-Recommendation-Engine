@@ -1,24 +1,79 @@
 import { useEffect, useState } from "react";
-import { Activity, BriefcaseBusiness, Database, ShieldCheck, Users } from "lucide-react";
-import { PageTitle } from "../components/PageTitle";
-import { api, type AdminOverview } from "../lib/api";
+import { Activity, ArrowLeft, ArrowRight, BriefcaseBusiness, Database, RefreshCw, Search, ShieldCheck, Users } from "lucide-react";
+import { api, type AdminOverview, type AdminUser, type ApiHealth } from "../lib/api";
 
 const metrics = [
   ["users_count", "Registered users", Users],
-  ["candidates_count", "Candidate profiles", ShieldCheck],
-  ["employers_count", "Employer profiles", BriefcaseBusiness],
+  ["candidates_count", "Candidates", ShieldCheck],
+  ["employers_count", "Employers", BriefcaseBusiness],
   ["jobs_count", "Job postings", Database],
-  ["match_results_count", "Evaluated matches", Activity],
+  ["match_results_count", "Match records", Activity],
+  ["applications_count", "Applications", BriefcaseBusiness],
+  ["pending_graph_events", "Pending graph updates", Database],
+  ["suspended_users_count", "Suspended accounts", ShieldCheck],
 ] as const;
 
 export function AdminPage() {
   const [overview, setOverview] = useState<AdminOverview | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [refresh, setRefresh] = useState(0);
+  const [health, setHealth] = useState<ApiHealth | null>(null);
+  const [accounts, setAccounts] = useState<AdminUser[]>([]);
+  const [accountsLoading, setAccountsLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [query, setQuery] = useState("");
+  const [offset, setOffset] = useState(0);
+  const [busy, setBusy] = useState<string | null>(null);
   useEffect(() => {
+    let active = true;
     const token = localStorage.getItem("jobbridge_token");
-    if (!token) return;
-    void api.adminOverview(token).then(setOverview).catch((reason: Error) => setError(reason.message));
-  }, []);
+    if (!token) { setLoading(false); setError("Sign in again to view administration."); return; }
+    setError(null); setLoading(true);
+    void Promise.all([api.adminOverview(token), api.health()]).then(([data, readiness]) => { if (active) { setOverview(data); setHealth(readiness); } })
+      .catch((reason: Error) => { if (active) setError(reason.message); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [refresh]);
 
-  return <main className="mx-auto max-w-[1500px] space-y-6 px-5 py-6 lg:px-8"><PageTitle eyebrow="Administration" title="System activity and placement oversight." detail="Review account growth, employer activity, job volume, and completed match evaluations from one protected dashboard." />{error && <p className="rounded-xl border border-spectral-coral/35 bg-spectral-coral/10 px-4 py-3 text-sm text-spectral-coral">{error}</p>}<section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">{metrics.map(([key, label, Icon]) => <div key={key} className="glass-panel rounded-2xl p-5"><Icon className="h-4 w-4 text-spectral-emerald" /><p className="mt-5 text-xs text-white/45">{label}</p><strong className="mt-2 block font-mono text-3xl text-white">{overview?.[key] ?? "-"}</strong></div>)}</section><section className="grid gap-6 xl:grid-cols-2"><div className="glass-panel rounded-2xl p-5"><h2 className="text-sm font-semibold">Recent users</h2><div className="mt-4 space-y-3">{overview?.recent_users.map((user) => <div key={user.user_id} className="flex items-center justify-between border-b border-white/5 pb-3 text-sm"><span className="truncate text-white/70">{user.email}</span><span className="font-mono text-xs uppercase text-spectral-emerald">{user.role}</span></div>) ?? <p className="text-sm text-white/40">Loading activity...</p>}</div></div><div className="glass-panel rounded-2xl p-5"><h2 className="text-sm font-semibold">Recent job postings</h2><div className="mt-4 space-y-3">{overview?.recent_jobs.map((job) => <div key={job.job_id} className="border-b border-white/5 pb-3"><div className="flex justify-between gap-3 text-sm"><strong>{job.title}</strong><span className="font-mono text-xs uppercase text-spectral-amber">{job.status}</span></div><p className="mt-1 text-xs text-white/40">{job.location || "Location flexible"} · {job.required_skills?.length ?? 0} required skills</p></div>) ?? <p className="text-sm text-white/40">Loading activity...</p>}</div></div></section></main>;
+  useEffect(() => {
+    let active = true;
+    const token = localStorage.getItem("jobbridge_token");
+    if (!token) { setAccountsLoading(false); return; }
+    setAccountsLoading(true);
+    void api.adminUsers(token, query, offset).then((data) => { if (active) setAccounts(data); })
+      .catch((reason: Error) => { if (active) { setError(reason.message); setAccounts([]); } })
+      .finally(() => { if (active) setAccountsLoading(false); });
+    return () => { active = false; };
+  }, [query, offset, refresh]);
+
+  const changeAccount = async (account: AdminUser) => {
+    if (!window.confirm(`${account.is_active ? "Suspend" : "Reactivate"} ${account.display_name}?`)) return;
+    setBusy(account.user_id); setError(null);
+    try { await api.setAccountActive(localStorage.getItem("jobbridge_token") ?? "", account.user_id, !account.is_active); setRefresh((value) => value + 1); }
+    catch (reason) { setError(reason instanceof Error ? reason.message : "Account update failed."); }
+    finally { setBusy(null); }
+  };
+
+  const changeJob = async (jobId: string, status: "open" | "closed") => {
+    if (!window.confirm(`Set this job to ${status}?`)) return;
+    setBusy(jobId); setError(null);
+    try { await api.setJobStatus(localStorage.getItem("jobbridge_token") ?? "", jobId, status); setRefresh((value) => value + 1); }
+    catch (reason) { setError(reason instanceof Error ? reason.message : "Job update failed."); }
+    finally { setBusy(null); }
+  };
+
+  return <main className="studio-page">
+    <div className="page-heading"><div><p className="eyebrow">Administration</p><h1>The bigger picture.</h1><p>Accounts, opportunities and matching activity.</p></div><button className="secondary-button" disabled={loading} onClick={() => setRefresh((value) => value + 1)}><RefreshCw size={16} />{loading ? "Refreshing..." : "Refresh overview"}</button></div>
+    {error && <p className="notice error" role="alert">{error}</p>}
+    <section className="admin-stats" aria-label="Platform totals" aria-busy={loading}>{metrics.map(([key, label, Icon]) => <div key={key}><Icon size={19} /><span>{label}</span><strong>{loading ? "..." : overview?.[key] ?? "—"}</strong></div>)}</section>
+    <section className="data-section"><h2 className="section-heading"><Database size={18} />System health</h2><div className="skill-tags"><span>PostgreSQL: {loading ? "Checking" : health?.database.postgres ?? "Unavailable"}</span><span>Neo4j: {loading ? "Checking" : health?.database.neo4j ?? "Unavailable"}</span></div></section>
+    <section className="data-section"><h2 className="section-heading"><Users size={18} />Accounts</h2>
+      <form className="admin-search" onSubmit={(event) => { event.preventDefault(); setOffset(0); setQuery(search.trim()); }}><label className="studio-field">Name, company or email<input value={search} onChange={(event) => setSearch(event.target.value)} maxLength={120} type="search" /></label><button className="secondary-button" type="submit"><Search size={16} />Search</button></form>
+      <div className="data-table-wrap" aria-busy={accountsLoading}><table className="data-table"><thead><tr><th scope="col">Name</th><th scope="col">Email</th><th scope="col">Role</th><th scope="col">Data</th><th scope="col">Active</th></tr></thead><tbody>{accounts.map((account) => <tr key={account.user_id}><td><strong>{account.display_name}</strong>{account.company_name && <div>{account.company_name}</div>}</td><td>{account.email}</td><td>{account.role}</td><td>{account.is_demo ? "Fictional demo" : "Registered"}</td><td><input type="checkbox" role="switch" checked={account.is_active} aria-label={`Account active for ${account.display_name}`} disabled={account.role === "admin" || busy !== null || accountsLoading} onChange={() => void changeAccount(account)} /></td></tr>)}{!accounts.length && <tr><td colSpan={5}>{accountsLoading ? "Loading accounts..." : "No accounts found"}</td></tr>}</tbody></table></div>
+      <div className="admin-pagination"><button className="icon-button" title="Previous accounts" aria-label="Previous accounts" disabled={offset === 0 || accountsLoading} onClick={() => setOffset((value) => Math.max(0, value - 25))}><ArrowLeft size={18} /></button><span>Page {Math.floor(offset / 25) + 1}</span><button className="icon-button" title="Next accounts" aria-label="Next accounts" disabled={accounts.length < 25 || accountsLoading} onClick={() => setOffset((value) => value + 25)}><ArrowRight size={18} /></button></div>
+    </section>
+    <section className="data-section"><h2 className="section-heading"><BriefcaseBusiness size={18} />Recent opportunities</h2><div className="data-table-wrap"><table className="data-table"><thead><tr><th scope="col">Role</th><th scope="col">Location</th><th scope="col">Skills</th><th scope="col">Status</th></tr></thead><tbody>{overview?.recent_jobs.map((job) => <tr key={job.job_id}><td>{job.title}</td><td>{job.location || "Not specified"}</td><td>{job.required_skills?.length ?? 0}</td><td><select aria-label={`Status for ${job.title}`} value={job.status} disabled={busy !== null || loading} onChange={(event) => void changeJob(job.job_id, event.target.value as "open" | "closed")}><option value="open">Open</option><option value="closed">Closed</option></select></td></tr>)}{!overview?.recent_jobs.length && <tr><td colSpan={4}>{loading ? "Loading opportunities..." : error ? "Opportunities unavailable" : "No job postings yet"}</td></tr>}</tbody></table></div></section>
+    <section className="data-section"><h2 className="section-heading"><Activity size={18} />Recent activity</h2><div className="data-table-wrap"><table className="data-table"><thead><tr><th scope="col">Time</th><th scope="col">Action</th><th scope="col">Actor</th><th scope="col">Resource</th></tr></thead><tbody>{overview?.recent_activity.map((event) => <tr key={event.event_id}><td>{new Date(event.created_at).toLocaleString()}</td><td>{event.action.replaceAll(".", " / ").replaceAll("_", " ")}</td><td title={event.actor_user_id ?? "System"}>{event.actor_user_id?.slice(0, 8) ?? "System"}</td><td title={event.resource_id ?? undefined}>{event.resource_type} {event.resource_id?.slice(0, 8)}</td></tr>)}{!overview?.recent_activity.length && <tr><td colSpan={4}>{loading ? "Loading activity..." : "No recorded activity yet"}</td></tr>}</tbody></table></div></section>
+  </main>;
 }

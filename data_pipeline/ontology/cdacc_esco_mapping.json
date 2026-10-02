@@ -1,0 +1,11 @@
+{
+  "mapping_status": "curated working examples; verify labels against the selected official CDACC occupational-standard release before academic claims",
+  "mappings": [
+    {"cdacc_name":"Apply Digital Literacy","esco_skill":"ICT literacy","source_note":"Illustrative mapping pending source-document verification"},
+    {"cdacc_name":"Perform Data Analysis","esco_skill":"data analysis","source_note":"Illustrative mapping pending source-document verification"},
+    {"cdacc_name":"Manage Financial Records","esco_skill":"financial accounting","source_note":"Illustrative mapping pending source-document verification"},
+    {"cdacc_name":"Prepare Tax Returns","esco_skill":"taxation","source_note":"Illustrative mapping pending source-document verification"},
+    {"cdacc_name":"Develop Software Applications","esco_skill":"software development","source_note":"Illustrative mapping pending source-document verification"},
+    {"cdacc_name":"Manage Projects","esco_skill":"project management","source_note":"Illustrative mapping pending source-document verification"}
+  ]
+}

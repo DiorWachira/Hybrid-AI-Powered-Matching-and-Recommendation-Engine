@@ -8,6 +8,7 @@ class CandidateRuleData:
     location: str | None
     expected_salary: Decimal | None
     certifications: frozenset[str]
+    work_authorized: bool | None = None
 
 
 @dataclass(frozen=True)
@@ -16,6 +17,7 @@ class JobRuleData:
     location: str | None
     salary_range_max: Decimal | None
     mandatory_certifications: frozenset[str]
+    requires_work_authorization: bool = False
 
 
 @dataclass(frozen=True)
@@ -29,6 +31,8 @@ class RuleBasedMatcher:
 
     def check_hard_filters(self, candidate: CandidateRuleData, job: JobRuleData) -> RuleFilterResult:
         failures: list[str] = []
+        if job.requires_work_authorization and candidate.work_authorized is not True:
+            failures.append("work authorization not confirmed")
         if candidate.years_experience < job.required_experience_years:
             failures.append("minimum experience not met")
         if job.location and candidate.location and candidate.location.casefold() != job.location.casefold():

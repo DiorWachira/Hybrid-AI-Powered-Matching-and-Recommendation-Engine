@@ -1,11 +1,11 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { Bell, LayoutDashboard, Menu, Network, Settings2, ShieldCheck, Target, Users, X } from "lucide-react";
+import { ArrowUpRight, LayoutDashboard, LogOut, Menu, Network, ShieldCheck, Target, Users, X } from "lucide-react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import { api, type ApiHealth } from "../lib/api";
 import { clearSession, getSessionRole } from "../lib/session";
 
 const navigationByRole = {
-  candidate: [{ to: "/candidate", label: "Candidate profile", icon: Users }],
+  candidate: [{ to: "/candidate", label: "My opportunities", icon: Users }],
   recruiter: [
     { to: "/recruiter", label: "Recruiter workspace", icon: LayoutDashboard },
     { to: "/matches", label: "Match analysis", icon: Target },
@@ -21,35 +21,43 @@ export function AppShell({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const [mobileNav, setMobileNav] = useState(false);
   const [health, setHealth] = useState<ApiHealth | null>(null);
+  const [checking, setChecking] = useState(true);
 
   useEffect(() => {
-    void api.health().then(setHealth).catch(() => setHealth(null));
+    let active = true;
+    void api.health().then((value) => { if (active) setHealth(value); }).catch(() => { if (active) setHealth(null); }).finally(() => { if (active) setChecking(false); });
+    return () => { active = false; };
   }, []);
 
-  const status = health?.status === "ok" ? "connected" : health ? "degraded" : "demo";
+  const status = checking ? "Connecting" : health?.status === "ok" ? "All systems online" : health ? "Service degraded" : "API unavailable";
   const sessionRole = getSessionRole() ?? "recruiter";
   const visibleNavigation = navigationByRole[sessionRole];
   const homePath = sessionRole === "candidate" ? "/candidate" : sessionRole === "admin" ? "/admin" : "/recruiter";
 
   return (
-    <div className="min-h-screen bg-obsidian text-white">
-      <aside className={`fixed inset-y-0 left-0 z-40 w-64 border-r border-white/10 bg-obsidian-surface/95 p-4 backdrop-blur-xl transition-transform lg:translate-x-0 ${mobileNav ? "translate-x-0" : "-translate-x-full"}`}>
-        <div className="flex items-center justify-between px-2 py-1">
-          <Link to={homePath} className="flex items-center gap-3">
-            <span className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-spectral-emerald to-spectral-mint text-obsidian shadow-glow-emerald"><Network className="h-5 w-5" /></span>
-            <span><strong className="block text-sm tracking-tight">JobBridge</strong><span className="font-mono text-[9px] uppercase tracking-[0.2em] text-white/35">placement OS</span></span>
-          </Link>
-          <button className="text-white/55 lg:hidden" onClick={() => setMobileNav(false)} aria-label="Close navigation"><X className="h-5 w-5" /></button>
+    <div className="workspace-shell">
+      <a className="skip-link" href="#workspace-content">Skip to content</a>
+      {mobileNav && <button className="nav-scrim" aria-label="Close navigation" onClick={() => setMobileNav(false)} />}
+      <aside id="workspace-navigation" className={`workspace-nav ${mobileNav ? "is-open" : ""}`}>
+        <div className="nav-brand-row">
+          <Link to={homePath} className="brand-lockup"><span className="brand-symbol"><Network size={22} /></span><span>JobBridge<span className="brand-dot">.</span></span></Link>
+          <button className="icon-button mobile-only" onClick={() => setMobileNav(false)} aria-label="Close navigation"><X size={20} /></button>
         </div>
-        <p className="mt-10 px-2 font-mono text-[9px] uppercase tracking-[0.2em] text-white/30">Workspace</p>
-        <nav className="mt-3 space-y-1" aria-label="Primary workspace">
-          {visibleNavigation.map(({ to, label, icon: Icon }) => <NavLink key={to} to={to} onClick={() => setMobileNav(false)} className={({ isActive }) => `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors ${isActive ? "bg-spectral-emerald/10 text-spectral-emerald" : "text-white/55 hover:bg-white/5 hover:text-white"}`}><Icon className="h-4 w-4" />{label}</NavLink>)}
+        <div className="workspace-identity"><span className="identity-avatar">{sessionRole === "admin" ? "AD" : sessionRole === "candidate" ? "CA" : "RE"}</span><div><strong>{sessionRole === "admin" ? "Administration" : sessionRole === "candidate" ? "Career workspace" : "Talent workspace"}</strong><span>{sessionRole} account</span></div></div>
+        <p className="eyebrow nav-label">Workspace</p>
+        <nav aria-label="Primary workspace" className="workspace-links">
+          {visibleNavigation.map(({ to, label, icon: Icon }) => <NavLink key={to} to={to} onClick={() => setMobileNav(false)} className={({ isActive }) => isActive ? "is-active" : ""}><Icon size={18} /><span>{label}</span><ArrowUpRight className="nav-arrow" size={15} /></NavLink>)}
         </nav>
-        <p className="mt-8 px-2 font-mono text-[9px] uppercase tracking-[0.2em] text-white/30">System</p>
-        <div className="mt-3 space-y-1 text-xs text-white/55"><div className="flex items-center gap-3 px-3 py-2"><ShieldCheck className="h-3.5 w-3.5 text-spectral-amber" />Rule gate</div><div className="flex items-center gap-3 px-3 py-2"><Network className="h-3.5 w-3.5 text-spectral-violet" />Skill graph</div><div className="flex items-center gap-3 px-3 py-2"><Settings2 className="h-3.5 w-3.5 text-spectral-emerald" />Engine settings</div></div>
-        <div className="absolute inset-x-4 bottom-4 rounded-xl border border-white/10 bg-white/[0.03] p-3"><div className="flex items-center gap-2 text-xs text-white/70"><span className={`h-1.5 w-1.5 rounded-full ${status === "connected" ? "bg-spectral-emerald animate-status" : status === "degraded" ? "bg-spectral-amber" : "bg-white/35"}`} />API {status}</div><p className="mt-2 font-mono text-[10px] text-white/30">POSTGRES · NEO4J · FASTAPI</p></div>
+        <div className="nav-bottom"><div className="engine-signature"><Network size={24} /><strong>Human potential.<br />Intelligent connections.</strong><span>JobBridge matching engine</span></div><div className="connection-state" role="status"><i className={health?.status === "ok" ? "online" : ""} />{status}</div></div>
       </aside>
-      <div className="lg:pl-64"><header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-white/10 bg-obsidian/85 px-5 backdrop-blur-xl lg:px-8"><div className="flex items-center gap-3"><button className="text-white/65 lg:hidden" onClick={() => setMobileNav(true)} aria-label="Open navigation"><Menu className="h-5 w-5" /></button><div><p className="font-mono text-[10px] uppercase tracking-[0.18em] text-white/30">Hybrid workforce placement</p><p className="text-sm font-medium text-white/85">Operations workspace</p></div></div><div className="flex items-center gap-3"><span className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/35">{sessionRole}</span><button onClick={() => { clearSession(); navigate("/auth"); }} className="rounded-lg border border-white/10 px-3 py-2 text-xs text-white/65 hover:border-spectral-emerald/50 hover:text-spectral-emerald">Sign out</button><button className="relative rounded-lg border border-white/10 p-2 text-white/55 hover:text-white" aria-label="Notifications"><Bell className="h-4 w-4" /><span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-spectral-amber" /></button></div></header>{children}</div>
+      <div className="workspace-body">
+        <header className="workspace-topbar">
+          <div className="topbar-location"><button className="icon-button mobile-only" aria-label="Open navigation" aria-expanded={mobileNav} aria-controls="workspace-navigation" onClick={() => setMobileNav(true)}><Menu size={20} /></button><span>Workspace</span><span className="breadcrumb-slash">/</span><strong>{sessionRole === "candidate" ? "Discover" : sessionRole === "admin" ? "Overview" : "Recruitment"}</strong></div>
+          <div className="topbar-actions"><span className="role-tag">{sessionRole}</span><button className="icon-button" title="Sign out" aria-label="Sign out" onClick={() => { clearSession(); navigate("/auth", { replace: true }); }}><LogOut size={18} /></button></div>
+        </header>
+        <div id="workspace-content">{children}</div>
+        <footer className="workspace-footer"><span>JobBridge / Workforce placement</span><span>Rules. Relevance. Opportunity.</span></footer>
+      </div>
     </div>
   );
 }

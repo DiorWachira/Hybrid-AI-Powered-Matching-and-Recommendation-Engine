@@ -9,9 +9,9 @@ and `Dataset_sourcing/kenya_specific_datasets.txt` (local, gitignored).
 | Layer | Source | Why |
 | --- | --- | --- |
 | Candidate CVs | **Synthetic**, from a seeded deterministic generator with a curated skill/certification pool (ESCO + CDACC + common industry certs) | Real resumes carry consent/privacy risk and bias; synthetic data can be produced at 10k-100k scale, is free, and lets us control class balance for the anti-bias pipeline. |
-| Job postings | **Real, scraped**: BrighterMonday Kenya Jobs (Apify), Kenya-filtered, small paid runs (~500-800 jobs) | Gives authentic KES salary bands, Kenyan locations and natural job-description text for BERT embeddings, at low cost (~$0.001/job). Synthetic job postings (same generator style) are the fallback if the scraper budget/access is unavailable. |
-| Skill ontology | **ESCO v1.2.1** (CC BY 4.0) as the Neo4j skill graph backbone | Free, structured, 13k+ skills with `broader_skill` / `narrower_skill` / `related_skill` already modelled — ingest almost directly into the `RELATED_TO` edges. |
-| Local skill alignment | A **curated subset** of TVET CDACC occupational standards mapped onto ESCO skills via a `MAPS_TO`-style edge | Keeps certifications and hard-filter criteria meaningful for the Kenyan market (e.g. CDACC "Apply Digital Literacy" -> ESCO "ICT literacy"), without ingesting all 50+ CDACC PDFs. |
+| Job postings | Target source: BrighterMonday Kenya Jobs, supplied as a permitted local JSON export. Current demo data remains synthetic. | Local importer normalizes an export to the internal schema without scraping or requiring a paid API key. Synthetic postings remain the free, repeatable default. |
+| Skill ontology | ESCO v1.2.1 (CC BY 4.0) as the intended Neo4j graph backbone; current graph also has a small curated demo seed. | The loader accepts trimmed skills and related-skill CSV inputs. Full official ontology loading depends on obtaining the chosen ESCO export. |
+| Local skill alignment | Planned curated CDACC occupational-standard to ESCO mapping, represented by `MAPS_TO` edges. | Current repository entries are provisional working examples; verify against official CDACC material before treating the crosswalk as authoritative. |
 | Optional validation | JobSearch-XS, PJB Benchmark | Reserved as an **optional, later** cross-check (Week 7 stretch) for ranking quality — not a core dependency. Non-Kenyan, and PJB's redistribution terms need re-checking before any use. |
 | Excluded | Freehire Jobs, Zalize Tech Jobs | Non-Kenyan, no strong reason to prefer over BrighterMonday for this project; Zalize is CC BY-NC which complicates reuse. Skip unless a specific gap appears later. |
 | Methodology check only | Kaggle "Profile Matching and Recommendation Dataset" (`users.csv` + `feedback.csv`, MIT) | **Not** job/skill data — generic profile-to-profile matching with demographic/personality/free-text fields. Its `feedback.csv` has real accept/reject labels, which the project's own synthetic data doesn't have on its own. Used only in `notebooks/hybrid_matching_model_training.ipynb` (Section 17) to confirm the train/val/test-split + regularized-logistic-regression training procedure works on independently-labelled data, kept fully separate from the exported production artifact. |
@@ -56,14 +56,36 @@ compared against that ceiling rather than against 1.0.
 
 1. `data_pipeline/generate_synthetic_data.py` (Week 4) produces the synthetic candidate
    population and, if the scraper isn't used, synthetic job postings too.
-2. A small `data_pipeline/import_brightermonday_jobs.py` (optional, Week 4) loads a
-   scraped Kenya jobs export (JSON) into the same schema as the synthetic job postings,
-   so both can be scored identically.
-3. `data_pipeline/load_esco_ontology.py` (Week 1/4) ingests a trimmed ESCO CSV export
-   into Neo4j `Skill` nodes and `RELATED_TO` edges, extending the Week 1 seed script.
-4. A small hand-authored CDACC-to-ESCO mapping table (JSON, <100 rows) adds
-   `MAPS_TO` edges for the certification families used in the demo (software,
-   data, accounting — matching the existing Neo4j seed).
+2. `data_pipeline/import_brightermonday_jobs.py` normalizes a permitted local
+   Kenya jobs export (JSON) into the same schema as synthetic postings.
+3. `data_pipeline/load_esco_ontology.py` ingests a trimmed ESCO CSV export into
+   Neo4j `Skill` nodes and `RELATED_TO` edges.
+4. A provisional CDACC-to-ESCO mapping JSON adds `MAPS_TO` relationships; verify
+   each entry with the official standards before describing it as authoritative.
 5. `data_pipeline/evaluate_model.py` (Week 7) computes precision/recall/F1 against a
    held-out labelled slice of the synthetic set; JobSearch-XS/PJB checks are optional
    additions to that same script, not a prerequisite for it.
+
+## Week 4 Implementation Status (2026-10-01)
+
+- `data_pipeline/import_brightermonday_jobs.py` normalizes a researcher-provided
+   local JSON export. It does not scrape the site or require a paid API key.
+- `data_pipeline/load_esco_ontology.py` accepts a trimmed skills CSV with
+   `preferredLabel` plus an optional normalized related-skill CSV containing
+   `source_skill`, `target_skill`, and `weight`.
+- `data_pipeline/ontology/curated_skill_relationships.json` supplies a compact
+   demo graph when an official ESCO export is not present.
+- `data_pipeline/ontology/cdacc_esco_mapping.json` contains provisional example
+   mappings. Validate every mapping against the selected official CDACC release
+   before presenting it as authoritative.
+- `data_pipeline/prepare_week4.py` creates anonymized deployment exports and a
+   quality report in the ignored local `data_pipeline/processed/` directory. It
+   excludes latent label-generation fields and preserves raw training data.
+- The one-command workflow was exercised in file-only mode with a fixed seed:
+   12 candidates and 8 jobs exported, with zero duplicate IDs, zero missing
+   required fields, non-negative experience, and all 12 resume texts distinct.
+- Nine focused Week 4 data and rule-gate regression tests pass.
+- Docker-backed database seeding is implemented but could not be re-verified in
+   this session because the Docker Desktop engine pipe was unavailable.
+- Live Docker database loading could not be rerun in this session because the
+   Docker Desktop engine was unavailable.

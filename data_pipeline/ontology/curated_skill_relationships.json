@@ -1,0 +1,12 @@
+[
+  {"name":"Python","category":"Programming","related":[{"name":"Data Analysis","weight":0.8},{"name":"REST APIs","weight":0.7}]},
+  {"name":"SQL","category":"Data","related":[{"name":"Data Analysis","weight":0.7},{"name":"Business Analysis","weight":0.6}]},
+  {"name":"Data Analysis","category":"Data","related":[{"name":"Business Analysis","weight":0.6}]},
+  {"name":"Docker","category":"DevOps","related":[{"name":"Kubernetes","weight":0.8},{"name":"CI/CD","weight":0.7}]},
+  {"name":"Kubernetes","category":"DevOps","related":[{"name":"AWS","weight":0.7},{"name":"Terraform","weight":0.8}]},
+  {"name":"AWS","category":"Cloud","related":[{"name":"Terraform","weight":0.7}]},
+  {"name":"Financial Accounting","category":"Accounting","related":[{"name":"Taxation","weight":0.9},{"name":"Excel","weight":0.6}]},
+  {"name":"Taxation","category":"Accounting","related":[{"name":"Financial Accounting","weight":0.9}]},
+  {"name":"Excel","category":"Productivity","related":[{"name":"Data Analysis","weight":0.6}]},
+  {"name":"Business Analysis","category":"Business","related":[{"name":"Project Management","weight":0.6}]}
+]

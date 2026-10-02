@@ -4,8 +4,12 @@ import json
 import threading
 from math import exp
 from pathlib import Path
+from typing import TYPE_CHECKING
 
-from sentence_transformers import SentenceTransformer
+if TYPE_CHECKING:
+    from sentence_transformers import SentenceTransformer
+
+from app.core.text_preprocessing import anonymize_resume_text
 
 ARTIFACT_PATH = Path(__file__).resolve().parents[3] / "data_pipeline" / "artifacts" / "hybrid_match_weights.json"
 _model: SentenceTransformer | None = None
@@ -21,11 +25,14 @@ def _get_model() -> SentenceTransformer:
     if _model is None:
         with _model_lock:
             if _model is None:
+                from sentence_transformers import SentenceTransformer
+
                 _model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
     return _model
 
 
 def semantic_similarity(candidate_text: str, job_text: str) -> float:
+    candidate_text = anonymize_resume_text(candidate_text)
     embeddings = _get_model().encode([candidate_text, job_text], normalize_embeddings=True)
     return float(max(0.0, min(1.0, embeddings[0] @ embeddings[1])))
 

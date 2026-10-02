@@ -1,9 +1,11 @@
 from decimal import Decimal
+from datetime import datetime
+from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
 
-from app.db.models import UserRole
+from app.db.models import JobStatus, OpportunityStatus, UserRole
 
 
 class RegisterRequest(BaseModel):
@@ -38,8 +40,16 @@ class JobCreateRequest(BaseModel):
     location: str | None = Field(default=None, max_length=120)
     required_experience_years: int = Field(default=0, ge=0, le=60)
     salary_range_max: Decimal | None = Field(default=None, ge=0, max_digits=12, decimal_places=2)
+    salary_range_min: Decimal | None = Field(default=None, ge=0, max_digits=12, decimal_places=2)
+    requires_work_authorization: bool = False
     required_skills: list[str] = Field(default_factory=list, max_length=50)
     mandatory_certifications: list[str] = Field(default_factory=list, max_length=20)
+
+    @model_validator(mode="after")
+    def validate_salary_range(self):
+        if self.salary_range_min is not None and self.salary_range_max is not None and self.salary_range_min > self.salary_range_max:
+            raise ValueError("salary_range_min must not exceed salary_range_max")
+        return self
 
     @field_validator("required_skills", "mandatory_certifications")
     @classmethod
@@ -56,9 +66,47 @@ class JobResponse(BaseModel):
     location: str | None
     required_experience_years: int
     salary_range_max: Decimal | None
+    salary_range_min: Decimal | None = None
+    requires_work_authorization: bool = False
     required_skills: list[str] | None
     mandatory_certifications: list[str] | None
     status: str
+
+
+class JobUpdateRequest(JobCreateRequest):
+    status: JobStatus = JobStatus.open
+
+
+class ApplicationStatusUpdate(BaseModel):
+    status: Literal["reviewing", "shortlisted", "rejected", "hired"]
+
+
+class ApplicationResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    application_id: UUID
+    candidate_id: UUID
+    job_id: UUID
+    status: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class StoredMatchResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    match_id: UUID
+    candidate_id: UUID
+    job_id: UUID
+    hard_rule_passed: bool
+    matching_status: str
+    similarity_score: float | None
+    growth_score: float | None
+    skill_overlap_score: float | None
+    final_weighted_score: float | None
+    skill_gap_breakdown: dict | None
+    model_version: str | None
+    created_at: datetime
 
 
 class ProfileResponse(BaseModel):
@@ -72,6 +120,7 @@ class CandidateProfileUpdate(BaseModel):
     location: str | None = Field(default=None, max_length=120)
     years_experience: int = Field(default=0, ge=0, le=60)
     expected_salary: Decimal | None = Field(default=None, ge=0, max_digits=12, decimal_places=2)
+    work_authorized: bool | None = None
     parsed_resume_text: str | None = Field(default=None, max_length=20_000)
     skills: list[str] = Field(default_factory=list, max_length=50)
     certifications: list[str] = Field(default_factory=list, max_length=20)
@@ -95,7 +144,32 @@ class CandidateProfileResponse(CandidateProfileUpdate):
         return value or []
 
 
+class OpportunityResponse(BaseModel):
+    job_id: UUID
+    title: str
+    company_name: str
+    description: str
+    location: str | None
+    salary_range_max: Decimal | None
+    required_experience_years: int
+    required_skills: list[str]
+    mandatory_certifications: list[str]
+    match_score: float
+    status: OpportunityStatus | None
+
+
+class CandidateDashboardResponse(BaseModel):
+    available_opportunities: list[OpportunityResponse]
+    for_you: list[OpportunityResponse]
+    history: list[OpportunityResponse]
+
+
+class OpportunityActionRequest(BaseModel):
+    status: OpportunityStatus
+
+
 class MatchCandidateResponse(BaseModel):
+    match_id: UUID | None = None
     candidate_id: UUID
     full_name: str
     hard_rule_passed: bool
@@ -111,11 +185,45 @@ class MatchEvaluationResponse(BaseModel):
     candidates: list[MatchCandidateResponse]
 
 
+class AdminUserResponse(BaseModel):
+    user_id: UUID
+    email: str
+    role: UserRole
+    display_name: str
+    company_name: str | None = None
+    is_active: bool
+    is_demo: bool
+    created_at: datetime
+
+
+class AccountStatusUpdate(BaseModel):
+    is_active: bool
+
+
+class JobStatusUpdate(BaseModel):
+    status: JobStatus
+
+
+class AuditEventResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    event_id: UUID
+    actor_user_id: UUID | None
+    action: str
+    resource_type: str
+    resource_id: UUID | None
+    details: dict | None
+    created_at: datetime
+
+
 class AdminOverviewResponse(BaseModel):
     users_count: int
     candidates_count: int
     employers_count: int
     jobs_count: int
     match_results_count: int
-    recent_users: list[ProfileResponse]
+    applications_count: int
+    pending_graph_events: int
+    suspended_users_count: int
+    recent_users: list[AdminUserResponse]
     recent_jobs: list[JobResponse]
+    recent_activity: list[AuditEventResponse]

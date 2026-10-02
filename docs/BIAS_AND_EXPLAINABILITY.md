@@ -15,21 +15,37 @@ A candidate who fails a hard requirement is reported with the exact reason. The 
 
 ## 2. Trained machine-learning score
 
-Only observable, job-related features are sent to the trained scorer:
+The current API supplies these numeric features to the saved calibration:
 
 - MiniLM semantic similarity between resume text and job description
 - Structured skill overlap
 - Experience and certification growth score
 
-The production API loads the saved scaler values, logistic-regression coefficients, and decision threshold from `data_pipeline/artifacts/hybrid_match_weights.json`. Names, phone numbers, account emails, and other identity fields are not scoring features.
+The API loads saved scaler values, coefficients and threshold from
+[hybrid_match_weights.json](../data_pipeline/artifacts/hybrid_match_weights.json).
+However, its skill and growth definitions differ from the historical notebook.
+Training/serving parity is an open blocker, not an established property.
 
-The data-generation process also keeps hidden competence, adaptability, and job-quality variables out of the model features. They are used only when creating evaluation labels, preventing the model from learning a circular target.
+Structured names/emails are not explicit numeric features, but free-text resumes
+can still contain identities and proxies that affect embeddings. Regex redaction
+is best effort and does not establish anonymity, job relevance or fairness.
+
+Synthetic hidden latents are excluded from the model inputs. Labels still depend
+partly on observable signals related to model features; hidden latents and noise
+reduce simple circularity but do not create independent real-world ground truth.
 
 ## 3. Knowledge-graph explanation
 
-Neo4j stores candidate skills, job-required skills, certifications, and related-skill paths. Direct and weighted two-hop `RELATED_TO` paths can be explored visually in Neo4j Browser and used to explain skill relationships. The graph visualization is kept separate from the trained model decision so it does not silently change the trained feature definition.
+Neo4j projection/query code stores candidate skills, job requirements and related
+paths. Neo4j Browser can be used for exploration when the database is running.
+There is no completed in-app graph visualization. The desired architecture keeps
+the graph explanatory, but the older training feature did use related-skill
+weights; a versioned shared feature contract and reviewed retraining are needed.
 
-This design improves transparency: a recruiter can see which hard rule failed, which skills matched, how the semantic score contributed, and which graph relationships explain transferable skills.
+The UI shows score components and failed-rule reasons. Matched/missing skill
+breakdowns are stored but are not fully delivered/rendered in the current results
+workflow. Neither a component score nor a graph path is a validated causal
+explanation of hiring suitability.
 
 ## Remaining limitation
 
