@@ -57,6 +57,10 @@ export type AdminUser = {
   created_at: string;
 };
 
+export type OntologySkill = { name: string; category: string | null; source: string | null };
+export type OntologyRelation = { source_skill: string; target_skill: string; weight: number; source: string | null };
+export type OntologyData = { skills: OntologySkill[]; relationships: OntologyRelation[] };
+
 export type AdminOverview = {
   users_count: number;
   candidates_count: number;
@@ -113,6 +117,15 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
+  ontology: (token: string, search: string) => request<OntologyData>(`/admin/ontology?${new URLSearchParams({search})}`, {headers:{Authorization:`Bearer ${token}`}}),
+  saveSkill: (token: string, skill: OntologySkill) => request<OntologySkill>("/admin/ontology/skills", {method:"PUT",headers:{Authorization:`Bearer ${token}`},body:JSON.stringify(skill)}),
+  saveRelation: (token: string, relation: OntologyRelation, remove: boolean) => request<{status:string}>(`/admin/ontology/relationships?remove=${remove}`, {method:"PUT",headers:{Authorization:`Bearer ${token}`},body:JSON.stringify(relation)}),
+    resetPassword: (token: string, newPassword: string) => request<{ message: string }>("/auth/reset-password", {
+      method: "POST", body: JSON.stringify({ token, new_password: newPassword }),
+    }),
+    issuePasswordReset: (token: string, userId: string, password: string) => request<{ token: string; expires_at: string }>(`/admin/users/${userId}/password-reset`, {
+      method: "POST", headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify({ password }),
+    }),
   health: () => request<ApiHealth>("/health"),
   register: (payload: RegisterInput) =>
     request<{ access_token: string; role: UserRole }>("/auth/register", {
