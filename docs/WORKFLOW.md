@@ -5,6 +5,18 @@ Living document. Update it whenever the process or the increment status changes.
 Audited 2026-10-01. Status is evidence-based, not a count of existing files.
 See [IMPLEMENTATION_AUDIT.md](IMPLEMENTATION_AUDIT.md) for findings and verification.
 
+Database update 2026-10-02: local Docker databases/pgAdmin are healthy; migration
+`20261002_0005` applied and graph backfill processed. Isolated migration/graph and
+authenticated API persistence tests pass. See [DATABASE_SCHEMA.md](DATABASE_SCHEMA.md).
+The October 1 status table below is historical; model/public-deployment gates stay
+open. Run the one-shot graph worker after writes or schedule it; no recurring
+worker has been installed:
+
+```powershell
+Set-Location backend
+..\venv\Scripts\python.exe -m app.db.graph_sync --limit 1000
+```
+
 Related documents:
 
 - [ROADMAP.txt](ROADMAP.txt) - the 8-week milestone plan, with current status.
@@ -59,7 +71,12 @@ Shut down with `docker compose down` (add `-v` only when you intend to wipe data
 - `main` holds reviewed, working increments.
 - Feature work happens on `feat/<short-topic>`; fixes on `fix/<short-topic>`;
   docs/infra on `chore/<short-topic>`.
-- Keep work on `feat/bootstrap-migration-ready-backend` for this stage.
+- Use area-focused branches for substantial work, such as
+  `feat/database-workflows` for schema, migrations and graph persistence.
+- Group commits by ownership: `db`, `backend`, `data`, `frontend`, and `docs`.
+  Include directly related tests with their implementation; do not mix unrelated
+  file areas into a catch-all commit.
+- Merge prerequisite area branches before their dependent API/UI changes.
 - Do not merge or push `main` without explicit user permission.
 - Review scoped changes before any commit; preserve unrelated notebook/ignore
   edits. Chapter 5 notes and the local epoch workflow plan must not be published.

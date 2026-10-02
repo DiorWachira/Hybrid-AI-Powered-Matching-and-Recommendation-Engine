@@ -5,6 +5,12 @@ and graph-based skill explanations for workforce placement.
 
 ## Current Increment
 
+Database increment (2026-10-02): application workflow tables, eligibility fields,
+owner-protected management APIs, persistent match details and a transactional
+Neo4j sync queue are implemented. Migration `20261002_0005` is applied locally.
+See [docs/DATABASE_SCHEMA.md](docs/DATABASE_SCHEMA.md) for the ER/graph design,
+pgAdmin connection details, verification and required graph-worker command.
+
 Implemented on the feature branch, with verification gaps documented in
 [docs/IMPLEMENTATION_AUDIT.md](docs/IMPLEMENTATION_AUDIT.md):
 

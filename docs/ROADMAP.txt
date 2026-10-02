@@ -2,6 +2,24 @@ HYBRID AI-POWERED WORKFORCE PLACEMENT ENGINE
 PROJECT MILESTONE ROADMAP (8 WEEKS)
 Last updated: 2026-10-01 (implementation and deployment-readiness audit)
 
+DATABASE INCREMENT UPDATE (2026-10-02; supersedes database blockers below)
+[x] Existing Docker PostgreSQL/Neo4j/pgAdmin healthy; native PostgreSQL untouched
+[x] Revision 20261002_0005 applied after checked local backup; existing data preserved
+[x] Application table/status constraints, salary minimum, work authorization,
+    generated eligibility status, score provenance and query indexes added
+[x] Transactional graph outbox/triggers; unique Candidate/Job nodes and
+    HAS_SKILL/REQUIRES_SKILL/APPLIED_TO/BELONGS_TO projection implemented
+[x] Initial 53 graph events processed; queue empty after migration
+[x] Live isolated migration/graph tests and real JWT application workflow pass
+[x] Owner-protected job edit/close, application status and stored match GET APIs
+[~] Graph synchronization command is one-shot; recurring worker scheduling pending
+[~] New fields/status APIs not yet fully exposed by the frontend
+[~] Training/serving parity, independent quality, public deployment remain open
+Full schema, adaptation notes, operations and evidence: docs/DATABASE_SCHEMA.md.
+The dated 2026-10-01 audit below is retained as historical context, not current
+evidence that local databases are still unavailable. Sprint 1 still requires
+clean-checkout and current remote-CI sign-off.
+
 Legend: [x] narrowly stated deliverable implemented, with evidence where noted
     [~] partial, historically verified or awaiting required verification
     [ ] not implemented or not demonstrated
@@ -117,6 +135,8 @@ CURRENT STATUS SNAPSHOT
     against Postgres + Neo4j; current remote green run not inspected
 [x] Audit checks: 30 DB-independent tests, frontend build, Compose config pass
 [~] UI redesign builds; selected browser fixture checks are not live E2E proof
+[ ] Adding a Simulate button that will sim jobs being posted and candidates applying for the opportunities to save on time
+[ ] Adding visuals from the knowledge graphs for candidate, previous applications other related details
 
 Known gaps to close early:
  - Auth, create/list jobs (NOT CRUD), profiles, resume ingestion and match

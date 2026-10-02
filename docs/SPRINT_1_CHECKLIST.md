@@ -1,6 +1,10 @@
 # Sprint 1: Data Preparation and Development Environment
 
 Status: Source preparation substantially complete; runtime sign-off BLOCKED.
+Update 2026-10-02: local database health, migration and graph integration checks
+now pass; the runtime blocker recorded below has been resolved locally. Full
+Sprint 1 closure still awaits a clean-checkout run and reviewed remote CI evidence.
+See [DATABASE_SCHEMA.md](DATABASE_SCHEMA.md) for the applied schema and tests.
 Audit: 2026-10-01. See [implementation audit](IMPLEMENTATION_AUDIT.md).
 
 ## Requirements checklist
