@@ -207,7 +207,7 @@ button, a { transition: background-color .18s, color .18s, border-color .18s; }
 .account-selector input { accent-color: #1a311a; }
 .auth-caption { position: absolute; right: 6%; bottom: 42px; z-index: 1; color: #fff; font-size: 12px; text-shadow: 0 1px 4px #000; }
 .auth-caption span { display: block; font-size: 10px; margin-top: 6px; }
-.admin-stats { display: grid; grid-template-columns: repeat(5,minmax(0,1fr)); border-block: 1px solid var(--line); margin-bottom: 34px; }
+.admin-stats { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); border-block: 1px solid var(--line); margin-bottom: 34px; }
 .admin-stats div { padding: 23px 18px; border-right: 1px solid var(--line); }
 .admin-stats div:last-child { border: 0; }
 .admin-stats svg { color: var(--accent); margin-bottom: 18px; }
@@ -215,7 +215,13 @@ button, a { transition: background-color .18s, color .18s, border-color .18s; }
 .admin-stats strong { font-size: 30px; display: block; margin-top: 8px; }
 .data-section { margin: 30px 0; min-width: 0; }
 .data-table-wrap { overflow-x: auto; }
-.data-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px; }
+.admin-search { display: flex; align-items: end; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; }
+.admin-search .studio-field { flex: 1 1 220px; min-width: 0; }
+.admin-pagination { display: flex; align-items: center; justify-content: flex-end; gap: 12px; margin-top: 16px; font-size: 12px; }
+.data-table select { padding: 8px; color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 4px; min-width: 90px; }
+.data-table input[role="switch"] { width: 18px; height: 18px; accent-color: var(--accent); cursor: pointer; }
+.data-table input:disabled { cursor: not-allowed; }
+.data-table { width: 100%; min-width: 680px; border-collapse: collapse; text-align: left; font-size: 13px; }
 .data-table th { color: var(--muted); font-size: 11px; font-weight: 400; padding: 12px; border-block: 1px solid var(--line); }
 .data-table td { padding: 16px 12px; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
 @keyframes arrive { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }

@@ -23,7 +23,7 @@ export function AuthPage() {
     setNotice(null); setBusy(true);
     try {
       const response = isRegistering
-        ? await api.register({ email, password, role, ...(role === "candidate" ? { full_name: fullName } : { company_name: companyName }), location })
+        ? await api.register({ email, password, role, full_name: fullName, ...(role === "recruiter" ? { company_name: companyName } : {}), location })
         : await api.login(email, password);
       localStorage.setItem("jobbridge_token", response.access_token);
       navigate(response.role === "candidate" ? "/candidate" : response.role === "admin" ? "/admin" : "/recruiter", { replace: true });
@@ -41,7 +41,8 @@ export function AuthPage() {
       <form onSubmit={submit} className="auth-form">
         {isRegistering && <>
           <fieldset><legend className="sr-only">Account type</legend><div className="account-selector"><label><input type="radio" name="role" value="candidate" checked={role === "candidate"} onChange={() => setRole("candidate")} /><UserRound size={15} />Candidate</label><label><input type="radio" name="role" value="recruiter" checked={role === "recruiter"} onChange={() => setRole("recruiter")} /><BriefcaseBusiness size={15} />Recruiter</label></div></fieldset>
-          {role === "candidate" ? <label className="studio-field">Full name<input autoComplete="name" value={fullName} minLength={2} maxLength={255} onChange={(event) => setFullName(event.target.value)} required /></label> : <label className="studio-field">Company name<input autoComplete="organization" value={companyName} minLength={2} maxLength={255} onChange={(event) => setCompanyName(event.target.value)} required /></label>}
+          <label className="studio-field">Full name<input autoComplete="name" value={fullName} minLength={2} maxLength={255} onChange={(event) => setFullName(event.target.value)} required /></label>
+          {role === "recruiter" && <label className="studio-field">Company name<input autoComplete="organization" value={companyName} minLength={2} maxLength={255} onChange={(event) => setCompanyName(event.target.value)} required /></label>}
           <label className="studio-field">Location<input autoComplete="address-level2" maxLength={120} value={location} onChange={(event) => setLocation(event.target.value)} required /></label>
         </>}
         <label className="studio-field">Email address<input type="email" autoComplete="email" placeholder="you@example.com" value={email} onChange={(event) => setEmail(event.target.value)} required /></label>

@@ -46,13 +46,28 @@ export type MatchCandidate = {
   final_score: number;
 };
 
+export type AdminUser = {
+  user_id: string;
+  email: string;
+  role: UserRole;
+  display_name: string;
+  company_name?: string | null;
+  is_active: boolean;
+  is_demo: boolean;
+  created_at: string;
+};
+
 export type AdminOverview = {
   users_count: number;
   candidates_count: number;
   employers_count: number;
   jobs_count: number;
   match_results_count: number;
-  recent_users: Array<{ user_id: string; email: string; role: UserRole }>;
+  applications_count: number;
+  pending_graph_events: number;
+  suspended_users_count: number;
+  recent_users: AdminUser[];
+  recent_activity: Array<{ event_id: string; actor_user_id: string | null; action: string; resource_type: string; resource_id: string | null; details: Record<string, unknown> | null; created_at: string }>;
   recent_jobs: Array<{ job_id: string; title: string; status: string; location?: string; required_experience_years: number; salary_range_max?: number; required_skills?: string[]; mandatory_certifications?: string[]; description: string }>;
 };
 
@@ -160,5 +175,17 @@ export const api = {
   adminOverview: (token: string) =>
     request<AdminOverview>("/admin/overview", {
       headers: { Authorization: `Bearer ${token}` },
+    }),
+  adminUsers: (token: string, search: string, offset: number) =>
+    request<AdminUser[]>(`/admin/users?${new URLSearchParams({ search, offset: String(offset) })}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    }),
+  setAccountActive: (token: string, userId: string, isActive: boolean) =>
+    request<AdminUser>(`/admin/users/${userId}`, {
+      method: "PATCH", headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify({ is_active: isActive }),
+    }),
+  setJobStatus: (token: string, jobId: string, status: "open" | "closed") =>
+    request<AdminOverview["recent_jobs"][number]>(`/admin/jobs/${jobId}`, {
+      method: "PATCH", headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify({ status }),
     }),
 };
