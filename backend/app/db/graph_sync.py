@@ -95,15 +95,30 @@ def sync_graph_events(database: Session, driver, limit: int = 100) -> int:
 
 def main() -> None:
     import argparse
+    import json
+    from datetime import UTC, datetime
+    from pathlib import Path
     from app.db.postgres import SessionLocal
 
     parser = argparse.ArgumentParser(description="Apply committed PostgreSQL changes to Neo4j; failed events remain queued.")
     parser.add_argument("--limit", type=int, default=100)
+    parser.add_argument("--status-file", type=Path)
     arguments = parser.parse_args()
-    with get_neo4j_driver() as driver:
-        ensure_graph_schema(driver)
-        with SessionLocal() as database:
-            print(f"Graph events processed: {sync_graph_events(database, driver, arguments.limit)}")
+    result = {"finished_at": None, "status": "error", "processed": 0}
+    try:
+        with get_neo4j_driver() as driver:
+            ensure_graph_schema(driver)
+            with SessionLocal() as database:
+                result["processed"] = sync_graph_events(database, driver, arguments.limit)
+        result["status"] = "ok"
+        print(f"Graph events processed: {result['processed']}")
+    finally:
+        result["finished_at"] = datetime.now(UTC).isoformat()
+        if arguments.status_file:
+            arguments.status_file.parent.mkdir(parents=True, exist_ok=True)
+            temporary = arguments.status_file.with_suffix(".tmp")
+            temporary.write_text(json.dumps(result), encoding="utf-8")
+            temporary.replace(arguments.status_file)
 
 
 if __name__ == "__main__":
