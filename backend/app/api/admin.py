@@ -1,15 +1,91 @@
 from uuid import UUID
+import hashlib
+import secrets
+from datetime import UTC, datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from app.core.rate_limit import limiter
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import require_roles
 from app.db.models import AuditEvent, Candidate, Employer, GraphSyncEvent, JobApplication, JobPosting, MatchResult, User, UserRole
 from app.db.postgres import get_db
-from app.schemas import AccountStatusUpdate, AdminOverviewResponse, AdminUserResponse, AuditEventResponse, JobResponse, JobStatusUpdate
+from app.schemas import AccountStatusUpdate, AdminOverviewResponse, AdminUserResponse, AuditEventResponse, JobResponse, JobStatusUpdate, OntologyRelationRequest, OntologySkillRequest, ResetAuthorization
+from app.db.neo4j_db import get_neo4j_driver
+from neo4j.exceptions import Neo4jError, ServiceUnavailable, SessionExpired
+from app.utils.security import verify_password
 
 router = APIRouter(prefix="/admin", tags=["administration"])
+
+
+@router.get("/ontology")
+def read_ontology(search: str = Query(default="", max_length=120), user: User = Depends(require_roles(UserRole.admin))):
+    try:
+        with get_neo4j_driver() as driver, driver.session(database="neo4j") as graph:
+            skills = graph.run("MATCH (skill:Skill) WHERE toLower(skill.name) CONTAINS $search RETURN skill.name AS name, skill.category AS category, skill.source AS source ORDER BY skill.name LIMIT 200", search=search.strip().lower()).data()
+            links = graph.run("MATCH (source:Skill)-[edge:RELATED_TO]->(target:Skill) WHERE toLower(source.name) CONTAINS $search OR toLower(target.name) CONTAINS $search RETURN source.name AS source_skill, target.name AS target_skill, edge.weight AS weight, edge.source AS source ORDER BY source.name, target.name LIMIT 200", search=search.strip().lower()).data()
+            return {"skills": skills, "relationships": links}
+    except (Neo4jError, ServiceUnavailable, SessionExpired):
+        raise HTTPException(status_code=503, detail="Ontology service unavailable") from None
+
+
+@router.put("/ontology/skills")
+def update_ontology_skill(payload: OntologySkillRequest, user: User = Depends(require_roles(UserRole.admin)), db: Session = Depends(get_db)):
+    db.add(AuditEvent(actor_user_id=user.user_id, action="ontology.skill_requested", resource_type="ontology", details=payload.model_dump()))
+    db.commit()
+    try:
+        with get_neo4j_driver() as driver, driver.session(database="neo4j") as graph:
+            def update(transaction):
+                existing = transaction.run("MATCH (skill:Skill) WHERE toLower(trim(skill.name)) = $name RETURN skill.name AS name ORDER BY skill.name LIMIT 1", name=payload.name.lower()).single()
+                name = existing["name"] if existing else payload.name.lower()
+                transaction.run("MERGE (skill:Skill {name:$name}) SET skill.category=$category, skill.source=$source", name=name, category=payload.category, source=payload.source).consume()
+                return {"name": name, "category": payload.category, "source": payload.source}
+            result = graph.execute_write(update)
+    except (Neo4jError, ServiceUnavailable, SessionExpired):
+        raise HTTPException(status_code=503, detail="Ontology update not confirmed; retry after checking connectivity") from None
+    db.add(AuditEvent(actor_user_id=user.user_id, action="ontology.skill_updated", resource_type="ontology", details=result))
+    db.commit()
+    return result
+
+
+@router.put("/ontology/relationships")
+def update_ontology_relationship(payload: OntologyRelationRequest, remove: bool = False, user: User = Depends(require_roles(UserRole.admin)), db: Session = Depends(get_db)):
+    db.add(AuditEvent(actor_user_id=user.user_id, action="ontology.relation_requested", resource_type="ontology", details={**payload.model_dump(), "remove": remove}))
+    db.commit()
+    try:
+        with get_neo4j_driver() as driver, driver.session(database="neo4j") as graph:
+            def update(transaction):
+                source = transaction.run("MATCH (skill:Skill) WHERE toLower(trim(skill.name))=$name RETURN skill.name AS name ORDER BY skill.name LIMIT 1", name=payload.source_skill.strip().lower()).single()
+                target = transaction.run("MATCH (skill:Skill) WHERE toLower(trim(skill.name))=$name RETURN skill.name AS name ORDER BY skill.name LIMIT 1", name=payload.target_skill.strip().lower()).single()
+                if not source or not target:
+                    raise HTTPException(status_code=404, detail="Both skills must exist before linking them")
+                query = "MATCH (source:Skill {name:$source_name})-[edge:RELATED_TO]->(target:Skill {name:$target_name}) DELETE edge" if remove else "MATCH (source:Skill {name:$source_name}), (target:Skill {name:$target_name}) MERGE (source)-[edge:RELATED_TO]->(target) SET edge.weight=$weight, edge.source=$provenance"
+                transaction.run(query, source_name=source["name"], target_name=target["name"], weight=payload.weight, provenance=payload.source).consume()
+            graph.execute_write(update)
+    except (Neo4jError, ServiceUnavailable, SessionExpired):
+        raise HTTPException(status_code=503, detail="Ontology update not confirmed; retry after checking connectivity") from None
+    db.add(AuditEvent(actor_user_id=user.user_id, action="ontology.relation_removed" if remove else "ontology.relation_updated", resource_type="ontology", details=payload.model_dump()))
+    db.commit()
+    return {"status": "removed" if remove else "updated"}
+
+
+@router.post("/users/{user_id}/password-reset")
+@limiter.limit("5/minute")
+def issue_password_reset(request: Request, user_id: UUID, payload: ResetAuthorization, user: User = Depends(require_roles(UserRole.admin)), db: Session = Depends(get_db)):
+    if not verify_password(payload.password, user.password_hash):
+        raise HTTPException(status_code=401, detail="Administrator password is incorrect")
+    account = db.scalar(select(User).where(User.user_id == user_id).with_for_update())
+    if account is None:
+        raise HTTPException(status_code=404, detail="Account not found")
+    if account.role == UserRole.admin or not account.is_active:
+        raise HTTPException(status_code=409, detail="Reset requires an active non-administrator account")
+    token = secrets.token_urlsafe(32)
+    account.password_reset_hash = hashlib.sha256(token.encode()).hexdigest()
+    account.password_reset_expires_at = datetime.now(UTC) + timedelta(minutes=15)
+    db.add(AuditEvent(actor_user_id=user.user_id, action="account.reset_issued", resource_type="user", resource_id=user_id))
+    db.commit()
+    return {"token": token, "expires_at": account.password_reset_expires_at}
 
 
 def _user_response(user: User, db: Session) -> AdminUserResponse:

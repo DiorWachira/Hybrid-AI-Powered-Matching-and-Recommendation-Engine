@@ -212,6 +212,23 @@ def test_authenticated_application_and_match_workflow(migrated_database, monkeyp
             assert users_response.status_code == 200
             assert len(users_response.json()) == 1
             assert "password_hash" not in users_response.text
+            issued = client.post(f"/api/admin/users/{candidate_id}/password-reset", json={"password": "TestAdminOnly123!"}, headers=admin_headers)
+            assert issued.status_code == 200
+            reset_token = issued.json()["token"]
+            invalid = client.post("/api/auth/reset-password", json={"token": "x" * 43, "new_password": "UpdatedPassword123!"})
+            assert invalid.status_code == 400
+            reset = client.post("/api/auth/reset-password", json={"token": reset_token, "new_password": "UpdatedPassword123!"})
+            assert reset.status_code == 200
+            assert client.post("/api/auth/reset-password", json={"token": reset_token, "new_password": "UpdatedPassword123!"}).status_code == 400
+            assert client.get("/api/auth/me", headers=candidate_headers).status_code == 401
+            assert client.post("/api/auth/login", json={"email": "candidate@example.org", "password": "IsolatedTestOnly123!"}).status_code == 401
+            assert client.post("/api/auth/login", json={"email": "candidate@example.org", "password": "UpdatedPassword123!"}).status_code == 200
+            second = client.post(f"/api/admin/users/{candidate_id}/password-reset", json={"password": "TestAdminOnly123!"}, headers=admin_headers)
+            assert second.status_code == 200
+            with Session(engine) as database:
+                database.execute(text("UPDATE users SET password_reset_expires_at = CURRENT_TIMESTAMP - interval '1 minute' WHERE user_id = :id"), {"id": candidate_id})
+                database.commit()
+            assert client.post("/api/auth/reset-password", json={"token": second.json()["token"], "new_password": "UpdatedPassword123!"}).status_code == 400
     finally:
         app.dependency_overrides.clear()
         app.dependency_overrides.update(previous)

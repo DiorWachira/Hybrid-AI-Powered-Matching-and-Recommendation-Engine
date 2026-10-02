@@ -1,11 +1,14 @@
 from io import BytesIO
 from pathlib import Path
 from uuid import UUID
+from zipfile import ZipFile
 import re
 
 from docx import Document
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
+from app.core.rate_limit import limiter
 from pypdf import PdfReader
+from starlette.concurrency import run_in_threadpool
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
@@ -30,8 +33,21 @@ def candidate_applications(user: User = Depends(require_roles(UserRole.candidate
 def _extract_text(filename: str, content: bytes) -> str:
     suffix = Path(filename).suffix.casefold()
     if suffix == ".pdf":
-        return "\n".join(page.extract_text() or "" for page in PdfReader(BytesIO(content)).pages).strip()
+        if b"%PDF-" not in content[:1024]:
+            raise HTTPException(status_code=415, detail="Invalid PDF signature")
+        reader = PdfReader(BytesIO(content))
+        if reader.is_encrypted or len(reader.pages) > 100:
+            raise HTTPException(status_code=422, detail="Resume must be unencrypted and at most 100 pages")
+        return "\n".join(page.extract_text() or "" for page in reader.pages).strip()
     if suffix == ".docx":
+        if not content.startswith(b"PK\x03\x04"):
+            raise HTTPException(status_code=415, detail="Invalid DOCX signature")
+        with ZipFile(BytesIO(content)) as archive:
+            entries = archive.infolist()
+            if len(entries) > 1000 or sum(entry.file_size for entry in entries) > 30 * 1024 * 1024:
+                raise HTTPException(status_code=413, detail="Expanded DOCX exceeds processing limits")
+            if "word/document.xml" not in archive.namelist() or any(entry.flag_bits & 1 for entry in entries):
+                raise HTTPException(status_code=422, detail="Invalid or encrypted DOCX")
         document = Document(BytesIO(content))
         return "\n".join(paragraph.text for paragraph in document.paragraphs).strip()
     raise HTTPException(status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, detail="Only PDF and DOCX resumes are supported")
@@ -87,7 +103,9 @@ def update_candidate_profile(
 
 
 @router.post("/upload-resume", response_model=CandidateProfileResponse)
+@limiter.limit("5/minute")
 async def upload_resume(
+    request: Request,
     resume: UploadFile = File(...),
     user: User = Depends(require_roles(UserRole.candidate)),
     db: Session = Depends(get_db),
@@ -102,7 +120,7 @@ async def upload_resume(
     if len(content) > MAX_RESUME_BYTES:
         raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="Resume must be 10 MB or smaller")
     try:
-        text = _extract_text(filename, content)
+        text = await run_in_threadpool(_extract_text, filename, content)
     except HTTPException:
         raise
     except Exception as exc:

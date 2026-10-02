@@ -1,6 +1,7 @@
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from app.core.rate_limit import limiter
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -80,7 +81,9 @@ def _score_candidate(candidate: Candidate, job: JobPosting) -> MatchCandidateRes
 
 
 @router.post("/evaluate/{job_id}", response_model=MatchEvaluationResponse)
+@limiter.limit("10/minute")
 def evaluate_matches(
+    request: Request,
     job_id: UUID,
     user: User = Depends(require_roles(UserRole.recruiter, UserRole.admin)),
     db: Session = Depends(get_db),
