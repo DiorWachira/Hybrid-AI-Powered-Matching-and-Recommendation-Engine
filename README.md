@@ -7,7 +7,7 @@ and graph-based skill explanations for workforce placement.
 
 Database increment (2026-10-02): application workflow tables, eligibility fields,
 owner-protected management APIs, persistent match details and a transactional
-Neo4j sync queue are implemented. Migration `20261002_0005` is applied locally.
+Neo4j sync queue are implemented. Migration `20261002_0007` is applied locally.
 See [docs/DATABASE_SCHEMA.md](docs/DATABASE_SCHEMA.md) for the ER/graph design,
 pgAdmin connection details, verification and required graph-worker command.
 
@@ -15,10 +15,16 @@ Implemented on the feature branch, with verification gaps documented in
 [docs/IMPLEMENTATION_AUDIT.md](docs/IMPLEMENTATION_AUDIT.md):
 
 - FastAPI authentication, candidate profiles/resume parsing, jobs and match APIs
-- React candidate, recruiter and read-only admin workspaces
+- React candidate/recruiter workspaces and admin monitoring/moderation/ontology controls
+- Admin-assisted single-use password recovery, session revocation and request throttling
 - PostgreSQL/Alembic persistence and Neo4j projection/ontology tooling
 - Synthetic data preparation and historical model artifacts
 - Rule, data-tool and API-boundary tests plus backend CI configuration
+
+Local graph sync runs every minute via Windows Task Scheduler while the current
+user is signed in. See [docs/WORKFLOW.md](docs/WORKFLOW.md) for installation,
+status checks and operational limits. `data_pipeline/validate_model_contract.py`
+currently fails feature parity; no retraining or public deployment has occurred.
 
 ## Explicitly Deferred
 

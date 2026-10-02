@@ -1,6 +1,27 @@
 HYBRID AI-POWERED WORKFORCE PLACEMENT ENGINE
 PROJECT MILESTONE ROADMAP (8 WEEKS)
-Last updated: 2026-10-01 (implementation and deployment-readiness audit)
+Last updated: 2026-10-02 (admin release-readiness follow-up)
+
+ADMIN RELEASE-READINESS UPDATE (2026-10-02; supersedes older items below)
+[x] Existing table-width layout verified without page overflow at 320/390/768/1440px
+[x] Disposable job close/reopen verified through real browser controls and API
+[x] Password-recovery and ontology UI production build passes
+[x] Graph sync scheduled every minute as JobBridge-GraphSync for the signed-in
+    Windows user; completion status recorded outside Git, successful run observed
+[x] Migration 0007 applied: expiring hashed one-use reset tokens and session versions
+[x] Admin-assisted password reset with administrator reauthentication; old sessions
+    revoked after completion; token reuse and expiry rejected in integration tests
+[x] Admin skill/category/source editing and bounded weighted relationship controls
+    use parameterized Cypher; live temporary ontology CRUD checks pass
+[x] Authentication/reset/upload/match throttling, cache/security headers, bcrypt
+    byte limits and upload signature/archive-expansion limits added
+[x] Patched affected Python packages; installed-environment pip-audit and frontend
+    production npm audit report no known vulnerabilities at this check
+[~] Model validation RUN, NOT PASSED: valid artifact structure but different graph,
+    growth and empty-required-skills semantics. No training or weight replacement
+[ ] Public deployment: fresh Oracle login, verified free capacity/storage, TLS,
+    host-specific verification and model-quality gate remain unresolved
+Current operations/limits: docs/WORKFLOW.md and docs/DEPLOYMENT.md.
 
 DATABASE INCREMENT UPDATE (2026-10-02; supersedes database blockers below)
 [x] Existing Docker PostgreSQL/Neo4j/pgAdmin healthy; native PostgreSQL untouched
@@ -12,7 +33,7 @@ DATABASE INCREMENT UPDATE (2026-10-02; supersedes database blockers below)
 [x] Initial 53 graph events processed; queue empty after migration
 [x] Live isolated migration/graph tests and real JWT application workflow pass
 [x] Owner-protected job edit/close, application status and stored match GET APIs
-[~] Graph synchronization command is one-shot; recurring worker scheduling pending
+[x] One-shot graph worker now scheduled locally; host deployment needs its own schedule
 [~] New fields/status APIs not yet fully exposed by the frontend
 [~] Training/serving parity, independent quality, public deployment remain open
 Full schema, adaptation notes, operations and evidence: docs/DATABASE_SCHEMA.md.

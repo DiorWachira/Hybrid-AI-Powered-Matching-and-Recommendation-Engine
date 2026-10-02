@@ -1,5 +1,10 @@
 # Implementation Audit
 
+Historical audit below. The 2026-10-02 follow-up implements password recovery,
+ontology editing, local graph scheduling and targeted security guards; dependency
+updates pass regression checks. See [WORKFLOW.md](WORKFLOW.md) for current evidence.
+Model-contract validation now explicitly fails; public deployment remains blocked.
+
 Date: 2026-10-01. Scope: roadmap, workflow increments, Sprint 1, current API
 boundaries, training evidence and public-demo readiness. This is not a penetration
 test, a new model evaluation or a completed deployment.
