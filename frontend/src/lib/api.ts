@@ -81,13 +81,17 @@ const API_PREFIX = "/api";
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const headers = new Headers(init?.headers);
   if (!(init?.body instanceof FormData)) headers.set("Content-Type", "application/json");
-  const response = await fetch(`${API_PREFIX}${path}`, {
-    ...init,
-    headers,
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${API_PREFIX}${path}`, { ...init, headers });
+  } catch {
+    throw new Error("Cannot reach JobBridge. Check your connection and try again.");
+  }
 
   if (!response.ok) {
-    throw new Error(`API ${response.status}: ${await response.text()}`);
+    const body = await response.json().catch(() => null) as { detail?: string | Array<{ msg: string; loc: string[] }> } | null;
+    const detail = typeof body?.detail === "string" ? body.detail : Array.isArray(body?.detail) ? body.detail.map((item) => `${item.loc.slice(1).join(" ")}: ${item.msg}`).join(". ") : null;
+    throw new Error(detail ?? (response.status >= 500 ? "The service is currently unavailable. Please try again shortly." : `Request failed (${response.status}). Please try again.`));
   }
 
   return response.json() as Promise<T>;

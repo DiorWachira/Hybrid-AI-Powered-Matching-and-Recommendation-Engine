@@ -1,50 +1,58 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Play, Plus, SlidersHorizontal } from "lucide-react";
-import { PageTitle } from "../components/PageTitle";
+import { ArrowRight, Check, FileText, ListChecks, RotateCcw, Send, ShieldCheck } from "lucide-react";
 import { api, type JobInput } from "../lib/api";
 
 const initialJob: JobInput = { title: "Senior DevOps Engineer", description: "Own platform reliability, CI/CD delivery and cloud operations for a Nairobi fintech team.", location: "Nairobi", requiredExperienceYears: 5, salaryRangeMax: 250000, requiredSkills: ["CI/CD", "AWS", "Kubernetes", "Docker"], mandatoryCertifications: ["AWS Certified Cloud Practitioner"] };
+const toList = (value: string) => [...new Set(value.split(",").map((item) => item.trim()).filter(Boolean))];
 
 export function RecruiterPage() {
   const navigate = useNavigate();
   const [job, setJob] = useState(initialJob);
   const [certText, setCertText] = useState(initialJob.mandatoryCertifications.join(", "));
+  const [skillText, setSkillText] = useState(initialJob.requiredSkills.join(", "));
   const [notice, setNotice] = useState<string | null>(null);
-
-  const update = <K extends keyof JobInput>(key: K, value: JobInput[K]) => setJob((current) => ({ ...current, [key]: value }));
-  const evaluate = () => {
-    if (!job.title.trim() || !job.description.trim() || !job.location.trim()) {
-      setNotice("Complete the role title, location, and description before evaluating candidates.");
-      return;
-    };
-
-    const payload = { ...job, mandatoryCertifications: certText.split(",").map((item) => item.trim()).filter(Boolean) };
-    localStorage.setItem("jobbridge_active_job", JSON.stringify(payload));
-    if (!localStorage.getItem("jobbridge_job_id")) {
-      setNotice("Publish the role first. Live matching requires a saved job in PostgreSQL.");
-      return;
-    }
-    navigate("/matches");
-  };
-
+  const [failed, setFailed] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [published, setPublished] = useState<string | null>(null);
+  const invalidate = () => { setPublished(null); setNotice(null); };
+  const update = <Key extends keyof JobInput>(key: Key, value: JobInput[Key]) => { invalidate(); setJob((current) => ({ ...current, [key]: value })); };
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
-    const payload = { ...job, mandatoryCertifications: certText.split(",").map((item) => item.trim()).filter(Boolean) };
+    if (busy || published) return;
     const token = localStorage.getItem("jobbridge_token");
-    if (!token) {
-      localStorage.setItem("jobbridge_job_draft", JSON.stringify(payload));
-      setNotice("Role draft saved on this device. Sign in to publish it to the database.");
-      return;
-    }
+    if (!token) { navigate("/auth"); return; }
+    setBusy(true); setNotice(null); setFailed(false);
+    const payload = { ...job, requiredSkills: toList(skillText), mandatoryCertifications: toList(certText) };
     try {
       const response = await api.createJob(payload, token);
       localStorage.setItem("jobbridge_job_id", response.job_id);
-      setNotice("Job created successfully.");
-    } catch {
-      setNotice("The job could not be created. Please check your sign-in and try again.");
-    }
+      localStorage.setItem("jobbridge_active_job", JSON.stringify(payload));
+      setPublished(response.job_id); setNotice("Your role is published and ready for evaluation.");
+    } catch (error) { setFailed(true); setNotice(error instanceof Error ? error.message : "Could not publish this role."); }
+    finally { setBusy(false); }
   };
+  const reset = () => { setJob(initialJob); setCertText(initialJob.mandatoryCertifications.join(", ")); setSkillText(initialJob.requiredSkills.join(", ")); invalidate(); };
 
-  return <main className="mx-auto max-w-[1500px] space-y-6 px-5 py-6 lg:px-8"><PageTitle eyebrow="Recruiter command center" title="Create a role, then let the engine explain the shortlist." detail="Hard constraints are processed first. Semantic, graph and growth signals only run for profiles that clear the rule gate." action={<button onClick={evaluate} className="inline-flex items-center gap-2 rounded-lg bg-spectral-emerald px-4 py-2.5 text-sm font-semibold text-obsidian shadow-glow-emerald"><Play className="h-4 w-4" />Evaluate candidates</button>} />{notice && <div className="rounded-xl border border-spectral-amber/35 bg-spectral-amber/10 px-4 py-3 text-sm text-spectral-amber">{notice}</div>}<div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_330px]"><form onSubmit={submit} className="glass-panel rounded-2xl p-5"><div className="flex items-center gap-2"><Plus className="h-4 w-4 text-spectral-emerald" /><h2 className="text-base font-semibold">Role specification</h2></div><div className="mt-5 grid gap-4 sm:grid-cols-2"><label className="field"><span>Role title</span><input value={job.title} onChange={(e) => update("title", e.target.value)} required /></label><label className="field"><span>Location</span><input value={job.location} onChange={(e) => update("location", e.target.value)} required /></label><label className="field"><span>Minimum experience</span><input type="number" min="0" value={job.requiredExperienceYears} onChange={(e) => update("requiredExperienceYears", Number(e.target.value))} /></label><label className="field"><span>Salary ceiling (KES)</span><input type="number" min="0" value={job.salaryRangeMax} onChange={(e) => update("salaryRangeMax", Number(e.target.value))} /></label></div><label className="field mt-4"><span>Role description</span><textarea rows={6} value={job.description} onChange={(e) => update("description", e.target.value)} required /></label><label className="field mt-4"><span>Mandatory certifications</span><input value={certText} onChange={(e) => setCertText(e.target.value)} placeholder="CPA, AWS Certified Cloud Practitioner" /><small>Comma-separated. These become Tier 1 hard filters.</small></label><div className="mt-6 flex justify-end gap-3"><button type="button" onClick={() => { setJob(initialJob); setCertText(initialJob.mandatoryCertifications.join(", ")); }} className="rounded-lg border border-white/10 px-4 py-2 text-sm text-white/60">Reset</button><button className="rounded-lg bg-spectral-emerald px-4 py-2 text-sm font-semibold text-obsidian">Save role draft</button></div></form><aside className="space-y-4"><div className="glass-panel wave-amber rounded-2xl p-5"><div className="flex items-center gap-2"><SlidersHorizontal className="h-4 w-4 text-spectral-amber" /><h2 className="text-sm font-semibold">Tier 1 rule gate</h2></div><p className="mt-3 text-xs leading-relaxed text-white/45">Profiles failing any item below never consume model or graph computation.</p><ul className="mt-4 space-y-3 text-sm text-white/70"><li>Certification <strong className="float-right font-mono text-spectral-amber">required</strong></li><li>Experience <strong className="float-right font-mono text-spectral-amber">{job.requiredExperienceYears}+ yrs</strong></li><li>Location <strong className="float-right font-mono text-spectral-amber">{job.location}</strong></li><li>Salary <strong className="float-right font-mono text-spectral-amber">≤ KES {job.salaryRangeMax.toLocaleString()}</strong></li></ul></div><div className="glass-panel wave-primary rounded-2xl p-5"><p className="section-label semantic-label">Tier 2 after eligibility</p><div className="mt-4 space-y-3 text-xs text-white/60"><p><b className="text-spectral-emerald">S_bert</b> · semantic role/CV similarity</p><p><b className="text-spectral-emerald">S_graph</b> · direct + related skills</p><p><b className="text-spectral-violet">S_growth</b> · trajectory and certifications</p></div></div></aside></div></main>;
+  return <main className="studio-page">
+    <div className="page-heading"><div><p className="eyebrow">Recruiter workspace</p><h1>Make room for the right talent.</h1><p>Create a role with clear requirements.</p></div><button className="primary-button" disabled={!published || busy} onClick={() => navigate("/matches")}>Evaluate candidates<ArrowRight size={17} /></button></div>
+    {notice && <p className={`notice ${failed ? "error" : ""}`} role="status">{!failed && <Check size={18} />}{notice}</p>}
+    <div className="form-layout">
+      <form onSubmit={submit} className="role-form">
+        <fieldset disabled={busy} className="form-section"><legend className="section-heading"><FileText size={18} />01 / Role details</legend><div className="form-grid">
+          <label className="studio-field">Role title<input value={job.title} minLength={2} maxLength={255} onChange={(event) => update("title", event.target.value)} required /></label>
+          <label className="studio-field">Location<input value={job.location} maxLength={120} onChange={(event) => update("location", event.target.value)} required /></label>
+          <label className="studio-field full">Role description<textarea rows={6} value={job.description} minLength={20} maxLength={20000} onChange={(event) => update("description", event.target.value)} required /></label>
+          <label className="studio-field full">Required skills<input value={skillText} onChange={(event) => { invalidate(); setSkillText(event.target.value); }} /><small>Separate skills with commas</small></label>
+        </div></fieldset>
+        <fieldset disabled={busy} className="form-section"><legend className="section-heading"><ListChecks size={18} />02 / Eligibility criteria</legend><div className="form-grid">
+          <label className="studio-field">Minimum experience (years)<input type="number" min={0} max={60} step={1} value={job.requiredExperienceYears} onChange={(event) => update("requiredExperienceYears", Number(event.target.value))} required /></label>
+          <label className="studio-field">Salary ceiling (KES)<input type="number" min={0} max={9999999999} step="0.01" value={job.salaryRangeMax} onChange={(event) => update("salaryRangeMax", Number(event.target.value))} required /></label>
+          <label className="studio-field full">Mandatory certifications<input value={certText} onChange={(event) => { invalidate(); setCertText(event.target.value); }} /><small>Optional / separate certifications with commas</small></label>
+        </div></fieldset>
+        <div className="form-actions"><button className="secondary-button" type="button" disabled={busy} onClick={reset}><RotateCcw size={15} />Reset</button><button className="primary-button" disabled={busy || !!published}>{published ? <Check size={16} /> : <Send size={16} />}{busy ? "Publishing..." : published ? "Published" : "Publish role"}</button></div>
+      </form>
+      <aside className="role-summary"><p className="eyebrow">Role at a glance</p><h2>{job.title || "Untitled role"}</h2><p>{job.location || "Location not specified"}</p><div className="skill-tags">{toList(skillText).map((skill) => <span key={skill}>{skill}</span>)}</div><h3 className="section-heading mt-8"><ShieldCheck size={17} />Eligibility</h3><div className="summary-line"><span>Experience</span><strong>{job.requiredExperienceYears}+ years</strong></div><div className="summary-line"><span>Salary ceiling</span><strong>KES {job.salaryRangeMax.toLocaleString()}</strong></div><div className="summary-line"><span>Certifications</span><strong>{toList(certText).length} required</strong></div><div className="score-legend"><p className="eyebrow">Matching signals</p><span><i />Semantic relevance</span><span><i />Skill alignment</span><span><i />Growth potential</span></div></aside>
+    </div>
+  </main>;
 }

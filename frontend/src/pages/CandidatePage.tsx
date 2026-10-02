@@ -1,74 +1,128 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
-import { ArrowUpRight, BadgeDollarSign, Bookmark, Check, Clock3, FileUp, MapPin, ShieldCheck, UploadCloud } from "lucide-react";
-import { PageTitle } from "../components/PageTitle";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { ArrowUpRight, Bookmark, BriefcaseBusiness, Check, CircleAlert, Clock3, FileText, MapPin, RefreshCw, Search, SlidersHorizontal, Sparkles, UploadCloud } from "lucide-react";
 import { api, type CandidateDashboard, type Opportunity } from "../lib/api";
 
-const supported = ["application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"];
+const tabs = [
+  { id: "for-you", label: "For you", icon: Sparkles },
+  { id: "all", label: "All opportunities", icon: BriefcaseBusiness },
+  { id: "history", label: "My activity", icon: Clock3 },
+  { id: "resume", label: "My resume", icon: FileText },
+] as const;
+type Tab = typeof tabs[number]["id"];
+const percentage = (score: number) => Math.round(Math.max(0, Math.min(1, score)) * 100);
 
 export function CandidatePage() {
   const input = useRef<HTMLInputElement>(null);
+  const [tab, setTab] = useState<Tab>("for-you");
+  const [query, setQuery] = useState("");
+  const [sort, setSort] = useState("match");
   const [file, setFile] = useState<File | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [dashboard, setDashboard] = useState<CandidateDashboard | null>(null);
-  const [dashboardError, setDashboardError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [reload, setReload] = useState(0);
+  const [busyId, setBusyId] = useState<string | null>(null);
 
   useEffect(() => {
+    let active = true;
+    setLoading(true);
+    setError(null);
     const token = localStorage.getItem("jobbridge_token");
-    if (!token) return;
-    void api.candidateDashboard(token).then(setDashboard).catch((error: Error) => setDashboardError(error.message));
-  }, []);
+    if (!token) { setLoading(false); setError("Sign in again to load your opportunities."); return; }
+    void api.candidateDashboard(token).then((data) => { if (active) setDashboard(data); })
+      .catch((reason: Error) => { if (active) setError(reason.message); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [reload]);
 
   const selectFile = (next: File | undefined) => {
     if (!next) return;
-    if (!supported.includes(next.type) || next.size > 10 * 1024 * 1024) {
-      setMessage("Use a PDF or DOCX file no larger than 10 MB.");
-      return;
+    setFile(null);
+    if (!/\.(pdf|docx)$/i.test(next.name) || next.size > 10 * 1024 * 1024 || next.size === 0) {
+      setMessage("Choose a non-empty PDF or DOCX file under 10 MB."); return;
     }
-    setFile(next);
-    setMessage("Resume ready to upload.");
+    setFile(next); setMessage(null);
   };
 
   const upload = async () => {
     const token = localStorage.getItem("jobbridge_token");
-    if (!file || !token) {
-      setMessage("Select a resume and sign in before uploading.");
-      return;
-    }
-    setUploading(true);
+    if (!file || !token || uploading) return;
+    setUploading(true); setMessage(null);
     try {
       const profile = await api.uploadResume(file, token);
-      setMessage(`Resume uploaded. ${profile.skills.length} skills were detected and saved.`);
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "The resume could not be uploaded.");
-    } finally {
-      setUploading(false);
-    }
+      setMessage(`Resume saved. ${profile.skills.length} skills identified.`);
+      setReload((value) => value + 1);
+    } catch (reason) { setMessage(reason instanceof Error ? reason.message : "Upload failed. Please try again."); }
+    finally { setUploading(false); }
   };
 
   const updateOpportunity = async (jobId: string, status: "saved" | "applied") => {
     const token = localStorage.getItem("jobbridge_token");
-    if (!token) return;
+    if (!token || busyId) return;
+    setBusyId(jobId); setError(null);
     try {
-      await api.updateOpportunityStatus(jobId, status, token);
-      const refreshed = await api.candidateDashboard(token);
-      setDashboard(refreshed);
-    } catch (error) {
-      setDashboardError(error instanceof Error ? error.message : "The opportunity could not be updated.");
-    }
+      const updated = await api.updateOpportunityStatus(jobId, status, token);
+      setDashboard((current) => current ? {
+        available_opportunities: current.available_opportunities.map((job) => job.job_id === jobId ? updated : job),
+        for_you: current.for_you.map((job) => job.job_id === jobId ? updated : job),
+        history: [updated, ...current.history.filter((job) => job.job_id !== jobId)],
+      } : current);
+    } catch (reason) { setError(reason instanceof Error ? reason.message : "Could not save your activity."); }
+    finally { setBusyId(null); }
   };
 
-  return <main className="mx-auto max-w-[1400px] space-y-7 px-5 py-6 lg:px-8"><PageTitle eyebrow="Candidate workspace" title="Find work that fits your trajectory." detail="Your profile, activity history, and trained match scores stay together so recommendations become useful over time." />{dashboardError && <p className="rounded-xl border border-spectral-coral/35 bg-spectral-coral/10 px-4 py-3 text-sm text-spectral-coral">{dashboardError}</p>}<section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_330px]"><div className="glass-panel wave-violet rounded-2xl p-5"><div className="flex items-center gap-2"><FileUp className="h-4 w-4 text-spectral-violet" /><h2 className="font-semibold">Resume ingestion</h2></div><button onClick={() => input.current?.click()} onDrop={(event) => { event.preventDefault(); selectFile(event.dataTransfer.files[0]); }} onDragOver={(event) => event.preventDefault()} className="mt-5 flex min-h-44 w-full flex-col items-center justify-center rounded-xl border border-dashed border-spectral-violet/40 bg-spectral-violet/5 px-6 text-center transition hover:border-spectral-emerald/55 hover:bg-spectral-emerald/5"><UploadCloud className="h-8 w-8 text-spectral-violet" /><strong className="mt-3 text-sm">Drop your PDF or DOCX here</strong><span className="mt-1 text-xs text-white/40">or select it from your device · maximum 10 MB</span><input ref={input} type="file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" className="hidden" onChange={(event) => selectFile(event.target.files?.[0])} /></button>{message && <p className="mt-4 rounded-lg border border-spectral-emerald/25 bg-spectral-emerald/5 px-3 py-2 text-xs text-spectral-emerald">{message}</p>}{file && <div className="mt-4 flex items-center justify-between rounded-lg border border-white/10 bg-black/15 px-3 py-3 text-sm"><span className="truncate">{file.name}</span><span className="font-mono text-xs text-white/35">{(file.size / 1024 / 1024).toFixed(2)} MB</span></div>}<button type="button" onClick={upload} disabled={!file || uploading} className="mt-4 inline-flex items-center gap-2 rounded-lg bg-spectral-emerald px-4 py-2.5 text-sm font-semibold text-obsidian disabled:cursor-not-allowed disabled:opacity-40"><UploadCloud className="h-4 w-4" />{uploading ? "Uploading..." : "Upload resume"}</button></div><aside className="space-y-4"><div className="glass-panel rounded-2xl p-5"><p className="section-label semantic-label">Profile protection</p><div className="mt-4 flex items-start gap-3 text-sm text-white/55"><ShieldCheck className="mt-0.5 h-4 w-4 flex-none text-spectral-emerald" /><p>Only experience, skills, certifications, and resume text are used by the matching API.</p></div></div><div className="glass-panel rounded-2xl p-5"><p className="section-label compliance-label">Your activity</p><ul className="mt-4 space-y-3 text-sm text-white/55"><li className="flex items-center gap-2"><Check className="h-4 w-4 text-spectral-emerald" />{dashboard?.history.length ?? 0} saved or applied</li><li className="flex items-center gap-2"><Clock3 className="h-4 w-4 text-spectral-amber" />{dashboard?.available_opportunities.length ?? 0} open opportunities</li></ul></div></aside></section><section><SectionHeader icon={<Bookmark className="h-4 w-4" />} label="For you" detail="Highest current match scores" />{dashboard?.for_you.length ? <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">{dashboard.for_you.map((opportunity) => <OpportunityCard key={opportunity.job_id} opportunity={opportunity} onAction={updateOpportunity} featured />)}</div> : <EmptyState text="Your personalized opportunities will appear after the database is seeded and your profile is available." />}</section><section><SectionHeader icon={<ArrowUpRight className="h-4 w-4" />} label="Available opportunities" detail="Open roles from the marketplace" />{dashboard?.available_opportunities.length ? <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">{dashboard.available_opportunities.map((opportunity) => <OpportunityCard key={opportunity.job_id} opportunity={opportunity} onAction={updateOpportunity} />)}</div> : <EmptyState text="No open opportunities are available yet." />}</section><section><SectionHeader icon={<Clock3 className="h-4 w-4" />} label="Your opportunity history" detail="Saved and applied roles" />{dashboard?.history.length ? <div className="mt-4 grid gap-4 md:grid-cols-2">{dashboard.history.map((opportunity) => <OpportunityCard key={opportunity.job_id} opportunity={opportunity} onAction={updateOpportunity} history />)}</div> : <EmptyState text="Saved and applied opportunities will appear here." />}</section></main>;
+  const collection = tab === "history" ? dashboard?.history : tab === "all" ? dashboard?.available_opportunities : dashboard?.for_you;
+  const filtered = (collection ?? []).filter((job) => `${job.title} ${job.company_name} ${job.location ?? ""} ${job.required_skills.join(" ")}`.toLowerCase().includes(query.toLowerCase()));
+  const visible = [...filtered].sort((first, second) => sort === "salary" ? Number(second.salary_range_max ?? 0) - Number(first.salary_range_max ?? 0) : sort === "title" ? first.title.localeCompare(second.title) : second.match_score - first.match_score);
+  const saved = dashboard?.history.filter((job) => job.status === "saved").length;
+  const applied = dashboard?.history.filter((job) => job.status === "applied").length;
+
+  return (
+    <main className="studio-page">
+      <div className="page-heading"><div><p className="eyebrow">Your next chapter</p><h1>Opportunity, with direction.</h1><p>A closer look at the roles that could come next.</p></div><button className="secondary-button" onClick={() => setTab("resume")}><UploadCloud size={16} />Update resume</button></div>
+      <section className="opportunity-banner" aria-label="Career workspace">
+        <img src="/media/workspace.jpg" alt="A sunlit shared workspace with desks and greenery" />
+        <div><span className="eyebrow">JobBridge / Discover</span><h2>Find your place.<br />Build what comes next.</h2><p>Your skills. A new perspective on opportunity.</p></div>
+      </section>
+      <div className="dashboard-stats"><div><span>Open roles in your feed</span><strong>{loading ? "..." : dashboard?.available_opportunities.length ?? "—"}</strong></div><div><span>Saved opportunities</span><strong>{loading ? "..." : saved ?? "—"}</strong></div><div><span>Interest registered</span><strong>{loading ? "..." : applied ?? "—"}</strong></div></div>
+      <div className="tab-bar" role="tablist" aria-label="Candidate views">
+        {tabs.map(({ id, label, icon: Icon }) => <button key={id} role="tab" id={`tab-${id}`} aria-selected={tab === id} aria-controls="candidate-panel" onClick={() => { setTab(id); setQuery(""); }}><Icon size={15} />{label}</button>)}
+      </div>
+      <div id="candidate-panel" role="tabpanel" aria-labelledby={`tab-${tab}`}>
+        {tab === "resume" ? <section className="resume-section">
+          <h2 className="section-heading"><FileText size={19} />Your experience, in one place</h2>
+          <input ref={input} type="file" accept=".pdf,.docx" aria-label="Select resume file" className="sr-only" disabled={uploading} onChange={(event) => selectFile(event.target.files?.[0])} />
+          <button type="button" disabled={uploading} className="upload-zone" onClick={() => input.current?.click()} onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); if (!uploading) selectFile(event.dataTransfer.files[0]); }}><UploadCloud size={32} /><strong>{file ? file.name : "Choose or drop your resume"}</strong><span>PDF or DOCX / up to 10 MB</span></button>
+          <div className="upload-actions"><button className="primary-button" onClick={upload} disabled={!file || uploading}><UploadCloud size={16} />{uploading ? "Uploading..." : "Upload resume"}</button>{file && <span>{(file.size / 1024).toFixed(0)} KB / {file.name}</span>}</div>
+          {message && <p className="notice mt-5" role="status">{message}</p>}
+        </section> : <>
+          <div className="results-toolbar"><label className="search-field"><Search size={18} /><input aria-label="Search opportunities" placeholder="Search roles, skills or locations" value={query} onChange={(event) => setQuery(event.target.value)} /></label><label className="sort-control"><SlidersHorizontal size={15} /><span>Sort by</span><select aria-label="Sort opportunities" value={sort} onChange={(event) => setSort(event.target.value)}><option value="match">Match score</option><option value="salary">Salary ceiling</option><option value="title">Role title</option></select></label></div>
+          {error && <div className="notice error" role="alert"><CircleAlert size={18} /><span>{error}</span><button className="secondary-button" onClick={() => setReload((value) => value + 1)}><RefreshCw size={14} />Retry</button></div>}
+          {loading ? <div className="opportunity-grid" aria-busy="true" aria-label="Loading opportunities">{[1, 2, 3, 4].map((key) => <div key={key} className="skeleton" />)}</div> : <>
+            <p className="results-meta">{visible.length} {visible.length === 1 ? "opportunity" : "opportunities"}{tab === "for-you" ? " / ordered by your match score" : ""}</p>
+            {visible.length ? <div className="opportunity-grid">{visible.map((job, index) => <OpportunityCard key={job.job_id} opportunity={job} rank={tab === "for-you" && sort === "match" && !query ? index + 1 : undefined} onAction={updateOpportunity} busy={busyId !== null} />)}</div> : !error && <div className="empty-state"><BriefcaseBusiness size={30} /><h2>{query ? "No matching opportunities" : tab === "history" ? "Your next step starts here" : "No opportunities yet"}</h2><p>{query ? "Try another role, location or skill." : tab === "history" ? "Your saved roles and registered interests will appear here." : "New opportunities will appear as employers publish roles."}</p>{tab === "history" && <button className="secondary-button" onClick={() => setTab("all")}>Browse opportunities<ArrowUpRight size={16} /></button>}</div>}
+          </>}
+        </>}
+      </div>
+    </main>
+  );
 }
 
-function SectionHeader({ icon, label, detail }: { icon: ReactNode; label: string; detail: string }) {
-  return <div className="flex items-end justify-between gap-4"><div className="flex items-center gap-2 text-spectral-emerald">{icon}<h2 className="text-sm font-semibold uppercase tracking-[0.14em]">{label}</h2></div><p className="text-xs text-white/35">{detail}</p></div>;
-}
-
-function OpportunityCard({ opportunity, onAction, featured = false, history = false }: { opportunity: Opportunity; onAction: (jobId: string, status: "saved" | "applied") => void; featured?: boolean; history?: boolean }) {
-  return <article className={`glass-panel rounded-2xl p-5 ${featured ? "border-spectral-emerald/25" : ""}`}><div className="flex items-start justify-between gap-3"><div><p className="font-mono text-[10px] uppercase tracking-[0.15em] text-white/35">{opportunity.company_name}</p><h3 className="mt-2 font-semibold text-white">{opportunity.title}</h3></div><span className="rounded-lg bg-spectral-emerald/10 px-2 py-1 font-mono text-xs text-spectral-emerald">{Math.round(opportunity.match_score * 100)}%</span></div><div className="mt-4 flex flex-wrap gap-3 text-xs text-white/45"><span className="inline-flex items-center gap-1"><MapPin className="h-3.5 w-3.5" />{opportunity.location || "Flexible"}</span><span className="inline-flex items-center gap-1"><BadgeDollarSign className="h-3.5 w-3.5" />KES {Number(opportunity.salary_range_max || 0).toLocaleString()}</span></div><p className="mt-4 line-clamp-3 text-sm leading-6 text-white/55">{opportunity.description}</p><div className="mt-4 flex flex-wrap gap-2">{opportunity.required_skills.slice(0, 4).map((skill) => <span key={skill} className="rounded-full border border-white/10 px-2 py-1 text-[10px] text-white/45">{skill}</span>)}</div><div className="mt-5 flex gap-2">{history ? <span className="rounded-lg border border-white/10 px-3 py-2 text-xs uppercase text-white/45">{opportunity.status}</span> : <><button onClick={() => onAction(opportunity.job_id, "saved")} className="rounded-lg border border-white/10 px-3 py-2 text-xs text-white/60 hover:border-spectral-emerald/40 hover:text-spectral-emerald">Save</button><button onClick={() => onAction(opportunity.job_id, "applied")} className="rounded-lg bg-spectral-emerald px-3 py-2 text-xs font-semibold text-obsidian">Apply interest</button></>}</div></article>;
-}
-
-function EmptyState({ text }: { text: string }) {
-  return <div className="mt-4 rounded-2xl border border-dashed border-white/10 px-5 py-8 text-center text-sm text-white/40">{text}</div>;
+function OpportunityCard({ opportunity, rank, onAction, busy }: { opportunity: Opportunity; rank?: number; onAction: (id: string, status: "saved" | "applied") => void; busy: boolean }) {
+  const [expanded, setExpanded] = useState(false);
+  const applied = opportunity.status === "applied";
+  const saved = opportunity.status === "saved";
+  return <article className="job-card" style={{ animationDelay: `${Math.min(rank ?? 0, 5) * 50}ms` } as CSSProperties}>
+    <div className="job-card-top"><div className="company-mark" aria-hidden="true">{opportunity.company_name.slice(0, 2).toUpperCase()}</div><div className="match-badge"><strong>{percentage(opportunity.match_score)}%</strong><span>Match score</span></div></div>
+    <h3>{opportunity.title}</h3><p className="company-name">{opportunity.company_name}</p>
+    <div className="job-facts"><span><MapPin size={13} />{opportunity.location || "Location not specified"}</span><span><BriefcaseBusiness size={13} />{opportunity.required_experience_years}+ years</span></div>
+    <p className="job-description" style={expanded ? { display: "block" } : undefined}>{opportunity.description}</p>
+    <div className="skill-tags">{(expanded ? opportunity.required_skills : opportunity.required_skills.slice(0, 4)).map((skill) => <span key={skill}>{skill}</span>)}</div>
+    {expanded && <div className="company-name">Certifications: {opportunity.mandatory_certifications.join(", ") || "None specified"}</div>}
+    <button className="text-button mb-4" aria-expanded={expanded} onClick={() => setExpanded(!expanded)}>{expanded ? "Less detail" : "View role"}<ArrowUpRight size={14} /></button>
+    <div className="job-card-bottom"><span>{opportunity.salary_range_max != null ? `Up to KES ${Number(opportunity.salary_range_max).toLocaleString()}` : "Salary not disclosed"}</span><div className="flex gap-2"><button className="icon-button" title={applied ? "Interest already registered" : saved ? "Opportunity saved" : "Save opportunity"} aria-label={saved ? `Saved ${opportunity.title}` : `Save ${opportunity.title}`} disabled={busy || saved || applied} onClick={() => onAction(opportunity.job_id, "saved")}><Bookmark size={16} fill={saved ? "currentColor" : "none"} /></button><button className="secondary-button" disabled={busy || applied} onClick={() => onAction(opportunity.job_id, "applied")}>{applied ? <Check size={14} /> : <ArrowUpRight size={14} />}{applied ? "Interest sent" : "Register interest"}</button></div></div>
+    {rank && <span className="company-name mt-3">{String(rank).padStart(2, "0")} / In your recommendations</span>}
+  </article>;
 }
