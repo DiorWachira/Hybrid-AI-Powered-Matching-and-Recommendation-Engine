@@ -1,8 +1,15 @@
 HYBRID AI-POWERED WORKFORCE PLACEMENT ENGINE
 PROJECT MILESTONE ROADMAP (8 WEEKS)
-Last updated: 2026-10-01 (Week 4 preparation implementation pass)
+Last updated: 2026-10-01 (implementation and deployment-readiness audit)
 
-Legend:  [x] done   [~] partially done   [ ] not started
+Legend: [x] narrowly stated deliverable implemented, with evidence where noted
+    [~] partial, historically verified or awaiting required verification
+    [ ] not implemented or not demonstrated
+An [x] is NOT production approval. Week exit criteria require separate evidence.
+Audit details: docs/IMPLEMENTATION_AUDIT.md. Workflow: docs/WORKFLOW.md.
+Sprint 1: source preparation substantial; current runtime sign-off BLOCKED.
+Public demo: Oracle Always Free-only proposed; no public endpoint deployed.
+No new training, main-branch merge/push, or native PostgreSQL changes authorized.
 Note: academic documentation tasks (Chapter 5, UML write-ups, report) are
 owned by the student and are deliberately excluded from this roadmap.
 
@@ -18,31 +25,33 @@ CLIENT ALIGNMENT NOTES (2026-09-20)
    freelance-marketplace layer and is deliberately deferred -- see
    docs/extras/marketplace_features.txt for the captured requirements.
  - "Simulate but also be a web app": resolved as a seeded demo/evaluation
-   mode inside the web app (data_pipeline/evaluate_model.py running the
-   same hybrid engine over the synthetic dataset), not a separate program.
+    mode using the same hybrid engine over synthetic data. The planned
+    data_pipeline/evaluate_model.py is not implemented yet.
  - Mobile is out of scope entirely.
  - Dataset strategy decided -- see docs/DATASET_STRATEGY.md for the full
    rationale (synthetic Kenyan candidates, real BrighterMonday job posts,
    ESCO skill ontology, optional CDACC mapping).
  - Kaggle "Profile Matching and Recommendation Dataset" (users.csv +
    feedback.csv) added as a methodology-validation-only auxiliary set --
-   not job/skill data, used solely to confirm the training procedure works
-   on independently-labelled accept/reject data. See
+    not job/skill data. Its label provenance and suitability still require
+    review; it does not independently validate workforce matching. See
    notebooks/hybrid_matching_model_training.ipynb Section 17.
  - Model training notebook started early (normally Week 5/6): a Colab-ready
    end-to-end pipeline already exists at
    notebooks/hybrid_matching_model_training.ipynb covering data load,
    validation, text cleaning, MiniLM embeddings, graph-overlap + growth
-   scoring, leakage-safe splitting, CV-tuned logistic regression with
+    scoring, grouped outer splitting, CV-tuned logistic regression with
    overfitting/underfitting diagnostics, evaluation, top-k inference and
-   artifact export. EXECUTED on Colab 2026-09-20 -- see the results
-   section below.
+    artifact export. Historical execution was LOCAL, not a verified Colab
+    run. Inner CV is row-wise and cold candidates may overlap validation.
 
 
 ====================================================================
 TRAINING RUN RESULTS (local, 2026-09-20, recalibrated labels)
 ====================================================================
 Run headlessly via nbclient on the local venv (torch 2.14.0+cpu), not Colab.
+Historical reported results only; not rerun during this audit. Serving uses
+different skill/growth formulas, so these metrics do NOT certify API scores.
 Artifacts: data_pipeline/artifacts/hybrid_match_weights.json
 Evidence:  data_pipeline/reports/overfitting_diagnostics.png
            data_pipeline/reports/test_evaluation.png
@@ -60,11 +69,12 @@ Warm test (unseen candidates, seen jobs), threshold 0.37:
 
 Cold start (unseen jobs AND unseen candidates):
   precision 0.682 | recall 0.908 | F1 0.779 | ROC-AUC 0.799
-  warm->cold F1 change: +0.004. Essentially no degradation, so the model
-  generalises to new postings rather than memorising specific ones.
+    warm->cold F1 change: +0.004 in this synthetic experiment. This does not
+    establish real-world generalisation or independence from model selection.
   CAVEAT: the cold precision@3 / recall@3 / NDCG@3 all read 1.000 because
   most cold candidates have <= 3 held-out jobs, making top-3 degenerate.
-  Do not quote the cold ranking metrics; the classification metrics are sound.
+    Do not quote the cold ranking metrics. Classification metrics also need
+    independent split/provenance review before being used as quality evidence.
 
 Baselines (thresholds now tuned on validation, same as the learned model):
   fixed-weight rule (0.45/0.40/0.15): F1 0.747 | ROC-AUC 0.810
@@ -92,28 +102,29 @@ circular label produced.
 CURRENT STATUS SNAPSHOT
 ====================================================================
 [x] Git repository + remote on GitHub, branch/PR workflow in use
-[x] Docker Compose stack: PostgreSQL 16 (host port 5433), Neo4j 5 Community
-[x] PostgreSQL relational schema (users, candidates, employers,
-    job_postings, match_results) via SQLAlchemy + Alembic, migrated
-[x] FastAPI application shell with CORS + /api/health (verified 200 OK)
+[~] Docker Compose defined; config validation passes, Docker engine unavailable
+[~] PostgreSQL schema and migrations implemented (including candidate activity);
+    current applied migration head not verified
+[~] FastAPI/CORS/health implemented; current port 8000 connection fails
 [x] Python virtual environment with backend dependencies installed
 [x] Environment configuration via .env / pydantic-settings
 [x] docs/WORKFLOW.md (branching, commit convention, increment plan)
-[x] Neo4j Bolt driver, connection module and combined /api/health check
-[x] Baseline Neo4j ontology seed (Skill/Certification/JobRole/Industry)
-[x] pytest smoke tests for database health and the ontology seed
+[~] Neo4j driver, health and baseline ontology seed implemented; live recheck blocked
+[x] pytest database/ontology smoke-test source exists; two live checks not run
 [x] Dataset strategy decided and documented (docs/DATASET_STRATEGY.md)
-[x] GitHub Actions CI workflow (.github/workflows/backend-ci.yml) running
+[~] GitHub Actions CI workflow (.github/workflows/backend-ci.yml) configured for
     compile checks, docker-compose validation, migrations and pytest
-    against Postgres + Neo4j service containers
-[ ] Everything below in Weeks 1-8 that is not ticked
+    against Postgres + Neo4j; current remote green run not inspected
+[x] Audit checks: 30 DB-independent tests, frontend build, Compose config pass
+[~] UI redesign builds; selected browser fixture checks are not live E2E proof
 
 Known gaps to close early:
- - Auth, job CRUD, candidate profile updates, resume ingestion and
-     match-evaluation endpoints are implemented
- - ML dependencies, trained artifact loading, live MiniLM embeddings and
-     calibrated scoring are complete; Neo4j weighted two-hop skill paths are
-     available for visualization/explanation, separate from trained S_graph
+ - Auth, create/list jobs (NOT CRUD), profiles, resume ingestion and match
+     evaluation exist. Ownership/UUID evaluation guards added and tested.
+ - ML artifact loading exists, but training uses weighted related skills
+     and a different growth formula. Current API direct overlap/growth is
+     NOT training-equivalent. Version the shared feature contract before
+     retraining; graph remains explanatory, not an independent ranking layer.
  - Frontend routes, authentication, resume upload and live ranked-result
      rendering are implemented; richer trained-model explainability remains
      pending
@@ -131,22 +142,22 @@ MONTH 1 - INFRASTRUCTURE, BACKEND CORE, FRONTEND SHELL, DATA
 WEEK 1  Foundations and Database Architecture
 --------------------------------------------------------------------
 [x] Initialise Git repository and project directory structure
-[x] Define and migrate the PostgreSQL relational schema
-[x] Run PostgreSQL and Neo4j locally via Docker Compose
-[x] Verify the full local stack (containers healthy, migrations, API)
-[x] Add the Neo4j Bolt driver and a connection module (app/db/neo4j_db.py)
+[~] Define/migrate relational schema: files exist; historical run, current check blocked
+[~] Run PostgreSQL and Neo4j via Compose: historical evidence only today
+[~] Verify full local stack: Docker engine and live API currently unavailable
+[~] Add the Neo4j Bolt driver and a connection module (app/db/neo4j_db.py)
     with a combined /api/health readiness check covering both databases
-[x] Create the baseline Neo4j ontology: constraints plus seed Cypher for
+[~] Create the baseline Neo4j ontology: constraints plus seed Cypher for
     Skill, Certification, JobRole, Industry nodes and the RELATED_TO /
     SKILL_REQUIRED / REQUIRES_CERT relationships
 [x] Decide and record the dataset strategy (docs/DATASET_STRATEGY.md):
     synthetic Kenyan candidates + real BrighterMonday job posts + ESCO
     ontology, with CDACC mapped onto ESCO for local relevance
 [x] Add pytest and a first smoke test (backend/tests/test_database_health.py)
-[x] Add a GitHub Actions CI workflow that runs compile checks, migrations
-    and pytest on every push (.github/workflows/backend-ci.yml)
+[~] Backend CI configuration exists; verify a green run on the reviewed commit
 Exit criterion: both databases reachable from the API, ontology seed
 script re-runnable, CI green on every push.
+Audit: NOT currently met. No clean-checkout/current remote-CI proof.
 
 --------------------------------------------------------------------
 WEEK 2  Backend Core, Authentication and Rule Engine
@@ -155,63 +166,63 @@ WEEK 2  Backend Core, Authentication and Rule Engine
 [x] Password hashing (bcrypt) and JWT issuing/verification utilities
 [x] FR-01: /api/auth/register and /api/auth/login with role separation
     (candidate, recruiter, admin) and a role-based access dependency
-[x] Public candidate/recruiter signup, JWT login, and role-protected frontend
+[~] Public candidate/recruiter signup, JWT login, and role-protected frontend
     dashboards for candidate, recruiter, and administrator sessions
+    (browser role decoder still lacks expiry/allowed-role validation)
 [x] Protected /api/admin/overview endpoint with user, profile, job, and match
     activity counts plus recent records
-[x] Administrator bootstrap command (backend/create_admin.py); public signup
+[~] Administrator bootstrap command (backend/create_admin.py); public signup
     cannot create admin accounts
-[x] Pydantic request/response schemas and a shared error format
+    (CLI exists but its actual bootstrap flow is not verified)
+[~] Pydantic schemas exist; complete consistent application error handling pending
 [x] FR-03 (first pass): job creation and open-job listing endpoints with
     hard-filter criteria and recruiter/admin role protection
 [x] Tier 1 rule engine (app/core/rule_filter.py): mandatory
     certifications, minimum years of experience, location, salary ceiling
 [x] Unit tests for the rule engine covering pass and fail paths
+[x] Recruiter job ownership/UUID checks and admin role denial regression tests
+[x] Staging/production rejects default/short JWT secrets and non-HTTPS origins
 Exit criterion: a recruiter can register, log in, create a job, and the
 rule filter correctly eliminates ineligible sample candidates.
+Audit: PARTIAL. Rule tests pass; current real-database auth-to-job flow not rerun.
 
 --------------------------------------------------------------------
 WEEK 3  Frontend Shell and Resume Parsing
 --------------------------------------------------------------------
-[x] Scaffold the React frontend (Vite + TypeScript + Tailwind v4) with a
-    design-token layer enforcing the 60-30-10 palette
-    (60% #FDFBF7 canvas / 30% #0F5257 emerald / 10% #D4AF37 gold)
-[x] Public landing page (frontend/src/components/): header, hero with a
-    live match-telemetry card, 4-step pipeline, engine metrics, scenarios,
-    final CTA and footer. The telemetry card mirrors the real FR-05
-    explainability payload (tier-1 filters, the three tier-2 sub-scores,
-    matched vs missing skills) rather than a decorative score
-[x] Accessibility baseline: skip link, focus-visible rings, ARIA meters on
-    score bars, prefers-reduced-motion honoured. Gold is a surface-only
-    colour because #D4AF37 on the cream canvas measures 2.03:1 and fails
-    WCAG for text; CTAs use ink-on-gold at 6.90:1
+[x] React/Vite/TypeScript/Tailwind scaffold and production build
+[~] Routed role workspaces replace the former landing-page-first experience;
+    charcoal/lime/copper design and local workspace photo implemented, final
+    review pending. Legacy landing components are not live-feature evidence.
+[~] Skip link, focus states, ARIA meters and reduced-motion styles exist;
+    complete keyboard, screen-reader, contrast and mobile review pending
 [x] Client-side routing and a typed API client
     (React Router routes: /recruiter, /candidate, /matches, /auth; typed
-    frontend/lib/api.ts contract with live /api/health and planned endpoint
-    methods; API-unavailable state explicitly falls back to demo mode)
-[x] Auth page, token-storage-ready login contract and protected-route-ready
-    application shell (final JWT handling remains blocked on FR-01)
+    src/lib/api.ts methods; unavailable APIs show errors, not invented results)
+[~] Auth page and token-based application shell implemented; server remains
+    authority; browser expiry/session cleanup and full auth tests pending
 [x] Candidate dashboard (profile + PDF/DOCX resume intake validation) and
     recruiter dashboard (job creation form + hard-filter criteria) as
     functional shells
-[x] Candidate profile API stores structured skills, certifications, experience
+[~] Candidate profile API stores structured skills, certifications, experience
     and resume text in PostgreSQL
-[x] Candidate opportunity activity table stores saved/applied/viewed job
-    relationships and supports candidate history
-[x] Candidate dashboard API returns available jobs, ranked For You jobs, and
+[~] Candidate activity table stores saved/applied/viewed relationships;
+    timestamp updates, concurrency and state transitions need work
+[~] Candidate dashboard API returns available jobs, ranked For You jobs, and
     saved/applied history; generated demo data can be loaded with
     data_pipeline/seed_database.py
-[x] FR-04 first pass: /api/matches/evaluate/{job_id} applies Tier 1 rules,
+[~] FR-04 first pass: /api/matches/evaluate/{job_id} applies Tier 1 rules,
     local scoring and persists match results with skill-gap explanations
-[x] FR-02: /api/candidates/upload-resume with PDF/DOCX text extraction
+[~] FR-02: /api/candidates/upload-resume with PDF/DOCX text extraction
 [x] Basic section text extraction and known-skill detection from uploaded files
-[x] Persist parsed resume text and extracted skills to PostgreSQL and project
-    candidate skills/certifications into Neo4j
-[x] File-upload hardening: 10 MB limit, PDF/DOCX allow-list, no file storage
-    or execution of uploaded content
-[x] Replace demo match results with live API evaluation results
+[~] Resume DB/Neo4j writes implemented; cross-store failure handling not robust
+[~] Upload baseline: 10 MB and extension allow-list; no original file storage.
+    Parser resource limits, signature/MIME checks and adversarial tests pending
+[x] Active pages call real API methods; browser fixtures were testing only
+[x] For You excludes hard-rule failures (regression tested); no confidence
+    threshold claim until the trained feature contract is corrected
 Exit criterion: uploading a real CV through the UI produces stored
 parsed text plus skill nodes in the graph.
+Audit: NOT reverified against the current live stack.
 
 WEEK 4  Dataset Preparation and Anti-Bias Pipeline
 [x] data_pipeline/generate_synthetic_data.py: synthetic Kenyan candidate
@@ -225,17 +236,17 @@ WEEK 4  Dataset Preparation and Anti-Bias Pipeline
     verification
 [~] CDACC-to-ESCO JSON working mappings are included; examples are provisional
     pending verification against the relevant official CDACC standards
-[x] Shared text preprocessing is used by resume ingestion, cleaned exports,
+[x] Shared text preprocessing is called by resume ingestion, cleaned exports,
     and semantic scoring to remove identifiers and fine-grained locations
-[x] Shared anonymization removes labeled/known names, gender, age, email, phone,
-    URL, and fine-grained Kenyan city from resume scoring text
+[~] Redaction heuristics cover some identifiers and cities; they do NOT prove
+    anonymity or bias removal. Unlabelled names/proxies can remain in embeddings
 [x] data_pipeline/prepare_week4.py exports documented JSON with fixed seed,
     quality checks, and hidden label-generation fields removed; raw training
     data is preserved and generated exports stay local
 [~] data_pipeline/seed_database.py and prepare_week4.py can load candidates,
     jobs, and graph projections; live Docker seed execution awaits verification
-[x] Training labels and leakage-safe train/validation/warm/cold splits are
-    defined and evaluated in notebooks/hybrid_matching_model_training.ipynb
+[~] Synthetic labels/outer splits defined; row-wise inner CV and cold/validation
+    candidate overlap require correction before any leakage-safe claim
 Exit criterion: [~] one command prepares cleaned data; integrated PostgreSQL
 and Neo4j seeding is implemented but awaits live Docker verification.
 
@@ -247,10 +258,9 @@ MONTH 2 - MODEL TRAINING, INTEGRATION, EVALUATION
 --------------------------------------------------------------------
 WEEK 5  Model Work on Google Colab
 --------------------------------------------------------------------
-[x] notebooks/hybrid_matching_model_training.ipynb created and Colab-ready
-    (Drive mount, pinned deps, seed generation and reproducibility handled)
-[x] Run the notebook end-to-end on Colab and record the metrics
-    (done 2026-09-20 -- see FIRST TRAINING RUN RESULTS above)
+[~] Notebook has Colab setup code; latest saved probe says is_colab=False,
+    drive_mounted=False. Dependency reproducibility/remote runtime not certified
+[ ] Run notebook end-to-end on Colab: NOT evidenced and no new training authorized
 [x] Load a pre-trained sentence-transformer (all-MiniLM-L6-v2), tokenise CV
     and job description text, generate embeddings
 [x] Compute cosine similarity between candidate and job vectors and
@@ -264,48 +274,60 @@ WEEK 5  Model Work on Google Colab
     the .joblib/.npy/.parquet outputs stay gitignored and regenerable)
 [x] Embedding storage decision: JSONB column now (per the existing
     candidates/job_postings schema); pgvector deferred until proven needed
-Exit criterion: MET for the pipeline mechanics -- a reproducible notebook
-turns raw text into embeddings and produces a ranked candidate list. NOT
-met for matching quality, which is blocked on the label fix in Week 7.
+Exit criterion: historical LOCAL mechanics demonstrated; Colab execution,
+independent quality and reproducibility not signed off.
+
+EPOCH WORKFLOW (additional increment, execution on hold)
+[x] Local artifact-store proof writes fake per-epoch JSON/checkpoints and
+    mirrors temporary folders; tests pass. It does not train a model
+[ ] Actual fixed-epoch trainer with validation loss each epoch, no early stopping
+[ ] Full model/optimizer/RNG state, verified interrupted-run resume and atomic
+    recovery (current helper can replace local files before validating metadata)
+[ ] Real Colab -> Drive -> local reviewed-bundle round-trip with hashes
+[ ] Frozen independent test set used only after validation-based selection
+[ ] Explicit review/promotion of versioned artifacts; never automatic overwrite
 
 --------------------------------------------------------------------
 WEEK 6  Hybrid Engine Integration and Graph Linking
 --------------------------------------------------------------------
 [x] backend/app/core/hybrid_matcher.py: load all-MiniLM-L6-v2 lazily and
     apply the committed scaler and logistic-regression calibration artifact
-[x] Neo4j visual graph metrics: direct and weighted 2-hop RELATED_TO traversal
-    are available for graph exploration and explanations; the trained scorer
-    uses structured skill overlap as its S_graph feature, matching training
-    semantics
-[x] Hybrid scoring: MiniLM semantic similarity, graph overlap and growth
-    score are combined after the Tier 1 rule gate
-[x] FR-04 first pass: /api/matches/evaluate/{job_id} persists rows to
+[~] Neo4j direct/weighted two-hop query code exists; Browser exploration only,
+    no completed graph visualization in the app. Serving direct overlap does
+    NOT match the historical notebook's weighted-related-skill feature
+[~] Hybrid scoring is rules-first, but serving growth differs too. Feature
+    contract/parity tests are required before reusing historical quality claims
+[~] FR-04 first pass: /api/matches/evaluate/{job_id} persists rows to
     match_results using local rule, skill and text scoring
-[~] FR-05: live ranked evaluation response includes confidence scores,
-    verified hard filters and skill-gap breakdown; a separate cached-results
-    GET endpoint remains pending
-[x] Wire the React dashboards to the live upload, job and evaluation APIs
+[~] FR-05: response has component/final scores and rule reasons; skills breakdown
+    is stored, not fully returned/rendered. Scores are not verified confidence.
+    Separate persisted-results GET endpoint remains pending
+[~] React upload/job/evaluation API wiring exists; current live E2E blocked
 Exit criterion: a full matching run completes from the UI and results
 persist to the database.
+Audit: NOT currently met; test fixtures/builds do not establish this.
 
 --------------------------------------------------------------------
 WEEK 7  Theme, Explainability, Testing and Tuning
 --------------------------------------------------------------------
-[ ] Finalise the frontend visual theme, layout and candidate card design
-[ ] Explainability UI: match confidence, matched skills, missing skills
-    chart, and which hard filters were verified
+[~] Finalise frontend theme/layout/cards: redesign builds, selected fixture
+    interactions passed, full real-backend/accessibility acceptance pending
+[~] Explainability UI: component scores and failure reasons exist; matched/missing
+    skills display and graph explanation integration pending. Not proven confidence
 [ ] Functional testing across candidate and recruiter workflows
 [ ] Performance testing against NFR-02 (2-5 s per matching request);
     add batching/caching of embeddings if the target is missed
-[ ] Security pass: parameterised queries, bcrypt hashing, JWT expiry,
-    CORS allow-list, secrets only in .env, dependency vulnerability check
+[~] Security pass: ownership/UUID/config guards tested; Compose ports loopback.
+    Throttling, upload abuse, complete session/auth tests, dependency vulnerability
+    scan and public data/retention policy remain open
 [ ] data_pipeline/evaluate_model.py reporting precision, recall and F1 --
     this doubles as the "simulation mode" (seeded run of the hybrid engine
     over the synthetic dataset, independent of live user traffic)
 [ ] Tune scoring weights and thresholds using the evaluation output
 
     LABEL-VALIDITY CORRECTIONS (blocking any quality claim in the report):
-    CODE COMPLETE 2026-09-20 -- all four land in the next Colab re-run.
+    HISTORICAL LOCAL implementation, not a verified Colab re-run. Synthetic
+    latents reduce direct circularity but do not create independent gold labels.
 [x] Replace the circular weak label. generate_synthetic_data.py now emits
     hidden latents (latent_competence, latent_adaptability on candidates;
     latent_quality_bar on jobs) that are never model features, and the
@@ -324,10 +346,10 @@ WEEK 7  Theme, Explainability, Testing and Tuning
     the learned model's threshold is tuned (shared tune_threshold helper;
     the old flat 0.5 cut-off made the fixed-weight baseline a near-constant
     classifier at recall 1.000 / precision 0.629)
-[x] Add a job-disjoint split alongside the candidate-disjoint one. 20% of
+[~] Add a job-disjoint split alongside the candidate-disjoint one. 20% of
     job postings are held out entirely before splitting, giving a cold-start
-    test of unseen jobs AND unseen candidates; the warm->cold F1 drop is
-    reported and both ROC curves are plotted together
+    test excluding training candidates, but NOT all validation candidates;
+    improve split isolation before claiming an untouched cold test
 [x] Enrich job/CV text before trusting S_bert. Each role now has three
     specialisations with distinct vocabulary, rendered through four sentence
     templates: 800/800 distinct resumes and 99/100 distinct job posts, and
@@ -339,8 +361,8 @@ WEEK 7  Theme, Explainability, Testing and Tuning
     on the new label scheme -- deferred until the re-run confirms the scheme
     behaves as intended
 Exit criterion: measured precision/recall/F1 recorded against a label that
-is NOT a function of the model's own features, and matching latency within
-the stated performance target.
+has independent ground truth, and matching latency within the stated target.
+Audit: NOT met. Gold slice, feature parity and measured latency remain open.
 
 --------------------------------------------------------------------
 WEEK 8  Hardening, Cleanup and Demonstration
@@ -354,8 +376,12 @@ WEEK 8  Hardening, Cleanup and Demonstration
 [ ] Prepare demonstration assets: seeded demo accounts, sample jobs,
     sample CVs and a scripted walkthrough of the two-tier pipeline
 [ ] Tag a release commit for the supervisor evaluation build
+[ ] Deploy an approved Oracle Always Free-only demo with HTTPS, private DB
+    access, unique secrets and synthetic-only records; verify from another device
+[ ] Confirm restart persistence, backups/recovery and host ARM dependency support
 Exit criterion: the prototype runs from a clean checkout and the demo
 walkthrough is rehearsed end to end.
+Audit: NOT met; no deployment or release has occurred.
 
 
 ====================================================================
@@ -368,8 +394,10 @@ RISK WATCHLIST
    2-5 s target; pre-compute embeddings and consider a smaller model.
  - Python 3.14 compatibility: torch/transformers wheels may lag; be
    ready to run the backend on a 3.12 environment if installs fail.
- - Scope creep on the frontend theme: keep Week 3 shells minimal and
-   defer all styling to Week 7.
+ - Current primary blockers: feature-contract mismatch, unavailable live stack,
+     security/abuse controls and independent evaluation evidence.
+ - Free hosting: Oracle capacity/card verification/idle reclaim can block use;
+     stay within Always Free limits and stop if any resource requires payment.
  - Neo4j ontology breadth: seed only the skill families needed by the
    demo domains (software, data, accounting).
  - Marketplace scope creep: apply/accept/contract/project/milestone/

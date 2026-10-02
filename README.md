@@ -1,27 +1,28 @@
 # Hybrid AI-Powered Workforce Placement Engine
 
-Initial scaffold for an ICS II project: a web-based matching and recommendation engine for intelligent workforce placement.
+JobBridge is an ICS II prototype combining rule-based eligibility, local ML scoring,
+and graph-based skill explanations for workforce placement.
 
 ## Current Increment
 
-This branch starts the backend and database foundation only:
+Implemented on the feature branch, with verification gaps documented in
+[docs/IMPLEMENTATION_AUDIT.md](docs/IMPLEMENTATION_AUDIT.md):
 
-- FastAPI application shell
-- PostgreSQL connection settings
-- SQLAlchemy ORM models for the core relational schema
-- Alembic migration setup with an initial schema migration
-- Docker Compose services for PostgreSQL and Neo4j
+- FastAPI authentication, candidate profiles/resume parsing, jobs and match APIs
+- React candidate, recruiter and read-only admin workspaces
+- PostgreSQL/Alembic persistence and Neo4j projection/ontology tooling
+- Synthetic data preparation and historical model artifacts
+- Rule, data-tool and API-boundary tests plus backend CI configuration
 
 ## Explicitly Deferred
 
-The following decisions are intentionally not implemented yet:
+Not yet signed off:
 
-- Dataset final decision
-- Model training
-- CV upload behavior aligned to the final dataset
-- CV verification and bias handling
-- Knowledge base / ontology establishment
-- Project webpage theme
+- Current live stack/clean-machine verification and public deployment
+- Training/serving feature parity and independently measured model quality
+- Real Colab epoch training and Drive checkpoint recovery (training is on hold)
+- Privacy/fairness evaluation, abuse controls and robust graph consistency
+- Complete real-backend UI workflow and performance tests
 
 ## Local Setup
 
@@ -56,6 +57,22 @@ uvicorn main:app --reload
 ```
 
 The API health endpoint is available at `http://127.0.0.1:8000/api/health`.
+
+6. In another terminal at the repository root, start the frontend:
+
+```powershell
+npm --prefix frontend install
+npm --prefix frontend run dev -- --host 127.0.0.1
+```
+
+Open `http://127.0.0.1:5173`. Vite proxies `/api` to the backend. Both databases
+must be reachable; a build or loaded auth page does not prove live matching works.
+The root `.env` is loaded regardless of the backend launch directory.
+For tests, also install `httpx`; it is installed separately by backend CI.
+
+Public hosting is not active. See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for the
+Always Free-only proposal and required deployment gates. Do not expose the Vite
+server, database viewers, default credentials or seed accounts publicly.
 
 ## Service Endpoints
 
