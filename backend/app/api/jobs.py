@@ -3,7 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import require_roles
-from app.db.models import Employer, JobPosting, User, UserRole
+from app.db.models import Employer, JobPosting, JobStatus, User, UserRole
 from app.db.neo4j_db import project_job_requirements
 from app.db.postgres import get_db
 from app.schemas import JobCreateRequest, JobResponse
@@ -39,4 +39,4 @@ def create_job(
 
 @router.get("/", response_model=list[JobResponse])
 def list_open_jobs(db: Session = Depends(get_db)) -> list[JobPosting]:
-    return list(db.scalars(select(JobPosting).order_by(JobPosting.posted_at.desc())))
+    return list(db.scalars(select(JobPosting).where(JobPosting.status == JobStatus.open).order_by(JobPosting.posted_at.desc())))

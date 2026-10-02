@@ -122,16 +122,19 @@ def candidate_dashboard(
     employer_names = {employer.employer_id: employer.company_name for employer in db.scalars(select(Employer))}
     activity = {item.job_id: item for item in db.scalars(select(CandidateOpportunity).where(CandidateOpportunity.candidate_id == candidate.candidate_id))}
     scored = []
+    eligible = []
     for job in jobs:
         result = _score_candidate(candidate, job)
         scored.append(_opportunity(job, result.final_score, activity.get(job.job_id).status if job.job_id in activity else None, employer_names.get(job.employer_id, "Workforce employer")))
+        if result.hard_rule_passed:
+            eligible.append(scored[-1])
     history = []
     for item in sorted(activity.values(), key=lambda value: value.updated_at, reverse=True):
         if item.job.status == JobStatus.closed or item.status in {OpportunityStatus.saved, OpportunityStatus.applied}:
             history.append(_opportunity(item.job, next((entry.match_score for entry in scored if entry.job_id == item.job_id), 0.0), item.status, employer_names.get(item.job.employer_id, "Workforce employer")))
     return CandidateDashboardResponse(
         available_opportunities=scored[:20],
-        for_you=sorted(scored, key=lambda value: value.match_score, reverse=True)[:5],
+        for_you=sorted(eligible, key=lambda value: value.match_score, reverse=True)[:5],
         history=history[:20],
     )
 

@@ -1,10 +1,12 @@
+from uuid import UUID
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import require_roles
 from app.core.rule_filter import CandidateRuleData, JobRuleData, RuleBasedMatcher
-from app.db.models import Candidate, JobPosting, MatchResult, User, UserRole
+from app.db.models import Candidate, Employer, JobPosting, MatchResult, User, UserRole
 from app.core.hybrid_matcher import calibrated_score, semantic_similarity
 from app.db.postgres import get_db
 from app.schemas import MatchCandidateResponse, MatchEvaluationResponse
@@ -60,13 +62,17 @@ def _score_candidate(candidate: Candidate, job: JobPosting) -> MatchCandidateRes
 
 @router.post("/evaluate/{job_id}", response_model=MatchEvaluationResponse)
 def evaluate_matches(
-    job_id: str,
+    job_id: UUID,
     user: User = Depends(require_roles(UserRole.recruiter, UserRole.admin)),
     db: Session = Depends(get_db),
 ) -> MatchEvaluationResponse:
     job = db.get(JobPosting, job_id)
     if job is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job posting not found")
+    if user.role != UserRole.admin:
+        employer = db.get(Employer, job.employer_id)
+        if employer is None or employer.user_id != user.user_id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You can only evaluate your own job postings")
     candidates = list(db.scalars(select(Candidate).order_by(Candidate.created_at.asc())))
     ranked = sorted((_score_candidate(candidate, job) for candidate in candidates), key=lambda result: result.final_score, reverse=True)
     db.query(MatchResult).filter(MatchResult.job_id == job.job_id).delete(synchronize_session=False)
