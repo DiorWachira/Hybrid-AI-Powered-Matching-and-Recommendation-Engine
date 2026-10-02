@@ -3,8 +3,9 @@ from pathlib import Path
 from typing import Literal, Self
 from urllib.parse import urlsplit
 
-from pydantic import Field, model_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from sqlalchemy.engine import make_url
 
 
 class Settings(BaseSettings):
@@ -22,6 +23,14 @@ class Settings(BaseSettings):
     jwt_secret: str = "replace-this-development-secret-before-production"
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 60
+
+    @field_validator("database_url")
+    @classmethod
+    def normalize_local_database_host(cls, value: str) -> str:
+        url = make_url(value)
+        if url.host == "localhost":
+            return url.set(host="127.0.0.1").render_as_string(hide_password=False)
+        return value
 
     model_config = SettingsConfigDict(
         env_file=Path(__file__).resolve().parents[2] / ".env",

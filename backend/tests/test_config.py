@@ -41,3 +41,10 @@ def test_explicit_production_settings_are_accepted():
 
 def test_dotenv_path_is_repository_root():
     assert Settings.model_config["env_file"] == Path(__file__).resolve().parents[2] / ".env"
+
+
+def test_local_database_uses_ipv4_without_changing_remote_hosts():
+    local = Settings(_env_file=None, database_url="postgresql+psycopg://test:test@localhost:5433/test")
+    assert "@127.0.0.1:5433/" in local.database_url
+    remote_url = "postgresql+psycopg://test:test@db.example.org/test?sslmode=require"
+    assert Settings(_env_file=None, database_url=remote_url).database_url == remote_url
