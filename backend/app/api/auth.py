@@ -4,7 +4,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import get_current_user
-from app.db.models import Candidate, Employer, User, UserRole
+from app.db.models import AuditEvent, Candidate, Employer, User, UserRole
 from app.db.postgres import get_db
 from app.schemas import LoginRequest, ProfileResponse, RegisterRequest, TokenResponse
 from app.utils.security import create_access_token, hash_password, verify_password
@@ -28,7 +28,8 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)) -> TokenRe
         if payload.role == UserRole.candidate:
             db.add(Candidate(user_id=user.user_id, full_name=payload.full_name or "", location=payload.location))
         elif payload.role == UserRole.recruiter:
-            db.add(Employer(user_id=user.user_id, company_name=payload.company_name or "", industry=payload.industry, location=payload.location))
+            db.add(Employer(user_id=user.user_id, company_name=payload.company_name or "", contact_name=payload.full_name, industry=payload.industry, location=payload.location))
+        db.add(AuditEvent(actor_user_id=user.user_id, action="account.registered", resource_type="user", resource_id=user.user_id, details={"role": user.role.value}))
         db.commit()
     except IntegrityError:
         db.rollback()
@@ -42,6 +43,10 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)) -> TokenResponse
     user = db.scalar(select(User).where(User.email == str(payload.email).lower()))
     if user is None or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
+    if not user.is_active:
+        raise HTTPException(status_code=403, detail="Account suspended; contact the administrator")
+    db.add(AuditEvent(actor_user_id=user.user_id, action="account.login", resource_type="user", resource_id=user.user_id))
+    db.commit()
     return TokenResponse(access_token=create_access_token(user.user_id, user.role.value), role=user.role)
 
 

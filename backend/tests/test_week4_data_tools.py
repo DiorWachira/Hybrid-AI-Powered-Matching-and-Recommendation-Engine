@@ -97,10 +97,12 @@ def test_rule_gate_rejects_candidate_before_calling_ml(monkeypatch: pytest.Monke
         candidate_id=uuid4(), full_name="Candidate", years_experience=0,
         location="Nakuru", expected_salary=100000, certifications=[], skills=[],
         parsed_resume_text="some profile text",
+        work_authorized=None,
     )
     job = SimpleNamespace(
         required_experience_years=3, location="Nairobi", salary_range_max=200000,
         mandatory_certifications=["CPA"], required_skills=[], description="A valid job description.",
+        requires_work_authorization=False,
     )
     result = matches._score_candidate(candidate, job)
     assert result.hard_rule_passed is False

@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.api.dependencies import get_current_user
 from app.api import candidates, jobs
-from app.db.models import JobPosting, JobStatus, UserRole
+from app.db.models import Candidate, Employer, JobPosting, JobStatus, MatchResult, UserRole
 from app.db.postgres import get_db
 from app.main import app
 
@@ -94,3 +94,41 @@ def test_open_job_listing_filters_query(api_client):
     assert jobs.list_open_jobs(database) == []
     statement = database.scalars.call_args.args[0]
     assert statement.whereclause.compare(JobPosting.status == JobStatus.open)
+
+
+@pytest.mark.parametrize("method,path,payload", [
+    ("get", "/api/jobs/{job_id}/applications", None),
+    ("put", "/api/jobs/{job_id}", {"title": "Analyst", "description": "A sufficiently detailed job description"}),
+    ("patch", "/api/jobs/{job_id}/applications/{application_id}", {"status": "reviewing"}),
+])
+def test_other_employer_cannot_manage_job_or_applications(api_client, method, path, payload):
+    client, database, user = api_client
+    job_id = uuid4()
+    job = SimpleNamespace(job_id=job_id, employer_id=uuid4())
+    database.get.side_effect = lambda model, identifier: job if model is JobPosting else SimpleNamespace(user_id=uuid4())
+    response = client.request(method, path.format(job_id=job_id, application_id=uuid4()), json=payload)
+    assert response.status_code == 403
+    database.commit.assert_not_called()
+
+
+@pytest.mark.parametrize("role", [UserRole.candidate, UserRole.recruiter])
+def test_stored_match_is_owner_scoped(api_client, role):
+    client, database, user = api_client
+    user.role = role
+    records = {
+        MatchResult: SimpleNamespace(candidate_id=uuid4(), job_id=uuid4()),
+        Candidate: SimpleNamespace(user_id=uuid4()),
+        JobPosting: SimpleNamespace(employer_id=uuid4()),
+        Employer: SimpleNamespace(user_id=uuid4()),
+    }
+    database.get.side_effect = lambda model, identifier: records[model]
+    assert client.get(f"/api/matches/{uuid4()}").status_code == 403
+
+
+def test_terminal_application_status_cannot_be_reopened(api_client):
+    client, database, user = api_client
+    database.get.side_effect = lambda model, identifier: SimpleNamespace(employer_id=uuid4()) if model is JobPosting else SimpleNamespace(user_id=user.user_id)
+    database.scalar.return_value = SimpleNamespace(status="hired")
+    response = client.patch(f"/api/jobs/{uuid4()}/applications/{uuid4()}", json={"status": "reviewing"})
+    assert response.status_code == 409
+    database.commit.assert_not_called()
