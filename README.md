@@ -5,6 +5,11 @@ and graph-based skill explanations for workforce placement.
 
 ## Current Increment
 
+Public entry (2026-10-04): `/` now opens the JobBridge landing page with candidate
+and recruiter signup paths, About, approach, FAQs and project feedback links.
+`/privacy` and `/terms` describe prototype data handling and use limits. Existing
+workspaces remain authenticated; public pages do not depend on API availability.
+
 Matching increment (2026-10-04): saved evaluations load without rerunning inference;
 matched/missing skills and model provenance are displayed, with a separate current
 Neo4j skill graph. Evaluation is an explicit button action. No epoch training ran.

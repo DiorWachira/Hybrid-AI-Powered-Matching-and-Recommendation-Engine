@@ -30,7 +30,7 @@ Set-Location backend
   `Unregister-ScheduledTask -TaskName JobBridge-GraphSync -Confirm:$false`.
 - Administrator account recovery is assisted, not email-based: use the independent
   Account recovery search (name, company or email), which includes suspended accounts
-  and has its own pagination. Suspended accounts require an explicit confirmed
+  and has its own five-item pagination. Suspended accounts require an explicit confirmed
   Reactivate action before Reset password becomes available. The separate Accounts
   table search does not affect recovery results. Re-enter your admin password, securely deliver
   the 15-minute link. The recipient sets a new password on the auth page. The token
@@ -40,6 +40,11 @@ Set-Location backend
 - Ontology editing requires admin role; supply a provenance/source for skill and
   link updates. Nodes are not deleted by the UI. Current listing caps each result
   set at 200; use search for narrower results.
+- Admin lists show five items per page with independent controls for recovery,
+  accounts, recent opportunities/activity, skills and relationships. Totals and
+  health appear first. Ontology editing forms start collapsed and open on Edit.
+  Recent-job/activity paging uses the existing overview results, not unlimited
+  history; backend result limits and permissions are unchanged.
 - Run `python data_pipeline/validate_model_contract.py` from the repository root.
   Nonzero exit currently means the historical training/serving formulas differ.
   It does not train, run notebook cells or alter artifacts.

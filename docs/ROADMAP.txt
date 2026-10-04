@@ -1,6 +1,18 @@
 HYBRID AI-POWERED WORKFORCE PLACEMENT ENGINE
 PROJECT MILESTONE ROADMAP (8 WEEKS)
-Last updated: 2026-10-04 (saved matching and explanation increment)
+Last updated: 2026-10-04 (public entry and matching explanation increments)
+
+PUBLIC ENTRY UPDATE (2026-10-04)
+[x] Public home at /: photo-backed JobBridge introduction, candidate/recruiter
+    entry paths, approach, About, FAQ, contact/feedback and complete footer links
+[x] Privacy/data and prototype-use pages; no invented team, endorsements, success
+    statistics or unverified operational-status claims
+[x] Signup links preselect candidate/recruiter; authenticated workspaces protected
+[x] Build and browser navigation checks pass; no page overflow at 320/390/1440/1920px
+    Tested hero leaves next content visible; menus support Escape; FAQ controls work
+[x] Public pages make no API requests; no backend/user data changes needed
+[~] Integrated-browser screenshots clipped; functional DOM checks pass but full
+    screen-reader/contrast certification and external-browser review remain open
 
 NON-TRAINING WEEKLY PROGRESS (2026-10-04; current status)
 [x] Week 1: fixed backend-directory test imports; declared test dependencies;
@@ -254,9 +266,9 @@ Audit: core real-database auth/job/rule tests pass; complete security sign-off p
 WEEK 3  Frontend Shell and Resume Parsing
 --------------------------------------------------------------------
 [x] React/Vite/TypeScript/Tailwind scaffold and production build
-[~] Routed role workspaces replace the former landing-page-first experience;
-    charcoal/lime/copper design and local workspace photo implemented, final
-    review pending. Legacy landing components are not live-feature evidence.
+[x] Public landing page now introduces the platform before signup; authenticated
+    role workspaces retain their existing charcoal/lime/copper design. Public
+    content is descriptive and does not claim validated matching performance.
 [~] Skip link, focus states, ARIA meters and reduced-motion styles exist;
     complete keyboard, screen-reader, contrast and mobile review pending
 [x] Client-side routing and a typed API client
