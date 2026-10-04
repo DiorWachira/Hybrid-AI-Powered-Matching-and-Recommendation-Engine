@@ -8,6 +8,8 @@ import { NotFoundPage } from "./pages/NotFoundPage";
 import { RecruiterPage } from "./pages/RecruiterPage";
 import { AdminPage } from "./pages/AdminPage";
 import { getSessionRole } from "./lib/session";
+import { HomePage } from "./pages/HomePage";
+import { PublicInfoPage } from "./pages/PublicInfoPage";
 
 function WorkspaceRoute({ children, roles }: { children: ReactNode; roles: Array<"candidate" | "recruiter" | "admin"> }) {
   const role = getSessionRole();
@@ -20,7 +22,9 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Navigate to="/recruiter" replace />} />
+        <Route path="/" element={<HomePage />} />
+        <Route path="/privacy" element={<PublicInfoPage kind="privacy" />} />
+        <Route path="/terms" element={<PublicInfoPage kind="terms" />} />
         <Route path="/auth" element={<AuthPage />} />
         <Route path="/recruiter" element={<WorkspaceRoute roles={["recruiter", "admin"]}><RecruiterPage /></WorkspaceRoute>} />
         <Route path="/candidate" element={<WorkspaceRoute roles={["candidate"]}><CandidatePage /></WorkspaceRoute>} />

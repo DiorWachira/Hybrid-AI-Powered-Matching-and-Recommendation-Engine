@@ -6,7 +6,7 @@ import { clearSession } from "../lib/session";
 
 export function AuthPage() {
   const navigate = useNavigate();
-  const [mode, setMode] = useState<"login" | "register" | "reset">(() => window.location.hash.startsWith("#reset=") ? "reset" : "login");
+  const [mode, setMode] = useState<"login" | "register" | "reset">(() => window.location.hash.startsWith("#reset=") ? "reset" : new URLSearchParams(window.location.search).get("mode") === "register" ? "register" : "login");
   const [resetToken, setResetToken] = useState(() => new URLSearchParams(window.location.hash.slice(1)).get("reset") ?? "");
   useEffect(() => {
     const readResetLink = () => {
@@ -22,7 +22,7 @@ export function AuthPage() {
   }, []);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState<Exclude<UserRole, "admin">>("candidate");
+  const [role, setRole] = useState<Exclude<UserRole, "admin">>(() => new URLSearchParams(window.location.search).get("role") === "recruiter" ? "recruiter" : "candidate");
   const [fullName, setFullName] = useState("");
   const [companyName, setCompanyName] = useState("");
   const [location, setLocation] = useState("Nairobi");
