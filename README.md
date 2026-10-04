@@ -5,6 +5,10 @@ and graph-based skill explanations for workforce placement.
 
 ## Current Increment
 
+Matching increment (2026-10-04): saved evaluations load without rerunning inference;
+matched/missing skills and model provenance are displayed, with a separate current
+Neo4j skill graph. Evaluation is an explicit button action. No epoch training ran.
+
 Database increment (2026-10-02): application workflow tables, eligibility fields,
 owner-protected management APIs, persistent match details and a transactional
 Neo4j sync queue are implemented. Migration `20261002_0007` is applied locally.
@@ -21,8 +25,8 @@ Implemented on the feature branch, with verification gaps documented in
 - Synthetic data preparation and historical model artifacts
 - Rule, data-tool and API-boundary tests plus backend CI configuration
 
-Local graph sync runs every minute via Windows Task Scheduler while the current
-user is signed in. See [docs/WORKFLOW.md](docs/WORKFLOW.md) for installation,
+Automatic graph sync is disabled at the user's request to stop repeated terminals.
+Run the one-shot worker manually. See [docs/WORKFLOW.md](docs/WORKFLOW.md) for
 status checks and operational limits. `data_pipeline/validate_model_contract.py`
 currently fails feature parity; no retraining or public deployment has occurred.
 
@@ -80,7 +84,10 @@ npm --prefix frontend run dev -- --host 127.0.0.1
 Open `http://127.0.0.1:5173`. Vite proxies `/api` to the backend. Both databases
 must be reachable; a build or loaded auth page does not prove live matching works.
 The root `.env` is loaded regardless of the backend launch directory.
-For tests, also install `httpx`; it is installed separately by backend CI.
+For tests and data tools, install `pip install -r backend/requirements-dev.txt`.
+CI uses that manifest and runs a separate frontend build with `npm ci`.
+The training notebook is intentionally local/ignored and not present in a fresh
+checkout. Notebook-dependent model-contract checks require that local file.
 
 Public hosting is not active. See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for the
 Always Free-only proposal and required deployment gates. Do not expose the Vite

@@ -1,13 +1,35 @@
 HYBRID AI-POWERED WORKFORCE PLACEMENT ENGINE
 PROJECT MILESTONE ROADMAP (8 WEEKS)
-Last updated: 2026-10-02 (admin release-readiness follow-up)
+Last updated: 2026-10-04 (saved matching and explanation increment)
+
+NON-TRAINING WEEKLY PROGRESS (2026-10-04; current status)
+[x] Week 1: fixed backend-directory test imports; declared test dependencies;
+    CI includes frontend npm ci/build and disposable DB integration tests
+    Local equivalents pass; remote Actions/clean-machine sign-off remains pending
+[x] Weeks 6-7: saved job evaluation GET loads without scoring or database writes,
+    preserves empty runs and uses deterministic score-tie ordering
+[x] Match Analysis loads/refreshes saved results; evaluation is an explicit command
+[x] Stored matched/missing skills, evaluation time and model provenance displayed
+[x] Owner-protected selected-match Neo4j graph with bounded real relationships,
+    Cytoscape canvas, zoom/fit and accessible text relationships implemented
+[x] Tests: 65 passed from backend/, including actual DB/graph tests; build passes
+[~] Browser: saved load/refresh sent zero evaluation POSTs; graph pixels nonblank
+    and zoom/fit responded. Explicit evaluation returned 200 after a cold-start
+    automation timeout. Final 390px page bounds pass; screenshots were unreliable
+[~] Performance: one cold cached-model evaluation 63.034s; saved read 0.091s.
+    Not a representative benchmark; the 2-5s inference target remains open
+[x] Graph-sync task remains DISABLED at user request; manual sync only
+[ ] Next: demo-only simulation, fuller application/profile controls, broader
+    workflow/accessibility checks, latency improvements and clean setup
+[ ] Model parity/independent quality, official datasets and public deployment open
+    Epoch training is explicitly ON HOLD; no training files or weights changed
 
 ADMIN RELEASE-READINESS UPDATE (2026-10-02; supersedes older items below)
 [x] Existing table-width layout verified without page overflow at 320/390/768/1440px
 [x] Disposable job close/reopen verified through real browser controls and API
 [x] Password-recovery and ontology UI production build passes
-[x] Graph sync scheduled every minute as JobBridge-GraphSync for the signed-in
-    Windows user; completion status recorded outside Git, successful run observed
+[~] Graph sync was scheduled and verified, then DISABLED at user request because
+    it repeatedly opened terminals. Use the one-shot worker manually
 [x] Migration 0007 applied: expiring hashed one-use reset tokens and session versions
 [x] Admin-assisted password reset with administrator reauthentication; old sessions
     revoked after completion; token reuse and expiry rejected in integration tests
@@ -33,7 +55,7 @@ DATABASE INCREMENT UPDATE (2026-10-02; supersedes database blockers below)
 [x] Initial 53 graph events processed; queue empty after migration
 [x] Live isolated migration/graph tests and real JWT application workflow pass
 [x] Owner-protected job edit/close, application status and stored match GET APIs
-[x] One-shot graph worker now scheduled locally; host deployment needs its own schedule
+[x] One-shot graph worker available; recurring task disabled, host scheduling undecided
 [~] New fields/status APIs not yet fully exposed by the frontend
 [~] Training/serving parity, independent quality, public deployment remain open
 Full schema, adaptation notes, operations and evidence: docs/DATABASE_SCHEMA.md.
@@ -138,7 +160,7 @@ circular label produced.
 
 
 ====================================================================
-CURRENT STATUS SNAPSHOT
+HISTORICAL AUDIT SNAPSHOT (2026-10-01; superseded by dated updates above)
 ====================================================================
 [x] Git repository + remote on GitHub, branch/PR workflow in use
 [~] Docker Compose defined; config validation passes, Docker engine unavailable
@@ -157,7 +179,8 @@ CURRENT STATUS SNAPSHOT
 [x] Audit checks: 30 DB-independent tests, frontend build, Compose config pass
 [~] UI redesign builds; selected browser fixture checks are not live E2E proof
 [ ] Adding a Simulate button that will sim jobs being posted and candidates applying for the opportunities to save on time
-[ ] Adding visuals from the knowledge graphs for candidate, previous applications other related details
+[~] Selected-match skill/application graph added; broader candidate application-history
+    graph views remain pending
 
 Known gaps to close early:
  - Auth, create/list jobs (NOT CRUD), profiles, resume ingestion and match
@@ -183,9 +206,9 @@ MONTH 1 - INFRASTRUCTURE, BACKEND CORE, FRONTEND SHELL, DATA
 WEEK 1  Foundations and Database Architecture
 --------------------------------------------------------------------
 [x] Initialise Git repository and project directory structure
-[~] Define/migrate relational schema: files exist; historical run, current check blocked
-[~] Run PostgreSQL and Neo4j via Compose: historical evidence only today
-[~] Verify full local stack: Docker engine and live API currently unavailable
+[x] Define/migrate relational schema: migrations and isolated roundtrip tests pass
+[x] Run PostgreSQL/Neo4j via Compose: local services verified 2026-10-04
+[~] Local API/databases work; full clean-machine setup reproduction still pending
 [~] Add the Neo4j Bolt driver and a connection module (app/db/neo4j_db.py)
     with a combined /api/health readiness check covering both databases
 [~] Create the baseline Neo4j ontology: constraints plus seed Cypher for
@@ -209,12 +232,12 @@ WEEK 2  Backend Core, Authentication and Rule Engine
     (candidate, recruiter, admin) and a role-based access dependency
 [~] Public candidate/recruiter signup, JWT login, and role-protected frontend
     dashboards for candidate, recruiter, and administrator sessions
-    (browser role decoder still lacks expiry/allowed-role validation)
+    (browser expiry/role validation implemented; complete lifecycle review pending)
 [x] Protected /api/admin/overview endpoint with user, profile, job, and match
     activity counts plus recent records
-[~] Administrator bootstrap command (backend/create_admin.py); public signup
+[x] Administrator bootstrap command (backend/create_admin.py); public signup
     cannot create admin accounts
-    (CLI exists but its actual bootstrap flow is not verified)
+    (local bootstrap and protected generated credential file verified)
 [~] Pydantic schemas exist; complete consistent application error handling pending
 [x] FR-03 (first pass): job creation and open-job listing endpoints with
     hard-filter criteria and recruiter/admin role protection
@@ -225,7 +248,7 @@ WEEK 2  Backend Core, Authentication and Rule Engine
 [x] Staging/production rejects default/short JWT secrets and non-HTTPS origins
 Exit criterion: a recruiter can register, log in, create a job, and the
 rule filter correctly eliminates ineligible sample candidates.
-Audit: PARTIAL. Rule tests pass; current real-database auth-to-job flow not rerun.
+Audit: core real-database auth/job/rule tests pass; complete security sign-off pending.
 
 --------------------------------------------------------------------
 WEEK 3  Frontend Shell and Resume Parsing
@@ -240,7 +263,7 @@ WEEK 3  Frontend Shell and Resume Parsing
     (React Router routes: /recruiter, /candidate, /matches, /auth; typed
     src/lib/api.ts methods; unavailable APIs show errors, not invented results)
 [~] Auth page and token-based application shell implemented; server remains
-    authority; browser expiry/session cleanup and full auth tests pending
+    authority; browser expiry/session cleanup implemented, broader UX review pending
 [x] Candidate dashboard (profile + PDF/DOCX resume intake validation) and
     recruiter dashboard (job creation form + hard-filter criteria) as
     functional shells
@@ -255,9 +278,9 @@ WEEK 3  Frontend Shell and Resume Parsing
     local scoring and persists match results with skill-gap explanations
 [~] FR-02: /api/candidates/upload-resume with PDF/DOCX text extraction
 [x] Basic section text extraction and known-skill detection from uploaded files
-[~] Resume DB/Neo4j writes implemented; cross-store failure handling not robust
+[x] Resume/profile writes enqueue graph changes transactionally; manual worker retries
 [~] Upload baseline: 10 MB and extension allow-list; no original file storage.
-    Parser resource limits, signature/MIME checks and adversarial tests pending
+    Signature/page/archive-expansion limits tested; hard parser isolation pending
 [x] Active pages call real API methods; browser fixtures were testing only
 [x] For You excludes hard-rule failures (regression tested); no confidence
     threshold claim until the trained feature contract is corrected
@@ -284,12 +307,12 @@ WEEK 4  Dataset Preparation and Anti-Bias Pipeline
 [x] data_pipeline/prepare_week4.py exports documented JSON with fixed seed,
     quality checks, and hidden label-generation fields removed; raw training
     data is preserved and generated exports stay local
-[~] data_pipeline/seed_database.py and prepare_week4.py can load candidates,
-    jobs, and graph projections; live Docker seed execution awaits verification
+[~] Demo seed loader/graph projections verified locally; full real-source
+    prepare_week4 execution and provenance remain pending
 [~] Synthetic labels/outer splits defined; row-wise inner CV and cold/validation
     candidate overlap require correction before any leakage-safe claim
 Exit criterion: [~] one command prepares cleaned data; integrated PostgreSQL
-and Neo4j seeding is implemented but awaits live Docker verification.
+and Neo4j demo seeding verified; real-source quality/provenance remains partial.
 
 
 ====================================================================
@@ -333,34 +356,35 @@ WEEK 6  Hybrid Engine Integration and Graph Linking
 --------------------------------------------------------------------
 [x] backend/app/core/hybrid_matcher.py: load all-MiniLM-L6-v2 lazily and
     apply the committed scaler and logistic-regression calibration artifact
-[~] Neo4j direct/weighted two-hop query code exists; Browser exploration only,
-    no completed graph visualization in the app. Serving direct overlap does
+[~] Selected-match Neo4j skill graph now displayed in-app; wider pathway/history
+    views remain pending. Serving direct overlap does
     NOT match the historical notebook's weighted-related-skill feature
 [~] Hybrid scoring is rules-first, but serving growth differs too. Feature
     contract/parity tests are required before reusing historical quality claims
 [~] FR-04 first pass: /api/matches/evaluate/{job_id} persists rows to
     match_results using local rule, skill and text scoring
-[~] FR-05: response has component/final scores and rule reasons; skills breakdown
-    is stored, not fully returned/rendered. Scores are not verified confidence.
-    Separate persisted-results GET endpoint remains pending
+[x] FR-05 first pass: component scores, rule reasons, stored matched/missing skills,
+    provenance, per-match detail GET and saved job-evaluation GET available
+    Scores are explicitly experimental, not verified hiring confidence
 [~] React upload/job/evaluation API wiring exists; current live E2E blocked
 Exit criterion: a full matching run completes from the UI and results
 persist to the database.
-Audit: NOT currently met; test fixtures/builds do not establish this.
+Audit: local saved-results/real inference/graph flow verified; quality, latency
+and complete workflow/accessibility sign-off remain open.
 
 --------------------------------------------------------------------
 WEEK 7  Theme, Explainability, Testing and Tuning
 --------------------------------------------------------------------
 [~] Finalise frontend theme/layout/cards: redesign builds, selected fixture
     interactions passed, full real-backend/accessibility acceptance pending
-[~] Explainability UI: component scores and failure reasons exist; matched/missing
-    skills display and graph explanation integration pending. Not proven confidence
-[ ] Functional testing across candidate and recruiter workflows
+[~] Explainability UI: scores, rule reasons, stored matched/missing skills and
+    selected-match graph implemented; broader usability review pending
+[~] Auth/application/saved-results and graph tests pass; complete workflow testing pending
 [ ] Performance testing against NFR-02 (2-5 s per matching request);
     add batching/caching of embeddings if the target is missed
 [~] Security pass: ownership/UUID/config guards tested; Compose ports loopback.
-    Throttling, upload abuse, complete session/auth tests, dependency vulnerability
-    scan and public data/retention policy remain open
+    Throttling, upload guards, session revocation and dependency scans implemented;
+    parser isolation, distributed counters and public data/retention policy open
 [ ] data_pipeline/evaluate_model.py reporting precision, recall and F1 --
     this doubles as the "simulation mode" (seeded run of the hybrid engine
     over the synthetic dataset, independent of live user traffic)
@@ -435,8 +459,8 @@ RISK WATCHLIST
    2-5 s target; pre-compute embeddings and consider a smaller model.
  - Python 3.14 compatibility: torch/transformers wheels may lag; be
    ready to run the backend on a 3.12 environment if installs fail.
- - Current primary blockers: feature-contract mismatch, unavailable live stack,
-     security/abuse controls and independent evaluation evidence.
+ - Current primary blockers: feature-contract mismatch, cold-start latency,
+     production security/abuse controls and independent evaluation evidence.
  - Free hosting: Oracle capacity/card verification/idle reclaim can block use;
      stay within Always Free limits and stop if any resource requires payment.
  - Neo4j ontology breadth: seed only the skill families needed by the

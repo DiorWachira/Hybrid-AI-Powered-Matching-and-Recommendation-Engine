@@ -9,9 +9,9 @@ Database update 2026-10-02: local Docker databases/pgAdmin are healthy; migratio
 `20261002_0007` applied; graph backfill and administrator migration are complete. Isolated migration/graph and
 authenticated API persistence tests pass. See [DATABASE_SCHEMA.md](DATABASE_SCHEMA.md).
 The October 1 status table below is historical; model/public-deployment gates stay
-open. `JobBridge-GraphSync` now invokes the worker every minute under the signed-in
-Windows user, without task-stored credentials. A successful completion was observed.
-It does not run while this user is signed out. For a manual run:
+open. `JobBridge-GraphSync` was disabled and stopped at the user's request because
+it opened terminal windows every minute. It remains disabled. Do not re-enable
+or replace it with another recurring task without explicit approval. Manual sync:
 
 ```powershell
 Set-Location backend
@@ -20,8 +20,8 @@ Set-Location backend
 
 ### Local Operations
 
-- Install on a new Windows checkout with `backend/install_graph_sync_task.ps1`.
-  It refuses to overwrite an existing task. Check Task Scheduler or
+- The optional `backend/install_graph_sync_task.ps1` is NOT part of normal setup:
+  recurring console launches are not approved. Check Task Scheduler or
   `Get-ScheduledTaskInfo -TaskName JobBridge-GraphSync`.
 - Completion status: `%LOCALAPPDATA%\JobBridge\graph-sync-status.json`, containing
   time/status/count only, no credentials or profile content. Task result 267009
@@ -46,7 +46,26 @@ Set-Location backend
 
 ### Readiness Evidence
 
-Backend suite: 59 passed after the targeted dependency upgrades. Final frontend
+2026-10-04: 65 backend tests pass from the backend working directory, including
+isolated migration/graph/saved-evaluation tests. Frontend production build passes.
+CI installs `backend/requirements-dev.txt` and runs frontend `npm ci`/build plus
+database integration checks. A remote green run is not yet verified.
+
+Match Analysis reads `GET /api/matches/jobs/{job_id}` on load/refresh. Only the
+Evaluate candidates command sends the evaluation POST. Saved responses include
+evaluation time, matched/missing skills and model provenance. The separate graph
+shows current Neo4j relationships, not a reconstruction of historic scores.
+Graph failure does not erase saved results. No training or weight changes occurred.
+
+One local performance sample: cold offline-cached evaluation 63.034 seconds;
+saved read 0.091 seconds. This does not establish NFR latency or model quality.
+Browser load/refresh sent zero evaluation POSTs. Graph pixel checks and zoom/fit
+passed; explicit evaluation returned HTTP 200 after a cold-start automation timeout.
+After layout constraints, the settled 390px viewport had equal client/scroll widths
+(375px), three graph canvases and no page errors. Screenshot capture was tiled and
+unreliable. Full visual/accessibility/performance sign-off remains open.
+
+Earlier 2026-10-02 backend suite: 59 passed after targeted dependency upgrades. Frontend
 production build passed. Live job close/reopen and ontology operations passed;
 password reset issued in the admin UI and completed with HTTP 200 via browser
 form submission (pointer automation was unreliable). No training was performed.

@@ -100,15 +100,16 @@ acknowledgement and leave events queued. Replays are idempotent; crashes after a
 commit can cause a harmless replay. A PostgreSQL advisory lock serializes workers.
 Only graph entities referenced by events are removed, not the whole ontology.
 
-Run from `backend/` after migrations, or schedule periodically:
+Run manually from `backend/` after migrations or writes:
 
 ```powershell
 ..\venv\Scripts\python.exe -m app.db.graph_sync --limit 1000
 ```
 
-This command exits after one batch. **The local Windows JobBridge-GraphSync task
-now runs it every minute while the configured user is signed in.** A deployed host
-still needs its own schedule. API writes succeed while graph work is queued.
+This command exits after one batch. **JobBridge-GraphSync is disabled at the user's
+request to stop recurring terminal windows.** Do not re-enable automatically.
+A deployed host needs an independently approved worker. API writes succeed while
+graph work is queued.
 The seed loader drains up to 10,000 queued events after committing
 unless `--skip-graph` is used; that flag delays projection, not trigger enqueueing.
 Monitor `SELECT count(*) FROM graph_sync_events;`. Failures retain events, so repair
@@ -133,6 +134,8 @@ Existing `/api` routes are retained rather than silently moving to `/api/v1`.
 | Change application status | `PATCH /api/jobs/{job_id}/applications/{application_id}` | Job owner/admin |
 | Compute/persist rankings | `POST /api/matches/evaluate/{job_id}` | Job owner/admin; now appends immutable result snapshots and returns match IDs |
 | Stored explanation | `GET /api/matches/{match_id}` | Candidate owner, job owner, or admin |
+| Saved job evaluation | `GET /api/matches/jobs/{job_id}` | Job owner/admin; no scoring or writes |
+| Selected-match graph | `GET /api/matches/{match_id}/graph` | Same match ownership; bounded current Neo4j projection |
 | Health/admin summary | Existing health/admin routes | Health public, summary admin-only |
 
 Application transitions: submitted -> reviewing/shortlisted/rejected;
@@ -165,6 +168,20 @@ but completion logging fails, inspect current graph state and retry idempotently
 The candidate/job outbox guarantees do not imply atomic ontology/audit commits.
 
 ## Inspect the Databases
+
+Saved job evaluations use the most recent completed evaluation audit timestamp,
+shared with all its match rows. Empty evaluations remain empty instead of showing
+an older run. For historical data without completion events, the latest stored
+match timestamp is used. Retain completion audit records while retaining their
+associated evaluations; removing them can change latest-run selection.
+
+Matched/missing skills and scores are historical snapshots; candidate display names
+and active status are read currently. The graph is also current and can lag until
+manual synchronization. Its view is bounded to 25 candidate skills, 25 required
+skills and 50 related-skill edges, plus the selected pair's application edge.
+It does not expose other candidates or recalculate scores. No graph projection
+produces `awaiting_projection`; a Neo4j outage gives 503 only for the graph request.
+The UI labels scores as experimental because training/serving parity is unresolved.
 
 - pgAdmin web: `http://127.0.0.1:5050`.
 - In **Docker pgAdmin**, register PostgreSQL host `postgres`, port `5432`, database
