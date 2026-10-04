@@ -221,6 +221,9 @@ class OpportunityActionRequest(BaseModel):
 
 class MatchCandidateResponse(BaseModel):
     match_id: UUID | None = None
+    matched_skills: list[str] | None = None
+    missing_skills: list[str] | None = None
+    model_version: str | None = None
     candidate_id: UUID
     full_name: str
     hard_rule_passed: bool
@@ -233,6 +236,7 @@ class MatchCandidateResponse(BaseModel):
 
 class MatchEvaluationResponse(BaseModel):
     job_id: UUID
+    evaluated_at: datetime | None = None
     candidates: list[MatchCandidateResponse]
 
 
