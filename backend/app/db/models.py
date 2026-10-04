@@ -76,7 +76,7 @@ class Candidate(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("CURRENT_TIMESTAMP"))
 
     user = relationship("User", back_populates="candidate_profile")
-    matches = relationship("MatchResult", back_populates="candidate")
+    matches = relationship("MatchResult", back_populates="candidate", passive_deletes="all")
     opportunity_activity = relationship("CandidateOpportunity", back_populates="candidate")
 
 
@@ -126,7 +126,7 @@ class JobPosting(Base):
     posted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("CURRENT_TIMESTAMP"))
 
     employer = relationship("Employer", back_populates="job_postings")
-    matches = relationship("MatchResult", back_populates="job")
+    matches = relationship("MatchResult", back_populates="job", passive_deletes="all")
     opportunity_activity = relationship("CandidateOpportunity", back_populates="job")
 
 
