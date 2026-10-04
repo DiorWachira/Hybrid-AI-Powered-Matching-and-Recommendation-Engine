@@ -36,6 +36,10 @@ export type CandidateProfileInput = {
 };
 
 export type MatchCandidate = {
+  match_id?: string | null;
+  matched_skills?: string[] | null;
+  missing_skills?: string[] | null;
+  model_version?: string | null;
   candidate_id: string;
   full_name: string;
   hard_rule_passed: boolean;
@@ -44,6 +48,19 @@ export type MatchCandidate = {
   semantic_score: number;
   growth_score: number;
   final_score: number;
+};
+
+export type MatchEvaluation = {
+  job_id: string;
+  evaluated_at: string | null;
+  candidates: MatchCandidate[];
+};
+
+export type MatchGraph = {
+  nodes: Array<{ id: string; label: string; kind: "candidate" | "job" | "skill" }>;
+  edges: Array<{ id: string; source: string; target: string; label: string; weight?: number | null; status?: string | null }>;
+  state: "current_projection" | "awaiting_projection";
+  truncated: boolean;
 };
 
 export type AdminUser = {
@@ -56,6 +73,10 @@ export type AdminUser = {
   is_demo: boolean;
   created_at: string;
 };
+
+export type OntologySkill = { name: string; category: string | null; source: string | null };
+export type OntologyRelation = { source_skill: string; target_skill: string; weight: number; source: string | null };
+export type OntologyData = { skills: OntologySkill[]; relationships: OntologyRelation[] };
 
 export type AdminOverview = {
   users_count: number;
@@ -113,6 +134,15 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
+  ontology: (token: string, search: string) => request<OntologyData>(`/admin/ontology?${new URLSearchParams({search})}`, {headers:{Authorization:`Bearer ${token}`}}),
+  saveSkill: (token: string, skill: OntologySkill) => request<OntologySkill>("/admin/ontology/skills", {method:"PUT",headers:{Authorization:`Bearer ${token}`},body:JSON.stringify(skill)}),
+  saveRelation: (token: string, relation: OntologyRelation, remove: boolean) => request<{status:string}>(`/admin/ontology/relationships?remove=${remove}`, {method:"PUT",headers:{Authorization:`Bearer ${token}`},body:JSON.stringify(relation)}),
+    resetPassword: (token: string, newPassword: string) => request<{ message: string }>("/auth/reset-password", {
+      method: "POST", body: JSON.stringify({ token, new_password: newPassword }),
+    }),
+    issuePasswordReset: (token: string, userId: string, password: string) => request<{ token: string; expires_at: string }>(`/admin/users/${userId}/password-reset`, {
+      method: "POST", headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify({ password }),
+    }),
   health: () => request<ApiHealth>("/health"),
   register: (payload: RegisterInput) =>
     request<{ access_token: string; role: UserRole }>("/auth/register", {
@@ -168,10 +198,14 @@ export const api = {
       body: JSON.stringify({ status }),
     }),
   evaluateMatches: (jobId: string, token: string) =>
-    request<{ job_id: string; candidates: MatchCandidate[] }>(`/matches/evaluate/${jobId}`, {
+    request<MatchEvaluation>(`/matches/evaluate/${jobId}`, {
       method: "POST",
       headers: { Authorization: `Bearer ${token}` },
     }),
+  savedMatches: (jobId: string, token: string) =>
+    request<MatchEvaluation>(`/matches/jobs/${jobId}`, { headers: { Authorization: `Bearer ${token}` } }),
+  matchGraph: (matchId: string, token: string) =>
+    request<MatchGraph>(`/matches/${matchId}/graph`, { headers: { Authorization: `Bearer ${token}` } }),
   adminOverview: (token: string) =>
     request<AdminOverview>("/admin/overview", {
       headers: { Authorization: `Bearer ${token}` },

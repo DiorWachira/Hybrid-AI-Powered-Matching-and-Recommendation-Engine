@@ -6,16 +6,84 @@ Audited 2026-10-01. Status is evidence-based, not a count of existing files.
 See [IMPLEMENTATION_AUDIT.md](IMPLEMENTATION_AUDIT.md) for findings and verification.
 
 Database update 2026-10-02: local Docker databases/pgAdmin are healthy; migration
-`20261002_0005` applied and graph backfill processed. Isolated migration/graph and
+`20261002_0007` applied; graph backfill and administrator migration are complete. Isolated migration/graph and
 authenticated API persistence tests pass. See [DATABASE_SCHEMA.md](DATABASE_SCHEMA.md).
 The October 1 status table below is historical; model/public-deployment gates stay
-open. Run the one-shot graph worker after writes or schedule it; no recurring
-worker has been installed:
+open. `JobBridge-GraphSync` was disabled and stopped at the user's request because
+it opened terminal windows every minute. It remains disabled. Do not re-enable
+or replace it with another recurring task without explicit approval. Manual sync:
 
 ```powershell
 Set-Location backend
 ..\venv\Scripts\python.exe -m app.db.graph_sync --limit 1000
 ```
+
+### Local Operations
+
+- The optional `backend/install_graph_sync_task.ps1` is NOT part of normal setup:
+  recurring console launches are not approved. Check Task Scheduler or
+  `Get-ScheduledTaskInfo -TaskName JobBridge-GraphSync`.
+- Completion status: `%LOCALAPPDATA%\JobBridge\graph-sync-status.json`, containing
+  time/status/count only, no credentials or profile content. Task result 267009
+  means still running, not success; compare the status-file timestamp.
+- Remove when no longer needed using
+  `Unregister-ScheduledTask -TaskName JobBridge-GraphSync -Confirm:$false`.
+- Administrator account recovery is assisted, not email-based: use the independent
+  Account recovery search (name, company or email), which includes suspended accounts
+  and has its own five-item pagination. Suspended accounts require an explicit confirmed
+  Reactivate action before Reset password becomes available. The separate Accounts
+  table search does not affect recovery results. Re-enter your admin password, securely deliver
+  the 15-minute link. The recipient sets a new password on the auth page. The token
+  is held in a fragment, captured and removed; it is single-use and stored hashed.
+- Admin recovery cannot reset another admin. Use a controlled local recovery
+  procedure for administrator lockout; no public admin signup or promotion exists.
+- Ontology editing requires admin role; supply a provenance/source for skill and
+  link updates. Nodes are not deleted by the UI. Current listing caps each result
+  set at 200; use search for narrower results.
+- Admin lists show five items per page with independent controls for recovery,
+  accounts, recent opportunities/activity, skills and relationships. Totals and
+  health appear first. Ontology editing forms start collapsed and open on Edit.
+  Recent-job/activity paging uses the existing overview results, not unlimited
+  history; backend result limits and permissions are unchanged.
+- Run `python data_pipeline/validate_model_contract.py` from the repository root.
+  Nonzero exit currently means the historical training/serving formulas differ.
+  It does not train, run notebook cells or alter artifacts.
+
+### Readiness Evidence
+
+2026-10-04: 65 backend tests pass from the backend working directory, including
+isolated migration/graph/saved-evaluation tests. Frontend production build passes.
+CI installs `backend/requirements-dev.txt` and runs frontend `npm ci`/build plus
+database integration checks. A remote green run is not yet verified.
+
+Match Analysis reads `GET /api/matches/jobs/{job_id}` on load/refresh. Only the
+Evaluate candidates command sends the evaluation POST. Saved responses include
+evaluation time, matched/missing skills and model provenance. The separate graph
+shows current Neo4j relationships, not a reconstruction of historic scores.
+Graph failure does not erase saved results. No training or weight changes occurred.
+
+One local performance sample: cold offline-cached evaluation 63.034 seconds;
+saved read 0.091 seconds. This does not establish NFR latency or model quality.
+Browser load/refresh sent zero evaluation POSTs. Graph pixel checks and zoom/fit
+passed; explicit evaluation returned HTTP 200 after a cold-start automation timeout.
+After layout constraints, the settled 390px viewport had equal client/scroll widths
+(375px), three graph canvases and no page errors. Screenshot capture was tiled and
+unreliable. Full visual/accessibility/performance sign-off remains open.
+
+Earlier 2026-10-02 backend suite: 59 passed after targeted dependency upgrades. Frontend
+production build passed. Live job close/reopen and ontology operations passed;
+password reset issued in the admin UI and completed with HTTP 200 via browser
+form submission (pointer automation was unreliable). No training was performed.
+Known-vulnerability scans: `python -m pip_audit --progress-spinner off` and
+`npm --prefix frontend audit --omit=dev` both reported no known vulnerabilities
+at this check. This is not a penetration test or a guarantee against unknown flaws.
+
+Security remains a bounded demo baseline: rate-limit counters are in-memory per
+process and reset on restart; use shared storage before multiple API workers.
+Only trust proxy headers from a controlled reverse proxy. Resume parsing is
+thread-offloaded with PDF page and DOCX expansion limits, not process-isolated
+with a hard CPU/memory budget. Distributed audit atomicity/retention, email delivery,
+independent quality/fairness and public hosting remain open.
 
 Related documents:
 

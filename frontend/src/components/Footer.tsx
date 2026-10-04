@@ -1,68 +1,15 @@
-import { Terminal } from "lucide-react";
+import { ArrowUpRight, Network } from "lucide-react";
+import { Link } from "react-router-dom";
 
 const columns = [
-  {
-    title: "Platform",
-    links: ["Engine", "Roles", "How it Works", "Enterprise"],
-  },
-  {
-    title: "Resources",
-    links: ["Documentation", "Evaluation method", "Skill ontology", "Changelog"],
-  },
-  {
-    title: "Company",
-    links: ["About", "Privacy", "Terms", "Contact"],
-  },
+  { title: "Make a connection", links: [["For candidates", "/auth?mode=register&role=candidate"], ["For recruiters", "/auth?mode=register&role=recruiter"], ["Sign in", "/auth"]] },
+  { title: "Get to know us", links: [["About JobBridge", "/#about"], ["Our approach", "/#approach"], ["Common questions", "/#questions"]] },
+  { title: "The details", links: [["Data & privacy", "/privacy"], ["Prototype use", "/terms"], ["Project & feedback", "/#contact"]] },
 ];
 
 export function Footer() {
-  return (
-    <footer className="border-t border-line bg-canvas-sunk">
-      <div className="mx-auto max-w-6xl px-5 py-12">
-        <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-[1.4fr_repeat(3,1fr)]">
-          <div>
-            <div className="flex items-center gap-2.5">
-              <span className="grid h-9 w-9 place-items-center rounded-lg bg-emerald text-fg">
-                <Terminal className="h-4.5 w-4.5" aria-hidden />
-              </span>
-              <span className="text-lg font-bold text-fg">JobBridge</span>
-            </div>
-            <p className="mt-4 max-w-xs text-sm leading-relaxed text-muted">
-              A hybrid matching and recommendation engine for intelligent
-              workforce placement.
-            </p>
-            <p className="mt-5 inline-flex items-center gap-2 font-mono text-[11px] text-muted">
-              <span className="animate-status h-1.5 w-1.5 rounded-full bg-gold" aria-hidden />
-              All Systems Operational
-            </p>
-          </div>
-
-          {columns.map((col) => (
-            <nav key={col.title} aria-label={col.title}>
-              <h3 className="text-sm font-semibold text-fg">{col.title}</h3>
-              <ul className="mt-3 space-y-2">
-                {col.links.map((link) => (
-                  <li key={link}>
-                    <a
-                      href="#top"
-                      className="text-sm text-muted transition-colors hover:text-gold-bright"
-                    >
-                      {link}
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </nav>
-          ))}
-        </div>
-
-        <div className="mt-10 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-6">
-          <p className="font-mono text-[11px] text-muted">
-            © {new Date().getFullYear()} JobBridge — academic project build
-          </p>
-          <p className="font-mono text-[11px] text-muted">Nairobi, Kenya</p>
-        </div>
-      </div>
-    </footer>
-  );
+  return <footer className="public-footer"><div className="public-container">
+    <div className="public-footer-grid"><div><Link to="/" className="brand-lockup"><span className="brand-symbol"><Network size={22} /></span><span>JobBridge<span className="brand-dot">.</span></span></Link><p>Better context.<br />More considered connections.</p><a className="public-footer-project" href="https://github.com/DiorWachira/Hybrid-AI-Powered-Matching-and-Recommendation-Engine" target="_blank" rel="noopener noreferrer">Explore the project<ArrowUpRight size={15} /></a></div>{columns.map((column) => <nav key={column.title} aria-label={column.title}><h3>{column.title}</h3><ul>{column.links.map(([label, href]) => <li key={href}><Link to={href}>{label}</Link></li>)}</ul></nav>)}</div>
+    <div className="public-footer-bottom"><span>© {new Date().getFullYear()} JobBridge</span><span>Built with a Kenyan workforce perspective.</span><span>Academic project / Experimental matching</span></div>
+  </div></footer>;
 }

@@ -12,6 +12,8 @@ def get_neo4j_driver():
         settings.neo4j_uri,
         auth=(settings.neo4j_user, settings.neo4j_password),
         connection_acquisition_timeout=10,
+        connection_timeout=5,
+        max_transaction_retry_time=10,
         max_connection_lifetime=60,
     )
 

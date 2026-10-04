@@ -1,6 +1,9 @@
 # Sprint 1: Data Preparation and Development Environment
 
-Status: Source preparation substantially complete; runtime sign-off BLOCKED.
+Status: Local source/runtime checks pass; clean-checkout and remote CI sign-off pending.
+Update 2026-10-04: 65 backend tests pass from CI's backend working directory;
+frontend build passes. Fixed data_pipeline import root, declared test dependencies,
+and added frontend build/database integration CI steps. No remote run was claimed.
 Update 2026-10-02: local database health, migration and graph integration checks
 now pass; the runtime blocker recorded below has been resolved locally. Full
 Sprint 1 closure still awaits a clean-checkout run and reviewed remote CI evidence.
@@ -9,9 +12,8 @@ Audit: 2026-10-01. See [implementation audit](IMPLEMENTATION_AUDIT.md).
 
 ## Requirements checklist
 
-- [ ] Development environment sign-off: configuration is present and the local
-    Python tests/frontend build pass, but Docker Engine is currently unavailable.
-    PostgreSQL/Neo4j connectivity and migrations must be reverified.
+- [x] Local development environment: database/graph integration and frontend build
+    pass on 2026-10-04. Clean-machine reproduction remains a separate gate.
 - [x] Codebase organisation: backend, frontend, data pipeline, notebooks, tests,
   documentation, and CI configuration are separated into clear directories.
 - [x] Git version control scaffolding: feature branch and CI configuration exist.
@@ -19,10 +21,10 @@ Audit: 2026-10-01. See [implementation audit](IMPLEMENTATION_AUDIT.md).
 - [x] Synthetic resources: generator, quality report, migrations, ontology seed
     logic and historical weights exist. This does not certify real-job sourcing,
     official CDACC mappings, model quality or the live scoring feature contract.
-- [ ] Automation sign-off: backend CI is configured, but no current remote green
-    run was inspected. Frontend CI is absent.
+- [ ] Automation sign-off: backend and frontend CI are configured, including
+    isolated DB tests, but no current remote green run was inspected.
 
-## Evidence From This Audit
+## Historical Evidence (2026-10-01)
 
 - 30 database-independent pytest tests passed.
 - Frontend TypeScript/Vite production build passed.

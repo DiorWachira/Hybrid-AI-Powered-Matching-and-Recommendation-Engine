@@ -35,7 +35,7 @@ export function RecruiterPage() {
   const reset = () => { setJob(initialJob); setCertText(initialJob.mandatoryCertifications.join(", ")); setSkillText(initialJob.requiredSkills.join(", ")); invalidate(); };
 
   return <main className="studio-page">
-    <div className="page-heading"><div><p className="eyebrow">Recruiter workspace</p><h1>Make room for the right talent.</h1><p>Create a role with clear requirements.</p></div><button className="primary-button" disabled={!published || busy} onClick={() => navigate("/matches")}>Evaluate candidates<ArrowRight size={17} /></button></div>
+    <div className="page-heading"><div><p className="eyebrow">Recruiter workspace</p><h1>Make room for the right talent.</h1><p>Create a role with clear requirements.</p></div><button className="primary-button" disabled={!published || busy} onClick={() => navigate("/matches")}>Match analysis<ArrowRight size={17} /></button></div>
     {notice && <p className={`notice ${failed ? "error" : ""}`} role="status">{!failed && <Check size={18} />}{notice}</p>}
     <div className="form-layout">
       <form onSubmit={submit} className="role-form">

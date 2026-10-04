@@ -41,6 +41,9 @@ class User(Base):
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default=text("true"), nullable=False)
     is_demo: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("false"), nullable=False)
+    auth_version: Mapped[int] = mapped_column(Integer, default=0, server_default=text("0"), nullable=False)
+    password_reset_hash: Mapped[Optional[str]] = mapped_column(String(64), unique=True)
+    password_reset_expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     role: Mapped[UserRole] = mapped_column(Enum(UserRole, name="user_role"), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("CURRENT_TIMESTAMP"))
 
@@ -73,7 +76,7 @@ class Candidate(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("CURRENT_TIMESTAMP"))
 
     user = relationship("User", back_populates="candidate_profile")
-    matches = relationship("MatchResult", back_populates="candidate")
+    matches = relationship("MatchResult", back_populates="candidate", passive_deletes="all")
     opportunity_activity = relationship("CandidateOpportunity", back_populates="candidate")
 
 
@@ -123,7 +126,7 @@ class JobPosting(Base):
     posted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("CURRENT_TIMESTAMP"))
 
     employer = relationship("Employer", back_populates="job_postings")
-    matches = relationship("MatchResult", back_populates="job")
+    matches = relationship("MatchResult", back_populates="job", passive_deletes="all")
     opportunity_activity = relationship("CandidateOpportunity", back_populates="job")
 
 

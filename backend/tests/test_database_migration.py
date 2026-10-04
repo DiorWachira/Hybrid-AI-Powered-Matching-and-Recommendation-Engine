@@ -22,7 +22,7 @@ from app.schemas import MatchCandidateResponse
 from app.utils.security import create_access_token, hash_password
 from app.db.base import Base
 from app.db.graph_sync import ensure_graph_schema, sync_graph_events
-from app.db.models import Candidate, Employer, JobApplication, JobPosting, User, UserRole
+from app.db.models import Candidate, Employer, JobApplication, JobPosting, MatchResult, User, UserRole
 from app.db.neo4j_db import get_neo4j_driver
 
 pytestmark = pytest.mark.skipif(os.getenv("RUN_DATABASE_MIGRATION_TESTS") != "1", reason="requires local disposable PostgreSQL database privileges and Neo4j")
@@ -117,6 +117,14 @@ def test_graph_projection_update_delete_and_same_title_jobs(migrated_database):
                 database.commit()
                 assert sync_graph_events(database, driver) == 4
                 assert sync_graph_events(database, driver) == 0
+                saved = MatchResult(candidate_id=candidate_id, job_id=first_job_id, hard_rule_passed=True)
+                database.add(saved)
+                database.commit()
+                graph_view = matches.read_match_graph(saved.match_id, SimpleNamespace(role=UserRole.admin), database)
+                assert graph_view["state"] == "current_projection"
+                assert {edge["label"] for edge in graph_view["edges"]} >= {"HAS_SKILL", "REQUIRES_SKILL", "APPLIED_TO"}
+                assert len(graph_view["nodes"]) == 3
+                database.rollback()
                 with driver.session(database="neo4j") as graph:
                     assert graph.run("MATCH (job:Job) WHERE job.id IN $ids RETURN count(job) AS count", ids=[str(first_job_id), str(second_job_id)]).single()["count"] == 2
                     assert graph.run("MATCH (:Candidate {id: $id})-[:HAS_SKILL]->(:Skill {name: $skill}) RETURN count(*) AS count", id=str(candidate_id), skill=skill_name).single()["count"] == 1
@@ -169,6 +177,9 @@ def test_authenticated_application_and_match_workflow(migrated_database, monkeyp
             created = client.post("/api/jobs/create", json=job_payload, headers=recruiter_headers)
             assert created.status_code == 201
             job_id = created.json()["job_id"]
+            initial_results = client.get(f"/api/matches/jobs/{job_id}", headers=recruiter_headers)
+            assert initial_results.status_code == 200
+            assert initial_results.json()["evaluated_at"] is None
             for _ in range(2):
                 assert client.post(f"/api/candidates/opportunities/{job_id}", json={"status": "applied"}, headers=candidate_headers).status_code == 200
             applications = client.get("/api/candidates/me/applications", headers=candidate_headers).json()
@@ -182,9 +193,20 @@ def test_authenticated_application_and_match_workflow(migrated_database, monkeyp
             evaluated = client.post(f"/api/matches/evaluate/{job_id}", headers=recruiter_headers)
             assert evaluated.status_code == 200
             match_id = evaluated.json()["candidates"][0]["match_id"]
+            assert evaluated.json()["candidates"][0]["missing_skills"] == ["SQL"]
+            saved_results = client.get(f"/api/matches/jobs/{job_id}", headers=recruiter_headers)
+            assert saved_results.status_code == 200
+            assert saved_results.json() == evaluated.json()
+            assert client.get(f"/api/matches/jobs/{job_id}", headers=other_headers).status_code == 403
+            assert client.get(f"/api/matches/jobs/{job_id}", headers=candidate_headers).status_code == 403
             assert client.get(f"/api/matches/{match_id}", headers=candidate_headers).status_code == 200
             assert client.get(f"/api/matches/{match_id}", headers=other_headers).status_code == 403
             assert client.post(f"/api/matches/evaluate/{job_id}", headers=recruiter_headers).status_code == 200
+            latest = client.get(f"/api/matches/jobs/{job_id}", headers=recruiter_headers).json()
+            assert len(latest["candidates"]) == 1
+            assert latest["candidates"][0]["match_id"] != match_id
+            with Session(engine) as database:
+                assert database.scalar(text("SELECT count(*) FROM match_results")) == 2
             assert client.get(f"/api/matches/{match_id}", headers=candidate_headers).status_code == 200
             closed = client.put(f"/api/jobs/{job_id}", json={**job_payload, "status": "closed"}, headers=recruiter_headers)
             assert closed.status_code == 200
@@ -200,6 +222,10 @@ def test_authenticated_application_and_match_workflow(migrated_database, monkeyp
             assert client.patch(f"/api/admin/users/{candidate_id}", json={"is_active": False}, headers=recruiter_headers).status_code == 403
             assert client.patch(f"/api/admin/users/{candidate_id}", json={"is_active": False}, headers=admin_headers).status_code == 200
             assert client.get("/api/auth/me", headers=candidate_headers).status_code == 403
+            empty_run = client.post(f"/api/matches/evaluate/{job_id}", headers=recruiter_headers)
+            assert empty_run.status_code == 200
+            assert empty_run.json()["candidates"] == []
+            assert client.get(f"/api/matches/jobs/{job_id}", headers=recruiter_headers).json() == empty_run.json()
             assert client.post("/api/auth/login", json={"email": "candidate@example.org", "password": "IsolatedTestOnly123!"}).status_code == 403
             assert client.patch(f"/api/admin/users/{admin_id}", json={"is_active": False}, headers=admin_headers).status_code == 409
             assert client.patch(f"/api/admin/users/{candidate_id}", json={"is_active": True}, headers=admin_headers).status_code == 200
@@ -212,6 +238,23 @@ def test_authenticated_application_and_match_workflow(migrated_database, monkeyp
             assert users_response.status_code == 200
             assert len(users_response.json()) == 1
             assert "password_hash" not in users_response.text
+            issued = client.post(f"/api/admin/users/{candidate_id}/password-reset", json={"password": "TestAdminOnly123!"}, headers=admin_headers)
+            assert issued.status_code == 200
+            reset_token = issued.json()["token"]
+            invalid = client.post("/api/auth/reset-password", json={"token": "x" * 43, "new_password": "UpdatedPassword123!"})
+            assert invalid.status_code == 400
+            reset = client.post("/api/auth/reset-password", json={"token": reset_token, "new_password": "UpdatedPassword123!"})
+            assert reset.status_code == 200
+            assert client.post("/api/auth/reset-password", json={"token": reset_token, "new_password": "UpdatedPassword123!"}).status_code == 400
+            assert client.get("/api/auth/me", headers=candidate_headers).status_code == 401
+            assert client.post("/api/auth/login", json={"email": "candidate@example.org", "password": "IsolatedTestOnly123!"}).status_code == 401
+            assert client.post("/api/auth/login", json={"email": "candidate@example.org", "password": "UpdatedPassword123!"}).status_code == 200
+            second = client.post(f"/api/admin/users/{candidate_id}/password-reset", json={"password": "TestAdminOnly123!"}, headers=admin_headers)
+            assert second.status_code == 200
+            with Session(engine) as database:
+                database.execute(text("UPDATE users SET password_reset_expires_at = CURRENT_TIMESTAMP - interval '1 minute' WHERE user_id = :id"), {"id": candidate_id})
+                database.commit()
+            assert client.post("/api/auth/reset-password", json={"token": second.json()["token"], "new_password": "UpdatedPassword123!"}).status_code == 400
     finally:
         app.dependency_overrides.clear()
         app.dependency_overrides.update(previous)

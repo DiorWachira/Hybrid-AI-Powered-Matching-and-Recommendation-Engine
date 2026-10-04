@@ -1,27 +1,28 @@
 # Database Design and Operation
 
 Implemented and applied locally on 2026-10-02: Alembic revision
-`20261002_0005`. PostgreSQL is the authoritative store; Neo4j is a rebuildable
+`20261002_0007`. PostgreSQL is the authoritative store; Neo4j is a rebuildable
 skill/application graph. pgAdmin 4 is the PostgreSQL administration interface,
 not a separate database. No cloud database or native PostgreSQL installation was
 modified. Existing Docker volumes and records were preserved.
 
 ## Relational Schema
 
-The original five core tables remain. Three supporting tables cover candidate
-activity, application workflow and reliable graph synchronization. There are
-eight application tables, plus Alembic's internal version table.
+The original five core tables remain. Four supporting tables cover candidate
+activity, applications, graph synchronization and audit records. There are
+nine application tables, plus Alembic's internal version table.
 
 | Table | Purpose and constraints |
 | --- | --- |
-| `users` | UUID PK, unique email, password hash, role enum, creation timestamp |
+| `users` | UUID PK, unique email, password hash, role, active/demo flags, session version, nullable unique reset-token hash and expiry, creation timestamp |
 | `candidates` | UUID PK, unique user FK; name, contact/location, experience, salary expectation, skills/certifications, parsed text and embedding storage; nullable `work_authorized` means unknown |
-| `employers` | UUID PK, unique user FK; company, industry, location |
+| `employers` | UUID PK, unique user FK; company, recruiter contact name, industry, location |
 | `job_postings` | UUID PK, employer FK; title/description, experience, location, salary minimum/maximum, skills/certifications, authorization requirement, open/closed status and posting timestamp |
 | `match_results` | UUID PK, candidate/job FKs; rule outcome, component/final scores, JSON explanation, model version and computation timestamp; generated `matching_status` is eligible/filtered, not application status |
 | `candidate_opportunities` | Unique candidate/job pair; saved/viewed/applied activity for the existing frontend; automatically updated timestamp |
 | `job_applications` | Unique candidate/job pair; submitted/reviewing/shortlisted/rejected/hired/withdrawn status; created/updated timestamps |
 | `graph_sync_events` | Transactional outbox: entity type, entity UUID, event UUID, timestamp; deliberately no entity FK so deletion events survive |
+| `audit_events` | Actor FK (SET NULL on deletion), action/resource identifiers, restricted JSON details and timestamp; no credentials, reset tokens or resume contents |
 
 Foreign keys cascade deletion of dependent relational data. Positive-experience,
 nonnegative salary, ordered salary bounds, final-score range, application-status
@@ -99,15 +100,17 @@ acknowledgement and leave events queued. Replays are idempotent; crashes after a
 commit can cause a harmless replay. A PostgreSQL advisory lock serializes workers.
 Only graph entities referenced by events are removed, not the whole ontology.
 
-Run from `backend/` after migrations, or schedule periodically:
+Run manually from `backend/` after migrations or writes:
 
 ```powershell
 ..\venv\Scripts\python.exe -m app.db.graph_sync --limit 1000
 ```
 
-This command exits after one batch. **No automatic background worker is installed.**
-Schedule it before expecting ongoing graph freshness; API writes succeed while graph
-work is queued. The seed loader drains up to 10,000 queued events after committing
+This command exits after one batch. **JobBridge-GraphSync is disabled at the user's
+request to stop recurring terminal windows.** Do not re-enable automatically.
+A deployed host needs an independently approved worker. API writes succeed while
+graph work is queued.
+The seed loader drains up to 10,000 queued events after committing
 unless `--skip-graph` is used; that flag delays projection, not trigger enqueueing.
 Monitor `SELECT count(*) FROM graph_sync_events;`. Failures retain events, so repair
 connectivity/data and rerun. A persistently failing oldest event blocks later work;
@@ -131,6 +134,8 @@ Existing `/api` routes are retained rather than silently moving to `/api/v1`.
 | Change application status | `PATCH /api/jobs/{job_id}/applications/{application_id}` | Job owner/admin |
 | Compute/persist rankings | `POST /api/matches/evaluate/{job_id}` | Job owner/admin; now appends immutable result snapshots and returns match IDs |
 | Stored explanation | `GET /api/matches/{match_id}` | Candidate owner, job owner, or admin |
+| Saved job evaluation | `GET /api/matches/jobs/{job_id}` | Job owner/admin; no scoring or writes |
+| Selected-match graph | `GET /api/matches/{match_id}/graph` | Same match ownership; bounded current Neo4j projection |
 | Health/admin summary | Existing health/admin routes | Health public, summary admin-only |
 
 Application transitions: submitted -> reviewing/shortlisted/rejected;
@@ -151,7 +156,32 @@ The requested broader admin-management/ontology UI, advanced search, model servi
 refactor and new frontend application-status controls are not completed by this
 database increment. New API schemas/routes are available for that subsequent work.
 
+Follow-up: admin account suspension, job moderation and skill/relationship UI are
+now implemented, as is assisted password recovery. Reset completion increments
+`auth_version`, invalidating existing JWTs. Reset issue requires admin password
+verification and an active non-admin target; raw reset tokens are returned once
+and expire in 15 minutes. No email service is configured.
+
+Ontology changes use bounded parameterized Cypher and requested/completed audit
+events. PostgreSQL and Neo4j do not share a transaction: if the graph succeeds
+but completion logging fails, inspect current graph state and retry idempotently.
+The candidate/job outbox guarantees do not imply atomic ontology/audit commits.
+
 ## Inspect the Databases
+
+Saved job evaluations use the most recent completed evaluation audit timestamp,
+shared with all its match rows. Empty evaluations remain empty instead of showing
+an older run. For historical data without completion events, the latest stored
+match timestamp is used. Retain completion audit records while retaining their
+associated evaluations; removing them can change latest-run selection.
+
+Matched/missing skills and scores are historical snapshots; candidate display names
+and active status are read currently. The graph is also current and can lag until
+manual synchronization. Its view is bounded to 25 candidate skills, 25 required
+skills and 50 related-skill edges, plus the selected pair's application edge.
+It does not expose other candidates or recalculate scores. No graph projection
+produces `awaiting_projection`; a Neo4j outage gives 503 only for the graph request.
+The UI labels scores as experimental because training/serving parity is unresolved.
 
 - pgAdmin web: `http://127.0.0.1:5050`.
 - In **Docker pgAdmin**, register PostgreSQL host `postgres`, port `5432`, database

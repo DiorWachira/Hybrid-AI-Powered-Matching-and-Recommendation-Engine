@@ -1,8 +1,30 @@
 # Public Demo Deployment
 
-Status (2026-10-01): **not deployed**. The user permits Oracle Always Free only
-if no payment is required. No provider account, VM, hostname or credentials have
-been configured here. This guide is a preparation plan, not deployment evidence.
+Status (2026-10-02): **not deployed**. The user permits Oracle Always Free only
+if no payment is required. An existing London account previously showed Free Tier
+with an active trial. Current console access redirects to sign-in. A draft A1 VM
+was not created: a boot-volume estimate of GBP 1.60/month still needs account-wide
+free-allowance confirmation. No paid resources or public hostname were provisioned.
+
+### Current Blockers
+
+- User must sign in to Oracle directly; never send credentials/MFA/private keys
+   through chat. Reconfirm London home region, current free allowance and VM capacity.
+- The model-contract gate now runs and fails on graph overlap, growth and empty
+   required-skill handling. Historical accuracy is not API validation. No new
+   training was authorized or performed; artifact weights remain unchanged.
+- Independent gold-data quality/fairness and Linux ARM resource tests remain.
+- In-memory throttling is suitable only for a single-process demo baseline; host
+   limits, request-size enforcement, parser isolation, backup/recovery, secret rotation
+   and restricted ingress must be verified before exposure.
+- Do not deploy the populated local database or its shared seed passwords. Use
+   isolated fictional data and independently generated accounts on the public host.
+
+Local progress: migration0007/password recovery, bounded ontology controls,
+scheduled graph sync, request throttling, upload guards and security headers are
+implemented. Targeted dependency updates pass 59 tests; installed Python and
+production frontend audits report no known vulnerabilities at this check.
+This does not make public deployment complete or guarantee production security.
 
 ## Recommended Host
 

@@ -26,6 +26,8 @@ def get_current_user(
     user = db.get(User, user_id)
     if user is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User account not found")
+    if claims["ver"] != user.auth_version:
+        raise HTTPException(status_code=401, detail="Session expired; sign in again")
     if not user.is_active:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account suspended; contact the administrator")
     return user

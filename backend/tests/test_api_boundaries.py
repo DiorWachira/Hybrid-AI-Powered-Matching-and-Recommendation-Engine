@@ -1,6 +1,7 @@
 from types import SimpleNamespace
 from unittest.mock import MagicMock
-from uuid import uuid4
+from uuid import UUID, uuid4
+from datetime import UTC, datetime
 
 import pytest
 from fastapi.testclient import TestClient
@@ -132,3 +133,67 @@ def test_terminal_application_status_cannot_be_reopened(api_client):
     response = client.patch(f"/api/jobs/{uuid4()}/applications/{uuid4()}", json={"status": "reviewing"})
     assert response.status_code == 409
     database.commit.assert_not_called()
+
+
+def test_saved_job_results_reject_other_employer(api_client):
+    client, database, user = api_client
+    database.get.side_effect = [SimpleNamespace(employer_id=uuid4()), SimpleNamespace(user_id=uuid4())]
+    assert client.get(f"/api/matches/jobs/{uuid4()}").status_code == 403
+    database.execute.assert_not_called()
+
+
+def test_saved_results_do_not_score_or_write(api_client, monkeypatch):
+    from app.api import matches
+    client, database, user = api_client
+    job_id = uuid4()
+    now = datetime.now(UTC)
+    database.get.side_effect = [SimpleNamespace(employer_id=uuid4()), SimpleNamespace(user_id=user.user_id)]
+    database.scalar.return_value = SimpleNamespace(created_at=now)
+    result = MatchResult(match_id=uuid4(), candidate_id=uuid4(), job_id=job_id, hard_rule_passed=True, similarity_score=0.7, growth_score=0.5, skill_overlap_score=0.5, final_weighted_score=0.6, skill_gap_breakdown={"matched_skills": ["SQL"], "missing_skills": ["Python"], "rule_reasons": []}, model_version="test")
+    database.execute.return_value.all.return_value = [(result, "Test Candidate")]
+    scorer = MagicMock(side_effect=AssertionError("Saved reads must not score"))
+    monkeypatch.setattr(matches, "_score_candidate", scorer)
+    response = client.get(f"/api/matches/jobs/{job_id}")
+    assert response.status_code == 200
+    assert response.json()["candidates"][0]["matched_skills"] == ["SQL"]
+    assert response.json()["candidates"][0]["missing_skills"] == ["Python"]
+    scorer.assert_not_called()
+    database.commit.assert_not_called()
+
+
+def test_unevaluated_job_returns_empty_read_only_result(api_client):
+    client, database, user = api_client
+    database.get.side_effect = [SimpleNamespace(employer_id=uuid4()), SimpleNamespace(user_id=user.user_id)]
+    database.scalar.return_value = None
+    response = client.get(f"/api/matches/jobs/{uuid4()}")
+    assert response.status_code == 200
+    assert response.json()["evaluated_at"] is None
+    assert response.json()["candidates"] == []
+    database.execute.assert_not_called()
+    database.commit.assert_not_called()
+
+
+@pytest.mark.parametrize("role", [UserRole.candidate, UserRole.recruiter])
+def test_match_graph_checks_owner_before_querying_neo4j(api_client, monkeypatch, role):
+    from app.api import matches
+    client, database, user = api_client
+    user.role = role
+    records = {MatchResult: SimpleNamespace(candidate_id=uuid4(), job_id=uuid4()), Candidate: SimpleNamespace(user_id=uuid4()), JobPosting: SimpleNamespace(employer_id=uuid4()), Employer: SimpleNamespace(user_id=uuid4())}
+    database.get.side_effect = lambda model, identifier: records[model]
+    driver = MagicMock(side_effect=AssertionError("Graph must not be queried for unauthorized users"))
+    monkeypatch.setattr(matches, "get_neo4j_driver", driver)
+    assert client.get(f"/api/matches/{uuid4()}/graph").status_code == 403
+    driver.assert_not_called()
+
+
+def test_evaluation_uses_candidate_id_to_break_score_ties(api_client, monkeypatch):
+    from app.api import matches
+    from app.schemas import MatchCandidateResponse
+    client, database, user = api_client
+    job_id = uuid4()
+    database.get.side_effect = [SimpleNamespace(job_id=job_id, employer_id=uuid4(), required_skills=[]), SimpleNamespace(user_id=user.user_id)]
+    database.scalars.return_value = [SimpleNamespace(candidate_id=UUID(int=index), skills=[]) for index in (2, 1)]
+    monkeypatch.setattr(matches, "_score_candidate", lambda candidate, job: MatchCandidateResponse(candidate_id=candidate.candidate_id, full_name="Test", hard_rule_passed=False, rule_reasons=[], skill_overlap=0, semantic_score=0, growth_score=0, final_score=0))
+    response = client.post(f"/api/matches/evaluate/{job_id}")
+    assert response.status_code == 200
+    assert [item["candidate_id"] for item in response.json()["candidates"]] == [str(UUID(int=1)), str(UUID(int=2))]

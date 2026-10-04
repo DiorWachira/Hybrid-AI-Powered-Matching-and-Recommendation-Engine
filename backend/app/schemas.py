@@ -17,6 +17,13 @@ class RegisterRequest(BaseModel):
     industry: str | None = Field(default=None, max_length=120)
     location: str | None = Field(default=None, max_length=120)
 
+    @field_validator("password")
+    @classmethod
+    def validate_password_bytes(cls, value: str) -> str:
+        if len(value.encode("utf-8")) > 72:
+            raise ValueError("Password must be at most 72 UTF-8 bytes")
+        return value
+
     @field_validator("full_name")
     @classmethod
     def normalise_name(cls, value: str | None) -> str | None:
@@ -26,6 +33,50 @@ class RegisterRequest(BaseModel):
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str = Field(min_length=1, max_length=128)
+
+
+class PasswordResetRequest(BaseModel):
+    token: str = Field(min_length=40, max_length=100)
+    new_password: str = Field(min_length=12, max_length=72)
+
+    @field_validator("new_password")
+    @classmethod
+    def validate_password_bytes(cls, value: str) -> str:
+        if len(value.encode("utf-8")) > 72:
+            raise ValueError("Password must be at most 72 UTF-8 bytes")
+        return value
+
+
+class ResetAuthorization(BaseModel):
+    password: str = Field(min_length=1, max_length=72)
+
+
+class OntologySkillRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    category: str = Field(min_length=1, max_length=120)
+    source: str = Field(min_length=1, max_length=255)
+
+    @field_validator("name", "category", "source")
+    @classmethod
+    def nonblank(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("Value must not be blank")
+        return value.strip()
+
+
+class OntologyRelationRequest(BaseModel):
+    source_skill: str = Field(min_length=1, max_length=120)
+    target_skill: str = Field(min_length=1, max_length=120)
+    weight: float = Field(ge=0, le=1, allow_inf_nan=False)
+    source: str = Field(min_length=1, max_length=255)
+
+    @model_validator(mode="after")
+    def validate_relation(self):
+        if not all(value.strip() for value in (self.source_skill, self.target_skill, self.source)):
+            raise ValueError("Values must not be blank")
+        if self.source_skill.strip().casefold() == self.target_skill.strip().casefold():
+            raise ValueError("Source and target skills must differ")
+        return self
 
 
 class TokenResponse(BaseModel):
@@ -170,6 +221,9 @@ class OpportunityActionRequest(BaseModel):
 
 class MatchCandidateResponse(BaseModel):
     match_id: UUID | None = None
+    matched_skills: list[str] | None = None
+    missing_skills: list[str] | None = None
+    model_version: str | None = None
     candidate_id: UUID
     full_name: str
     hard_rule_passed: bool
@@ -182,6 +236,7 @@ class MatchCandidateResponse(BaseModel):
 
 class MatchEvaluationResponse(BaseModel):
     job_id: UUID
+    evaluated_at: datetime | None = None
     candidates: list[MatchCandidateResponse]
 
 
