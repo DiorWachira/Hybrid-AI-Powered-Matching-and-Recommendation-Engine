@@ -36,6 +36,10 @@ export type CandidateProfileInput = {
 };
 
 export type MatchCandidate = {
+  match_id?: string | null;
+  matched_skills?: string[] | null;
+  missing_skills?: string[] | null;
+  model_version?: string | null;
   candidate_id: string;
   full_name: string;
   hard_rule_passed: boolean;
@@ -44,6 +48,19 @@ export type MatchCandidate = {
   semantic_score: number;
   growth_score: number;
   final_score: number;
+};
+
+export type MatchEvaluation = {
+  job_id: string;
+  evaluated_at: string | null;
+  candidates: MatchCandidate[];
+};
+
+export type MatchGraph = {
+  nodes: Array<{ id: string; label: string; kind: "candidate" | "job" | "skill" }>;
+  edges: Array<{ id: string; source: string; target: string; label: string; weight?: number | null; status?: string | null }>;
+  state: "current_projection" | "awaiting_projection";
+  truncated: boolean;
 };
 
 export type AdminUser = {
@@ -181,10 +198,14 @@ export const api = {
       body: JSON.stringify({ status }),
     }),
   evaluateMatches: (jobId: string, token: string) =>
-    request<{ job_id: string; candidates: MatchCandidate[] }>(`/matches/evaluate/${jobId}`, {
+    request<MatchEvaluation>(`/matches/evaluate/${jobId}`, {
       method: "POST",
       headers: { Authorization: `Bearer ${token}` },
     }),
+  savedMatches: (jobId: string, token: string) =>
+    request<MatchEvaluation>(`/matches/jobs/${jobId}`, { headers: { Authorization: `Bearer ${token}` } }),
+  matchGraph: (matchId: string, token: string) =>
+    request<MatchGraph>(`/matches/${matchId}/graph`, { headers: { Authorization: `Bearer ${token}` } }),
   adminOverview: (token: string) =>
     request<AdminOverview>("/admin/overview", {
       headers: { Authorization: `Bearer ${token}` },
