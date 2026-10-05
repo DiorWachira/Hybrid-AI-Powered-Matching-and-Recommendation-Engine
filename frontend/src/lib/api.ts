@@ -20,10 +20,32 @@ export type JobInput = {
   description: string;
   location: string;
   requiredExperienceYears: number;
-  salaryRangeMax: number;
+  salaryRangeMax: number | null;
+  salaryRangeMin?: number | null;
+  requiresWorkAuthorization?: boolean;
   requiredSkills: string[];
   mandatoryCertifications: string[];
 };
+
+export type JobPosting = {
+  job_id: string; title: string; description: string; location: string | null;
+  required_experience_years: number; salary_range_max: number | string | null;
+  salary_range_min: number | string | null; requires_work_authorization: boolean;
+  required_skills: string[] | null; mandatory_certifications: string[] | null;
+  status: "open" | "closed"; posted_at: string | null;
+};
+export type ApplicationStatus = "submitted" | "reviewing" | "shortlisted" | "rejected" | "hired" | "withdrawn";
+export type RecruiterStatus = "reviewing" | "shortlisted" | "rejected" | "hired";
+export type Application = { application_id: string; candidate_id: string; job_id: string; status: ApplicationStatus; created_at: string; updated_at: string };
+export type Applicant = Application & { candidate_name: string; candidate_location: string | null; years_experience: number; skills: string[]; certifications: string[] };
+export type CandidateApplication = Application & { job_title: string; company_name: string; job_location: string | null; job_status: "open" | "closed" };
+
+const jobPayload = (job: JobInput) => ({
+  title: job.title, description: job.description, location: job.location || null,
+  required_experience_years: job.requiredExperienceYears, salary_range_max: job.salaryRangeMax,
+  salary_range_min: job.salaryRangeMin ?? null, requires_work_authorization: job.requiresWorkAuthorization ?? false,
+  required_skills: job.requiredSkills, mandatory_certifications: job.mandatoryCertifications,
+});
 
 export type CandidateProfileInput = {
   full_name: string;
@@ -155,19 +177,17 @@ export const api = {
       body: JSON.stringify({ email, password }),
     }),
   createJob: (job: JobInput, token: string) =>
-    request<{ job_id: string }>("/jobs/create", {
+    request<JobPosting>("/jobs/create", {
       method: "POST",
       headers: { Authorization: `Bearer ${token}` },
-      body: JSON.stringify({
-        title: job.title,
-        description: job.description,
-        location: job.location,
-        required_experience_years: job.requiredExperienceYears,
-        salary_range_max: job.salaryRangeMax,
-        required_skills: job.requiredSkills,
-        mandatory_certifications: job.mandatoryCertifications,
-      }),
+      body: JSON.stringify(jobPayload(job)),
     }),
+  myJobs: (token: string, offset = 0, limit = 6) => request<JobPosting[]>(`/jobs/mine?${new URLSearchParams({ offset: String(offset), limit: String(limit) })}`, { headers: { Authorization: `Bearer ${token}` } }),
+  updateJob: (jobId: string, job: JobInput, status: "open" | "closed", token: string) => request<JobPosting>(`/jobs/${jobId}`, { method: "PUT", headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify({ ...jobPayload(job), status }) }),
+  changeOwnJobStatus: (jobId: string, status: "open" | "closed", token: string) => request<JobPosting>(`/jobs/${jobId}/status`, { method: "PATCH", headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify({ status }) }),
+  jobApplications: (jobId: string, token: string, offset = 0, limit = 6) => request<Applicant[]>(`/jobs/${jobId}/applications?${new URLSearchParams({ offset: String(offset), limit: String(limit) })}`, { headers: { Authorization: `Bearer ${token}` } }),
+  changeApplicationStatus: (jobId: string, applicationId: string, status: RecruiterStatus, token: string) => request<Application>(`/jobs/${jobId}/applications/${applicationId}`, { method: "PATCH", headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify({ status }) }),
+  myApplications: (token: string, offset = 0, limit = 6) => request<CandidateApplication[]>(`/candidates/me/applications?${new URLSearchParams({ offset: String(offset), limit: String(limit) })}`, { headers: { Authorization: `Bearer ${token}` } }),
   getCandidateProfile: (token: string) =>
     request<CandidateProfileInput>("/candidates/me", {
       headers: { Authorization: `Bearer ${token}` },

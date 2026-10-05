@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useSearchParams } from "react-router-dom";
 import { ArrowUpRight, Bookmark, BriefcaseBusiness, Check, CircleAlert, Clock3, FileText, MapPin, RefreshCw, Search, SlidersHorizontal, Sparkles, UploadCloud } from "lucide-react";
 import { api, type CandidateDashboard, type Opportunity } from "../lib/api";
+import { CandidateApplications } from "../components/CandidateApplications";
 
 const tabs = [
   { id: "for-you", label: "For you", icon: Sparkles },
   { id: "all", label: "All opportunities", icon: BriefcaseBusiness },
   { id: "history", label: "My activity", icon: Clock3 },
+  { id: "applications", label: "My applications", icon: Check },
   { id: "resume", label: "My resume", icon: FileText },
 ] as const;
 type Tab = typeof tabs[number]["id"];
@@ -13,7 +16,11 @@ const percentage = (score: number) => Math.round(Math.max(0, Math.min(1, score))
 
 export function CandidatePage() {
   const input = useRef<HTMLInputElement>(null);
-  const [tab, setTab] = useState<Tab>("for-you");
+  const [params, setParams] = useSearchParams();
+  const tab = tabs.find((item) => item.id === params.get("view"))?.id ?? "for-you";
+  const setTab = (value: Tab) => setParams({ view: value });
+  const needsDashboard = tab !== "applications" && tab !== "resume";
+  const loadedRevision = useRef(-1);
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState("match");
   const [file, setFile] = useState<File | null>(null);
@@ -26,16 +33,17 @@ export function CandidatePage() {
   const [busyId, setBusyId] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!needsDashboard || loadedRevision.current === reload) return;
     let active = true;
     setLoading(true);
     setError(null);
     const token = localStorage.getItem("jobbridge_token");
     if (!token) { setLoading(false); setError("Sign in again to load your opportunities."); return; }
-    void api.candidateDashboard(token).then((data) => { if (active) setDashboard(data); })
+    void api.candidateDashboard(token).then((data) => { if (active) { setDashboard(data); loadedRevision.current = reload; } })
       .catch((reason: Error) => { if (active) setError(reason.message); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [reload]);
+  }, [reload, needsDashboard]);
 
   const selectFile = (next: File | undefined) => {
     if (!next) return;
@@ -86,12 +94,17 @@ export function CandidatePage() {
         <img src="/media/workspace.jpg" alt="A sunlit shared workspace with desks and greenery" />
         <div><span className="eyebrow">JobBridge / Discover</span><h2>Find your place.<br />Build what comes next.</h2><p>Your skills. A new perspective on opportunity.</p></div>
       </section>
-      <div className="dashboard-stats"><div><span>Open roles in your feed</span><strong>{loading ? "..." : dashboard?.available_opportunities.length ?? "—"}</strong></div><div><span>Saved opportunities</span><strong>{loading ? "..." : saved ?? "—"}</strong></div><div><span>Interest registered</span><strong>{loading ? "..." : applied ?? "—"}</strong></div></div>
+      {needsDashboard && <div className="dashboard-stats"><div><span>Open roles in your feed</span><strong>{loading ? "..." : dashboard?.available_opportunities.length ?? "—"}</strong></div><div><span>Saved opportunities</span><strong>{loading ? "..." : saved ?? "—"}</strong></div><div><span>Interest registered</span><strong>{loading ? "..." : applied ?? "—"}</strong></div></div>}
       <div className="tab-bar" role="tablist" aria-label="Candidate views">
-        {tabs.map(({ id, label, icon: Icon }) => <button key={id} role="tab" id={`tab-${id}`} aria-selected={tab === id} aria-controls="candidate-panel" onClick={() => { setTab(id); setQuery(""); }}><Icon size={15} />{label}</button>)}
+        {tabs.map(({ id, label, icon: Icon }, index) => <button key={id} role="tab" id={`tab-${id}`} tabIndex={tab === id ? 0 : -1} aria-selected={tab === id} aria-controls="candidate-panel" onClick={() => { setTab(id); setQuery(""); }} onKeyDown={(event) => {
+          const nextIndex = event.key === "ArrowRight" ? (index + 1) % tabs.length : event.key === "ArrowLeft" ? (index + tabs.length - 1) % tabs.length : event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1 : null;
+          if (nextIndex === null) return;
+          event.preventDefault();
+          event.currentTarget.parentElement?.querySelector<HTMLButtonElement>(`#tab-${tabs[nextIndex].id}`)?.focus();
+        }}><Icon size={15} />{label}</button>)}
       </div>
       <div id="candidate-panel" role="tabpanel" aria-labelledby={`tab-${tab}`}>
-        {tab === "resume" ? <section className="resume-section">
+        {tab === "applications" ? <CandidateApplications /> : tab === "resume" ? <section className="resume-section">
           <h2 className="section-heading"><FileText size={19} />Your experience, in one place</h2>
           <input ref={input} type="file" accept=".pdf,.docx" aria-label="Select resume file" className="sr-only" disabled={uploading} onChange={(event) => selectFile(event.target.files?.[0])} />
           <button type="button" disabled={uploading} className="upload-zone" onClick={() => input.current?.click()} onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); if (!uploading) selectFile(event.dataTransfer.files[0]); }}><UploadCloud size={32} /><strong>{file ? file.name : "Choose or drop your resume"}</strong><span>PDF or DOCX / up to 10 MB</span></button>
