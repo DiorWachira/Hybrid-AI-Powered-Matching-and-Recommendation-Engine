@@ -18,6 +18,42 @@ Set-Location backend
 ..\venv\Scripts\python.exe -m app.db.graph_sync --limit 1000
 ```
 
+### Candidate Self-Service
+
+Verified 2026-10-05 on `feat/candidate-self-service`; no new migration is needed.
+
+- `/candidate?view=profile` edits name, location, experience, skills, certifications,
+  expected salary and tri-state work authorization through the existing profile
+  GET/PUT. The form retains loaded resume text during the full-profile update.
+  Blank salary and unspecified authorization remain null. Discard and tab-change
+  confirmation protect unsaved edits; browser unload also warns while dirty.
+- All opportunities (`?view=all`) and My activity (`?view=history`) now use
+  `GET /api/candidates/opportunities`, not the capped scoring dashboard response.
+  Filters: `query` (role/company/skill), `location`, `minimum_salary` (salary ceiling),
+  `maximum_experience`, optional `activity` (all/saved/applied/viewed), and `sort`
+  (latest/salary/title). `offset`/`limit` provide server paging with five visible
+  items plus one lookahead. Applying filters resets the page.
+- Browsing defaults to open jobs; activity also retains closed saved roles.
+  Unscored cards have no match percentage. `DELETE /api/candidates/opportunities/{job_id}`
+  removes only the current candidate's saved activity and reports whether it existed.
+  Applications and other candidates' records are preserved; repeated removal is safe.
+- Profile/browse/activity reads and unsave do not call scoring. For You ranking
+  and the existing save/apply scoring path are unchanged. Profile or activity
+  changes invalidate the cached dashboard for the next visit to For You.
+
+Verification: 78 backend tests pass with `RUN_DATABASE_MIGRATION_TESTS=1`, including
+four real-database tests. Coverage includes profile isolation/nulls, browsing beyond
+20 jobs, literal search, filtering, ordering, and saved-only deletion without scoring.
+Frontend production build passes. Browser verified profile save and null values with
+resume preservation, discard cancellation/restoration, profile retry, browse filters,
+page reset/paging, closed-role locking, saved removal and refresh recovery after a
+simulated HTTP 503. Settled profile/browse/activity bounds fit 320/390/1440px; mobile
+activity and desktop profile screenshots inspected. No dashboard/evaluation requests
+occurred during these reads. Browser activity/applications were seeded directly;
+this is not browser submission, model-quality or full accessibility certification.
+Temporary accounts and dependent records were removed. Demo-only simulation remains
+queued; no training, scoring changes, deployment or recurring-task changes were made.
+
 ### Recruitment Workflows
 
 Verified 2026-10-05 on `feat/recruitment-workflows`; no new migration is needed.
