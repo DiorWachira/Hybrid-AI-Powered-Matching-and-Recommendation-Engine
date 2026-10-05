@@ -1,5 +1,7 @@
 from io import BytesIO
 from pathlib import Path
+from decimal import Decimal
+from typing import Literal
 from uuid import UUID
 from zipfile import ZipFile
 import re
@@ -9,14 +11,14 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, Upl
 from app.core.rate_limit import limiter
 from pypdf import PdfReader
 from starlette.concurrency import run_in_threadpool
-from sqlalchemy import select
+from sqlalchemy import String, and_, cast, delete, or_, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import require_roles
 from app.db.models import AuditEvent, Candidate, CandidateOpportunity, Employer, JobApplication, JobPosting, JobStatus, OpportunityStatus, User, UserRole
 from app.db.postgres import get_db
-from app.schemas import ApplicationResponse, CandidateApplicationResponse, CandidateDashboardResponse, CandidateProfileResponse, CandidateProfileUpdate, OpportunityActionRequest, OpportunityResponse
+from app.schemas import ApplicationResponse, BrowsedOpportunityResponse, CandidateApplicationResponse, CandidateDashboardResponse, CandidateProfileResponse, CandidateProfileUpdate, OpportunityActionRequest, OpportunityResponse
 from app.api.matches import _score_candidate
 from app.core.text_preprocessing import anonymize_resume_text
 
@@ -163,6 +165,54 @@ def candidate_dashboard(
         for_you=sorted(eligible, key=lambda value: value.match_score, reverse=True)[:5],
         history=history[:20],
     )
+
+
+@router.get("/opportunities", response_model=list[BrowsedOpportunityResponse])
+def browse_opportunities(
+    query: str = Query(default="", max_length=200),
+    location: str = Query(default="", max_length=120),
+    minimum_salary: Decimal | None = Query(default=None, ge=0, le=Decimal("9999999999.99")),
+    maximum_experience: int | None = Query(default=None, ge=0, le=60),
+    activity: Literal["all", "saved", "applied", "viewed"] | None = None,
+    sort: Literal["latest", "salary", "title"] = "latest",
+    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=6, ge=1, le=100),
+    user: User = Depends(require_roles(UserRole.candidate)),
+    db: Session = Depends(get_db),
+):
+    candidate = db.scalar(select(Candidate).where(Candidate.user_id == user.user_id))
+    if candidate is None:
+        raise HTTPException(status_code=404, detail="Candidate profile not found")
+    statement = select(JobPosting, Employer.company_name, CandidateOpportunity.status).join(Employer, Employer.employer_id == JobPosting.employer_id).outerjoin(CandidateOpportunity, and_(CandidateOpportunity.job_id == JobPosting.job_id, CandidateOpportunity.candidate_id == candidate.candidate_id))
+    if activity is None:
+        statement = statement.where(JobPosting.status == JobStatus.open)
+    elif activity == "all":
+        statement = statement.where(CandidateOpportunity.status.is_not(None))
+    else:
+        statement = statement.where(CandidateOpportunity.status == OpportunityStatus(activity))
+    if query.strip():
+        statement = statement.where(or_(JobPosting.title.icontains(query.strip(), autoescape=True), Employer.company_name.icontains(query.strip(), autoescape=True), cast(JobPosting.required_skills, String).icontains(query.strip(), autoescape=True)))
+    if location.strip():
+        statement = statement.where(JobPosting.location.icontains(location.strip(), autoescape=True))
+    if minimum_salary is not None:
+        statement = statement.where(JobPosting.salary_range_max >= minimum_salary)
+    if maximum_experience is not None:
+        statement = statement.where(JobPosting.required_experience_years <= maximum_experience)
+    ordering = JobPosting.title.asc() if sort == "title" else JobPosting.salary_range_max.desc().nulls_last() if sort == "salary" else CandidateOpportunity.updated_at.desc() if activity else JobPosting.posted_at.desc()
+    rows = db.execute(statement.order_by(ordering, JobPosting.job_id).offset(offset).limit(limit)).all()
+    return [BrowsedOpportunityResponse(job_id=job.job_id, title=job.title, company_name=company, description=job.description, location=job.location, salary_range_max=job.salary_range_max, required_experience_years=job.required_experience_years, required_skills=job.required_skills or [], mandatory_certifications=job.mandatory_certifications or [], status=activity_status, job_status=job.status) for job, company, activity_status in rows]
+
+
+@router.delete("/opportunities/{job_id}")
+def remove_saved_opportunity(job_id: UUID, user: User = Depends(require_roles(UserRole.candidate)), db: Session = Depends(get_db)) -> dict[str, bool]:
+    candidate = db.scalar(select(Candidate).where(Candidate.user_id == user.user_id))
+    if candidate is None:
+        raise HTTPException(status_code=404, detail="Candidate profile not found")
+    removed_id = db.execute(delete(CandidateOpportunity).where(CandidateOpportunity.candidate_id == candidate.candidate_id, CandidateOpportunity.job_id == job_id, CandidateOpportunity.status == OpportunityStatus.saved).returning(CandidateOpportunity.activity_id)).scalar_one_or_none()
+    if removed_id is not None:
+        db.add(AuditEvent(actor_user_id=user.user_id, action="opportunity.unsaved", resource_type="job", resource_id=job_id))
+    db.commit()
+    return {"removed": removed_id is not None}
 
 
 @router.post("/opportunities/{job_id}", response_model=OpportunityResponse)

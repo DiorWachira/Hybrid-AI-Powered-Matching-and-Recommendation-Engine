@@ -225,6 +225,11 @@ class OpportunityResponse(BaseModel):
     status: OpportunityStatus | None
 
 
+class BrowsedOpportunityResponse(OpportunityResponse):
+    match_score: float | None = None
+    job_status: JobStatus
+
+
 class CandidateDashboardResponse(BaseModel):
     available_opportunities: list[OpportunityResponse]
     for_you: list[OpportunityResponse]

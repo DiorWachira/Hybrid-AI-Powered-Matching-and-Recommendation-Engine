@@ -97,6 +97,35 @@ def test_open_job_listing_filters_query(api_client):
     assert statement.whereclause.compare(JobPosting.status == JobStatus.open)
 
 
+@pytest.mark.parametrize("role", [UserRole.recruiter, UserRole.admin])
+def test_candidate_browsing_and_unsave_reject_other_roles(api_client, role):
+    client, database, user = api_client
+    user.role = role
+    assert client.get("/api/candidates/opportunities").status_code == 403
+    assert client.delete(f"/api/candidates/opportunities/{uuid4()}").status_code == 403
+    database.scalar.assert_not_called()
+
+
+@pytest.mark.parametrize("parameters", ["limit=101", "offset=-1", "minimum_salary=-1", "maximum_experience=61", "sort=invalid", "activity=invalid"])
+def test_browsing_validates_filters(api_client, parameters):
+    client, database, user = api_client
+    user.role = UserRole.candidate
+    assert client.get(f"/api/candidates/opportunities?{parameters}").status_code == 422
+    database.execute.assert_not_called()
+
+
+def test_browsing_does_not_score_or_write(api_client, monkeypatch):
+    client, database, user = api_client
+    user.role = UserRole.candidate
+    database.scalar.return_value = SimpleNamespace(candidate_id=uuid4())
+    database.execute.return_value.all.return_value = []
+    scorer = MagicMock(side_effect=AssertionError("Browsing must not score"))
+    monkeypatch.setattr(candidates, "_score_candidate", scorer)
+    assert client.get("/api/candidates/opportunities?query=SQL&location=Nairobi&minimum_salary=100&maximum_experience=3&limit=6&offset=5").json() == []
+    scorer.assert_not_called()
+    database.commit.assert_not_called()
+
+
 @pytest.mark.parametrize("method,path,payload", [
     ("get", "/api/jobs/{job_id}/applications", None),
     ("put", "/api/jobs/{job_id}", {"title": "Analyst", "description": "A sufficiently detailed job description"}),
