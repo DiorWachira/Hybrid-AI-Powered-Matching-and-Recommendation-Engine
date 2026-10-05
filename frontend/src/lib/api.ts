@@ -49,10 +49,11 @@ const jobPayload = (job: JobInput) => ({
 
 export type CandidateProfileInput = {
   full_name: string;
-  location?: string;
+  location?: string | null;
   years_experience: number;
-  expected_salary?: number;
-  parsed_resume_text?: string;
+  expected_salary?: number | string | null;
+  work_authorized?: boolean | null;
+  parsed_resume_text?: string | null;
   skills: string[];
   certifications: string[];
 };
@@ -134,6 +135,13 @@ export type CandidateDashboard = {
   history: Opportunity[];
 };
 
+export type BrowsedOpportunity = Omit<Opportunity, "match_score" | "location" | "salary_range_max"> & {
+  match_score: null;
+  location: string | null;
+  salary_range_max: number | string | null;
+  job_status: "open" | "closed";
+};
+
 const API_PREFIX = "/api";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -207,6 +215,8 @@ export const api = {
       body,
     });
   },
+  browseOpportunities: (token: string, filters: Record<string, string>) => request<BrowsedOpportunity[]>(`/candidates/opportunities?${new URLSearchParams(filters)}`, { headers: { Authorization: `Bearer ${token}` } }),
+  removeSavedOpportunity: (jobId: string, token: string) => request<{ removed: boolean }>(`/candidates/opportunities/${jobId}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } }),
   candidateDashboard: (token: string) =>
     request<CandidateDashboard>("/candidates/dashboard", {
       headers: { Authorization: `Bearer ${token}` },
