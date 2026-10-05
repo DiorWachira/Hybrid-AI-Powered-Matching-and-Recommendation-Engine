@@ -1,6 +1,30 @@
 HYBRID AI-POWERED WORKFORCE PLACEMENT ENGINE
 PROJECT MILESTONE ROADMAP (8 WEEKS)
-Last updated: 2026-10-04 (public entry and matching explanation increments)
+Last updated: 2026-10-05 (recruitment workflow increment verified)
+
+ACTIVE NON-TRAINING TODO LIST (2026-10-05)
+[x] Recruiter job management: list own postings, edit, close and reopen
+[x] Application management: applicant details and permitted status transitions
+[x] Candidate application tracking: display recruiter updates independently of scores
+[ ] Candidate profile editor: experience, skills, certificates, salary and authorization
+[ ] Job browsing: filters, pagination and removal of saved opportunities
+[ ] Demo-only simulation: fictional activity, isolated from real accounts
+[~] End-to-end workflow tests and accessibility/usability checks for each increment
+Current implementation scope: first three items and their tests. Profile editing,
+browsing and simulation remain queued, not marked complete by API existence alone.
+No model training, scoring changes, deployment work or recurring sync task changes.
+
+RECRUITMENT WORKFLOW VERIFICATION (2026-10-05)
+[x] 65 regular backend tests and 3 opt-in real-database tests pass; frontend builds
+[x] Browser: create/edit/close/reopen, applicant details, reviewing/shortlisted/hired,
+    candidate refresh, terminal-status lock and five-row paging for all three lists
+[x] Candidate tabs support arrows/Home/End with Enter/Space activation; simulated
+    application-read failure recovers on refresh; settled 320/390/1440px bounds pass
+[x] Direct /candidate?view=applications and recruiter list/pipeline checks sent no
+    dashboard or evaluation requests. Browser applications were directly seeded;
+    API application submission is tested against PostgreSQL with scoring mocked
+[x] Disposable browser records removed; graph-sync scheduled task stays disabled
+[~] Broader screen-reader, contrast, clean-machine and remote CI checks remain open
 
 PUBLIC ENTRY UPDATE (2026-10-04)
 [x] Public home at /: photo-backed JobBridge introduction, candidate/recruiter

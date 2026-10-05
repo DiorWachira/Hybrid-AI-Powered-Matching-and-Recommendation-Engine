@@ -18,6 +18,44 @@ Set-Location backend
 ..\venv\Scripts\python.exe -m app.db.graph_sync --limit 1000
 ```
 
+### Recruitment Workflows
+
+Verified 2026-10-05 on `feat/recruitment-workflows`; no new migration is needed.
+
+- Recruiter workspace opens My postings. `GET /api/jobs/mine` returns only the
+  signed-in employer's roles; list pages show five items using a sixth as lookahead.
+  Edit reuses the posting form and preserves closed status, nullable salary bounds,
+  authorization requirements, skills and certifications. Closing/reopening uses
+  `PATCH /api/jobs/{job_id}/status`, which changes no other job fields.
+- Applicants uses `GET /api/jobs/{job_id}/applications`. The owner/admin response
+  includes name, location, experience, skills and certifications, not email or raw
+  resume text. Status updates use `PATCH /api/jobs/{job_id}/applications/{application_id}`.
+  Submitted can become reviewing, shortlisted or rejected; reviewing can become
+  shortlisted or rejected; shortlisted can become hired or rejected. Terminal
+  statuses cannot reopen. The UI requests confirmation and locks terminal controls.
+- Candidate My applications is directly available at `/candidate?view=applications`.
+  `GET /api/candidates/me/applications` returns the candidate's application status,
+  timestamps, job title/location/status and employer name. These reads do not score
+  candidates. Recruiter updates appear after refresh, independently of saved activity.
+  The ordinary For you dashboard and application-submission scoring are unchanged.
+- All three lists have separate five-item pagination and loading/error/empty states.
+  Candidate tabs use a single Tab stop, arrow/Home/End focus navigation and manual
+  Enter/Space activation, so merely moving focus does not fetch a scoring dashboard.
+
+Checks: 65 regular backend tests passed (3 opt-in database tests skipped in that
+run); those 3 database tests passed separately with `RUN_DATABASE_MIGRATION_TESTS=1`.
+Frontend production build and edited-page diagnostics pass. Browser checks covered
+creation, closed-job editing with field preservation, reopening, applicant details,
+reviewing/shortlisted/hired, candidate refresh, terminal locking, all three pagers,
+keyboard tabs and refresh recovery after a simulated HTTP 503. Recruiter pipeline
+and candidate applications had no page overflow at settled 320/390/1440px viewports;
+desktop/mobile screenshots were inspected. Workflow reads made zero dashboard or
+evaluation requests. Browser application records were seeded directly; API submission
+is covered by PostgreSQL integration tests with scoring mocked, not by live inference
+or a browser submission test. Temporary records were removed. Broader screen-reader,
+contrast, remote CI and clean-machine acceptance remain open. No training, model
+changes, deployment or recurring-task changes were made.
+
 ### Local Operations
 
 - The optional `backend/install_graph_sync_task.ps1` is NOT part of normal setup:
