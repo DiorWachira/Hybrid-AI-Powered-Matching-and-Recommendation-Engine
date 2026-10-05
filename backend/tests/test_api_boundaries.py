@@ -101,6 +101,7 @@ def test_open_job_listing_filters_query(api_client):
     ("get", "/api/jobs/{job_id}/applications", None),
     ("put", "/api/jobs/{job_id}", {"title": "Analyst", "description": "A sufficiently detailed job description"}),
     ("patch", "/api/jobs/{job_id}/applications/{application_id}", {"status": "reviewing"}),
+    ("patch", "/api/jobs/{job_id}/status", {"status": "closed"}),
 ])
 def test_other_employer_cannot_manage_job_or_applications(api_client, method, path, payload):
     client, database, user = api_client
@@ -133,6 +134,23 @@ def test_terminal_application_status_cannot_be_reopened(api_client):
     response = client.patch(f"/api/jobs/{uuid4()}/applications/{uuid4()}", json={"status": "reviewing"})
     assert response.status_code == 409
     database.commit.assert_not_called()
+
+
+def test_candidate_cannot_list_recruiter_postings(api_client):
+    client, database, user = api_client
+    user.role = UserRole.candidate
+    assert client.get("/api/jobs/mine").status_code == 403
+    database.scalars.assert_not_called()
+
+
+def test_job_list_is_owner_filtered_and_validates_pagination(api_client):
+    client, database, user = api_client
+    database.scalars.return_value = []
+    assert client.get("/api/jobs/mine?limit=6&offset=5").status_code == 200
+    statement = database.scalars.call_args.args[0]
+    assert statement.whereclause.compare(Employer.user_id == user.user_id)
+    assert client.get("/api/jobs/mine?limit=101").status_code == 422
+    assert client.get("/api/jobs/mine?offset=-1").status_code == 422
 
 
 def test_saved_job_results_reject_other_employer(api_client):

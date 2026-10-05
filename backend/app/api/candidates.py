@@ -5,7 +5,7 @@ from zipfile import ZipFile
 import re
 
 from docx import Document
-from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile, status
 from app.core.rate_limit import limiter
 from pypdf import PdfReader
 from starlette.concurrency import run_in_threadpool
@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 from app.api.dependencies import require_roles
 from app.db.models import AuditEvent, Candidate, CandidateOpportunity, Employer, JobApplication, JobPosting, JobStatus, OpportunityStatus, User, UserRole
 from app.db.postgres import get_db
-from app.schemas import ApplicationResponse, CandidateDashboardResponse, CandidateProfileResponse, CandidateProfileUpdate, OpportunityActionRequest, OpportunityResponse
+from app.schemas import ApplicationResponse, CandidateApplicationResponse, CandidateDashboardResponse, CandidateProfileResponse, CandidateProfileUpdate, OpportunityActionRequest, OpportunityResponse
 from app.api.matches import _score_candidate
 from app.core.text_preprocessing import anonymize_resume_text
 
@@ -25,9 +25,10 @@ MAX_RESUME_BYTES = 10 * 1024 * 1024
 KNOWN_SKILLS = ("python", "sql", "data analysis", "excel", "power bi", "docker", "kubernetes", "ci/cd", "linux", "aws", "terraform", "ansible", "git", "rest apis", "system design", "financial accounting", "taxation", "business analysis", "project management")
 
 
-@router.get("/me/applications", response_model=list[ApplicationResponse])
-def candidate_applications(user: User = Depends(require_roles(UserRole.candidate)), db: Session = Depends(get_db)):
-    return list(db.scalars(select(JobApplication).join(Candidate, JobApplication.candidate_id == Candidate.candidate_id).where(Candidate.user_id == user.user_id).order_by(JobApplication.created_at.desc()).limit(100)))
+@router.get("/me/applications", response_model=list[CandidateApplicationResponse])
+def candidate_applications(offset: int = Query(default=0, ge=0), limit: int = Query(default=100, ge=1, le=100), user: User = Depends(require_roles(UserRole.candidate)), db: Session = Depends(get_db)):
+    rows = db.execute(select(JobApplication, JobPosting, Employer.company_name).join(Candidate, JobApplication.candidate_id == Candidate.candidate_id).join(JobPosting, JobPosting.job_id == JobApplication.job_id).join(Employer, Employer.employer_id == JobPosting.employer_id).where(Candidate.user_id == user.user_id).order_by(JobApplication.created_at.desc(), JobApplication.application_id).offset(offset).limit(limit)).all()
+    return [CandidateApplicationResponse(**ApplicationResponse.model_validate(application).model_dump(), job_title=job.title, company_name=company, job_location=job.location, job_status=job.status.value) for application, job, company in rows]
 
 
 def _extract_text(filename: str, content: bytes) -> str:

@@ -1,15 +1,20 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import require_roles
-from app.db.models import AuditEvent, Employer, JobApplication, JobPosting, JobStatus, User, UserRole
+from app.db.models import AuditEvent, Candidate, Employer, JobApplication, JobPosting, JobStatus, User, UserRole
 from app.db.postgres import get_db
-from app.schemas import ApplicationResponse, ApplicationStatusUpdate, JobCreateRequest, JobResponse, JobUpdateRequest
+from app.schemas import ApplicantResponse, ApplicationResponse, ApplicationStatusUpdate, JobCreateRequest, JobResponse, JobStatusUpdate, JobUpdateRequest
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
+
+
+@router.get("/mine", response_model=list[JobResponse])
+def list_my_jobs(offset: int = Query(default=0, ge=0), limit: int = Query(default=25, ge=1, le=100), user: User = Depends(require_roles(UserRole.recruiter, UserRole.admin)), db: Session = Depends(get_db)):
+    return list(db.scalars(select(JobPosting).join(Employer, JobPosting.employer_id == Employer.employer_id).where(Employer.user_id == user.user_id).order_by(JobPosting.posted_at.desc(), JobPosting.job_id).offset(offset).limit(limit)))
 
 
 @router.post("/create", response_model=JobResponse, status_code=status.HTTP_201_CREATED)
@@ -67,10 +72,22 @@ def update_job(job_id: UUID, payload: JobUpdateRequest, user: User = Depends(req
     return job
 
 
-@router.get("/{job_id}/applications", response_model=list[ApplicationResponse])
-def list_applications(job_id: UUID, user: User = Depends(require_roles(UserRole.recruiter, UserRole.admin)), db: Session = Depends(get_db)):
+@router.patch("/{job_id}/status", response_model=JobResponse)
+def change_job_status(job_id: UUID, payload: JobStatusUpdate, user: User = Depends(require_roles(UserRole.recruiter, UserRole.admin)), db: Session = Depends(get_db)):
+    job = _owned_job(db, user, job_id)
+    if job.status != payload.status:
+        job.status = payload.status
+        db.add(AuditEvent(actor_user_id=user.user_id, action=f"job.{payload.status.value}", resource_type="job", resource_id=job_id))
+        db.commit()
+        db.refresh(job)
+    return job
+
+
+@router.get("/{job_id}/applications", response_model=list[ApplicantResponse])
+def list_applications(job_id: UUID, offset: int = Query(default=0, ge=0), limit: int = Query(default=100, ge=1, le=100), user: User = Depends(require_roles(UserRole.recruiter, UserRole.admin)), db: Session = Depends(get_db)):
     _owned_job(db, user, job_id)
-    return list(db.scalars(select(JobApplication).where(JobApplication.job_id == job_id).order_by(JobApplication.created_at.desc()).limit(100)))
+    rows = db.execute(select(JobApplication, Candidate).join(Candidate, Candidate.candidate_id == JobApplication.candidate_id).where(JobApplication.job_id == job_id).order_by(JobApplication.created_at.desc(), JobApplication.application_id).offset(offset).limit(limit)).all()
+    return [ApplicantResponse(**ApplicationResponse.model_validate(application).model_dump(), candidate_name=candidate.full_name, candidate_location=candidate.location, years_experience=candidate.years_experience, skills=candidate.skills or [], certifications=candidate.certifications or []) for application, candidate in rows]
 
 
 @router.patch("/{job_id}/applications/{application_id}", response_model=ApplicationResponse)

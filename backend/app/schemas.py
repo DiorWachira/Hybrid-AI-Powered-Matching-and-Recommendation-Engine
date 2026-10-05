@@ -112,6 +112,7 @@ class JobResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     job_id: UUID
+    posted_at: datetime | None = None
     title: str
     description: str
     location: str | None
@@ -141,6 +142,21 @@ class ApplicationResponse(BaseModel):
     status: str
     created_at: datetime
     updated_at: datetime
+
+
+class ApplicantResponse(ApplicationResponse):
+    candidate_name: str
+    candidate_location: str | None
+    years_experience: int
+    skills: list[str]
+    certifications: list[str]
+
+
+class CandidateApplicationResponse(ApplicationResponse):
+    job_title: str
+    company_name: str
+    job_location: str | None
+    job_status: str
 
 
 class StoredMatchResponse(BaseModel):

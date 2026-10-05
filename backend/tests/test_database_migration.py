@@ -2,6 +2,7 @@ import os
 from pathlib import Path
 from types import SimpleNamespace
 from uuid import uuid4
+from unittest.mock import Mock
 
 import pytest
 from alembic import command
@@ -157,7 +158,8 @@ def test_authenticated_application_and_match_workflow(migrated_database, monkeyp
     def score(candidate, job):
         return MatchCandidateResponse(candidate_id=candidate.candidate_id, full_name=candidate.full_name, hard_rule_passed=True, rule_reasons=[], skill_overlap=0.8, semantic_score=0.7, growth_score=0.6, final_score=0.75)
 
-    monkeypatch.setattr(candidates, "_score_candidate", score)
+    candidate_score = Mock(side_effect=score)
+    monkeypatch.setattr(candidates, "_score_candidate", candidate_score)
     monkeypatch.setattr(matches, "_score_candidate", score)
     previous = app.dependency_overrides.copy()
     app.dependency_overrides[get_db] = database_dependency
@@ -177,19 +179,55 @@ def test_authenticated_application_and_match_workflow(migrated_database, monkeyp
             created = client.post("/api/jobs/create", json=job_payload, headers=recruiter_headers)
             assert created.status_code == 201
             job_id = created.json()["job_id"]
+            own_jobs = client.get("/api/jobs/mine", headers=recruiter_headers)
+            assert own_jobs.status_code == 200
+            assert [job["job_id"] for job in own_jobs.json()] == [job_id]
+            assert own_jobs.json()[0]["posted_at"]
+            assert client.get("/api/jobs/mine", headers=other_headers).json() == []
+            assert client.get("/api/jobs/mine", headers=candidate_headers).status_code == 403
+            assert client.patch(f"/api/jobs/{job_id}/status", json={"status": "closed"}, headers=other_headers).status_code == 403
+            for posting_status in ("closed", "open"):
+                changed = client.patch(f"/api/jobs/{job_id}/status", json={"status": posting_status}, headers=recruiter_headers)
+                assert changed.status_code == 200
+                assert changed.json() == {**created.json(), "status": posting_status}
+            edited = client.put(f"/api/jobs/{job_id}", json={**job_payload, "title": "Senior Analyst", "requires_work_authorization": True}, headers=recruiter_headers)
+            assert edited.status_code == 200
+            assert edited.json()["salary_range_min"] == "100.00"
+            assert edited.json()["required_skills"] == ["SQL"]
+            assert edited.json()["requires_work_authorization"] is True
             initial_results = client.get(f"/api/matches/jobs/{job_id}", headers=recruiter_headers)
             assert initial_results.status_code == 200
             assert initial_results.json()["evaluated_at"] is None
             for _ in range(2):
                 assert client.post(f"/api/candidates/opportunities/{job_id}", json={"status": "applied"}, headers=candidate_headers).status_code == 200
+            candidate_score.reset_mock()
             applications = client.get("/api/candidates/me/applications", headers=candidate_headers).json()
             assert len(applications) == 1
+            assert applications[0]["job_title"] == "Senior Analyst"
+            assert applications[0]["company_name"] == "Test Employer"
+            assert applications[0]["job_status"] == "open"
+            candidate_score.assert_not_called()
             application_id = applications[0]["application_id"]
             assert client.get(f"/api/jobs/{job_id}/applications", headers=other_headers).status_code == 403
+            applicant_list = client.get(f"/api/jobs/{job_id}/applications", headers=recruiter_headers)
+            assert applicant_list.status_code == 200
+            assert applicant_list.json()[0]["candidate_name"] == "Test Candidate"
+            assert applicant_list.json()[0]["skills"] == []
+            assert "parsed_resume_text" not in applicant_list.json()[0]
+            assert "email" not in applicant_list.json()[0]
+            assert client.get(f"/api/jobs/{job_id}/applications", headers=candidate_headers).status_code == 403
             updated = client.patch(f"/api/jobs/{job_id}/applications/{application_id}", json={"status": "reviewing"}, headers=recruiter_headers)
             assert updated.status_code == 200
             assert updated.json()["status"] == "reviewing"
             assert updated.json()["updated_at"] >= applications[0]["updated_at"]
+            tracked = client.get("/api/candidates/me/applications", headers=candidate_headers).json()[0]
+            assert tracked["status"] == "reviewing"
+            assert tracked["updated_at"] == updated.json()["updated_at"]
+            for application_status in ("shortlisted", "hired"):
+                assert client.patch(f"/api/jobs/{job_id}/applications/{application_id}", json={"status": application_status}, headers=recruiter_headers).status_code == 200
+                assert client.get("/api/candidates/me/applications", headers=candidate_headers).json()[0]["status"] == application_status
+            assert client.patch(f"/api/jobs/{job_id}/applications/{application_id}", json={"status": "reviewing"}, headers=recruiter_headers).status_code == 409
+            candidate_score.assert_not_called()
             evaluated = client.post(f"/api/matches/evaluate/{job_id}", headers=recruiter_headers)
             assert evaluated.status_code == 200
             match_id = evaluated.json()["candidates"][0]["match_id"]
