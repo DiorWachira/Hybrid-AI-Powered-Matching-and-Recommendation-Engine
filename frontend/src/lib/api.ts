@@ -144,6 +144,15 @@ export type BrowsedOpportunity = Omit<Opportunity, "match_score" | "location" | 
 
 const API_PREFIX = "/api";
 
+export type SimulationEvent = { sequence: number; kind: string; message: string; candidate_id: string | null; job_id: string | null };
+export type SimulationRun = {
+  run_id: string; sandbox: boolean; model_version: string; encoder_revision: string; decision_threshold: number;
+  candidates: Array<{ candidate_id: string; full_name: string; years_experience: number; location: string; expected_salary: number; work_authorized: boolean; skills: string[]; certifications: string[]; resume_text: string }>;
+  jobs: Array<{ job_id: string; title: string; description: string; location: string; required_experience_years: number; salary_range_max: number; required_skills: string[] }>;
+  matches: Array<MatchCandidate & { job_id: string; above_threshold: boolean }>;
+  events: SimulationEvent[];
+};
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const headers = new Headers(init?.headers);
   if (!(init?.body instanceof FormData)) headers.set("Content-Type", "application/json");
@@ -164,6 +173,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
+  simulate: (token: string, signal?: AbortSignal) => request<SimulationRun>("/admin/simulation", { method: "POST", headers: { Authorization: `Bearer ${token}` }, signal }),
   ontology: (token: string, search: string) => request<OntologyData>(`/admin/ontology?${new URLSearchParams({search})}`, {headers:{Authorization:`Bearer ${token}`}}),
   saveSkill: (token: string, skill: OntologySkill) => request<OntologySkill>("/admin/ontology/skills", {method:"PUT",headers:{Authorization:`Bearer ${token}`},body:JSON.stringify(skill)}),
   saveRelation: (token: string, relation: OntologyRelation, remove: boolean) => request<{status:string}>(`/admin/ontology/relationships?remove=${remove}`, {method:"PUT",headers:{Authorization:`Bearer ${token}`},body:JSON.stringify(relation)}),
