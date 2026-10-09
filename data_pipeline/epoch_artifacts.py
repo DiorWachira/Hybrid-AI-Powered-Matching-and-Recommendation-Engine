@@ -14,6 +14,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 import threading
 from datetime import datetime, timezone
@@ -335,6 +336,95 @@ def sync_local_run(source_run: Path, destinations: list[Path]) -> dict:
     return {"epoch": completed, "copied": copied, "final_copied": final_copied, "production_artifact_touched": False}
 
 
+def review_returned_run(run: Path, expected_commit: str) -> dict:
+    final = run / "final"
+    if not (final / "manifest.json").is_file():
+        raise ValueError("run is not ready: verified final manifest is missing")
+    seal = json.loads((final / "manifest.json").read_bytes())
+    if seal.get("run_id") != run.name or set(seal.get("files", {})) != {"artifact_candidate.json", "metrics.json"}:
+        raise ValueError("invalid final manifest")
+    for name, expected_hash in seal["files"].items():
+        if _sha256(final / name) != expected_hash:
+            raise ValueError(f"final checksum differs: {name}")
+    artifact = json.loads((final / "artifact_candidate.json").read_bytes())
+    metrics = json.loads((final / "metrics.json").read_bytes())
+    first = run / "epochs" / "epoch_0001"
+    config_bytes = (first / "run_config.json").read_bytes()
+    split_bytes = (first / "split_manifest.json").read_bytes()
+    config, split = json.loads(config_bytes), json.loads(split_bytes)
+    count = config["max_epochs"]
+    if type(count) is not int or not 1 <= count <= 1000 or config["run_id"] != run.name or config["code_commit"] != expected_commit:
+        raise ValueError("run identity or epoch count differs")
+    split_hash = hashlib.sha256(_canonical_json(split)).hexdigest()
+    if split_hash != config["split_manifest_sha256"]:
+        raise ValueError("split manifest checksum differs")
+    expected_names = {f"epoch_{epoch:04d}" for epoch in range(1, count + 1)}
+    if {path.name for path in (run / "epochs").glob("epoch_*") if path.is_dir()} != expected_names:
+        raise ValueError("returned epochs do not match the planned epoch count")
+    records = []
+    for epoch in range(1, count + 1):
+        bundle = run / "epochs" / f"epoch_{epoch:04d}"
+        if (bundle / "run_config.json").read_bytes() != config_bytes or (bundle / "split_manifest.json").read_bytes() != split_bytes:
+            raise ValueError("epoch provenance differs")
+        record = json.loads((bundle / "epoch.json").read_bytes())
+        if record["epoch"] != epoch or record["run_id"] != run.name or record["code_commit"] != expected_commit or record["max_epochs"] != count or record["split_manifest_sha256"] != split_hash or record.get("dry_run"):
+            raise ValueError("epoch identity differs or is a dry-run fixture")
+        if _sha256(bundle / "checkpoint.bin") != record["checkpoint_sha256"]:
+            raise ValueError(f"epoch {epoch} checkpoint checksum differs")
+        if any(type(record[key]) not in (int, float) or not math.isfinite(record[key]) or record[key] < 0 for key in ("train_loss", "validation_loss")):
+            raise ValueError("invalid epoch loss")
+        records.append(record)
+    best = min(records, key=lambda record: record["validation_loss"])
+    if metrics.get("status") != "complete" or metrics.get("max_epochs") != count or metrics.get("selected_epoch") != best["epoch"]:
+        raise ValueError("final checkpoint was not selected by best validation loss")
+    checkpoint = json.loads((run / "epochs" / f"epoch_{best['epoch']:04d}" / "checkpoint.bin").read_bytes())
+    order = ["S_bert", "S_graph", "S_growth"]
+    if artifact.get("feature_order") != order or config.get("feature_order") != order or artifact.get("feature_contract") != config.get("feature_contract") or metrics.get("feature_contract") != config.get("feature_contract"):
+        raise ValueError("feature contract differs")
+    if artifact.get("model_version") != run.name or artifact.get("promotion_status") != "REVIEW_REQUIRED_NOT_PROMOTED" or artifact.get("embedding_model") != "sentence-transformers/all-MiniLM-L6-v2":
+        raise ValueError("candidate artifact identity differs")
+    if artifact.get("encoder_revision") != split.get("encoder_revision") or checkpoint.get("epoch") != best["epoch"] or checkpoint.get("data_sha256") != split["feature_data_sha256"]:
+        raise ValueError("selected checkpoint data identity differs")
+    vectors = [artifact["scaler_mean"], artifact["scaler_scale"], artifact["logistic_regression"]["coefficients"]]
+    if any(len(vector) != 3 or any(type(value) not in (int, float) or not math.isfinite(value) for value in vector) for vector in vectors) or any(value <= 0 for value in artifact["scaler_scale"]):
+        raise ValueError("invalid artifact vectors")
+    if artifact["scaler_mean"] != checkpoint["scaler_mean"] or artifact["scaler_scale"] != checkpoint["scaler_scale"] or artifact["logistic_regression"]["coefficients"] != checkpoint["coefficients"][0] or artifact["logistic_regression"]["intercept"] != checkpoint["intercept"][0]:
+        raise ValueError("artifact parameters differ from selected checkpoint")
+    threshold = artifact["decision_threshold"]
+    if type(threshold) not in (int, float) or not math.isfinite(threshold) or not 0 <= threshold <= 1 or not math.isfinite(artifact["logistic_regression"]["intercept"]):
+        raise ValueError("invalid artifact threshold or intercept")
+    comparisons = {}
+    for name in ("validation", "warm_test", "cold_test"):
+        results = metrics["results"][name]
+        for scorer in ("hybrid", "fixed_weights", "semantic_only"):
+            result = results[scorer]
+            if result["count"] != len(split["pair_indices"][name]):
+                raise ValueError("evaluation count differs from split")
+            for metric in ("precision", "recall", "f1", "threshold", "roc_auc", "log_loss"):
+                value = result[metric]
+                if metric == "roc_auc" and value is None:
+                    continue
+                if type(value) not in (int, float) or not math.isfinite(value) or value < 0 or (metric != "log_loss" and value > 1):
+                    raise ValueError("invalid reported evaluation metric")
+        if results["hybrid"]["threshold"] != threshold:
+            raise ValueError("reported threshold differs from artifact")
+        comparisons[name] = {"hybrid": results["hybrid"], "f1_gain_over_fixed": results["hybrid"]["f1"] - results["fixed_weights"]["f1"], "f1_gain_over_semantic": results["hybrid"]["f1"] - results["semantic_only"]["f1"]}
+    return {"status": "INTEGRITY_VERIFIED_REVIEW_REQUIRED", "run_id": run.name, "code_commit": expected_commit, "epochs_verified": count, "selected_epoch": best["epoch"], "best_validation_loss": best["validation_loss"], "selected_train_validation_gap": best["validation_loss"] - best["train_loss"], "recorded_comparisons": comparisons, "final_files_sha256": seal["files"], "warning": "Integrity checks do not establish real-world quality or authorize promotion. Metrics are reported values, not a repeated test evaluation.", "production_artifact_touched": False}
+
+
+def finalize_returned_run(source_run: Path, destinations: list[Path], expected_commit: str) -> dict:
+    runs = [destination / source_run.name for destination in destinations]
+    if len({run.resolve() for run in runs}) < 2:
+        raise ValueError("final review requires two distinct destinations")
+    reviews = [review_returned_run(run, expected_commit) for run in runs]
+    if any(review != reviews[0] for review in reviews[1:]):
+        raise ValueError("returned run reviews differ")
+    result = {"status": "COMPLETE_REVIEW_REQUIRED", "destinations_verified": len(runs), "review": reviews[0]}
+    for run in runs:
+        _atomic_json(run / "review_report.json", result)
+    return result
+
+
 def smoke_test() -> dict[str, Any]:
     """Prove the VS Code/local -> Drive mirror -> codebase return contract with fake records."""
     with tempfile.TemporaryDirectory(prefix="hybrid-epoch-handoff-") as temporary:
@@ -378,7 +468,24 @@ if __name__ == "__main__":
     parser.add_argument("--sync-run", type=Path)
     parser.add_argument("--destination", type=Path, action="append")
     parser.add_argument("--watch", action="store_true")
+    parser.add_argument("--review-on-completion", action="store_true")
+    parser.add_argument("--review-run", type=Path, action="append")
+    parser.add_argument("--expected-commit")
     arguments = parser.parse_args()
+    if arguments.review_on_completion and (not arguments.watch or not arguments.expected_commit):
+        parser.error("--review-on-completion requires --watch and --expected-commit")
+    if arguments.review_run:
+        if arguments.sync_run or arguments.destination or arguments.watch or not arguments.expected_commit:
+            parser.error("--review-run requires --expected-commit and cannot be combined with sync options")
+        try:
+            reviews = [review_returned_run(path, arguments.expected_commit) for path in arguments.review_run]
+            if any(review["run_id"] != reviews[0]["run_id"] or review["final_files_sha256"] != reviews[0]["final_files_sha256"] for review in reviews[1:]):
+                raise ValueError("returned destinations differ")
+        except (OSError, ValueError, KeyError, TypeError, IndexError) as error:
+            print(json.dumps({"status": "NOT_READY_OR_INVALID", "reason": str(error)}))
+            sys.exit(1)
+        print(json.dumps({"destinations_verified": len(reviews), "review": reviews[0]}, indent=2))
+        sys.exit(0)
     if bool(arguments.sync_run) != bool(arguments.destination):
         parser.error("--sync-run and --destination must be supplied together")
     if arguments.watch:
@@ -394,6 +501,15 @@ if __name__ == "__main__":
             if report != previous_report:
                 print(json.dumps(report), flush=True)
                 previous_report = report
+            if report.get("final_copied"):
+                if arguments.review_on_completion:
+                    try:
+                        result = finalize_returned_run(arguments.sync_run, arguments.destination, arguments.expected_commit)
+                    except (OSError, ValueError, KeyError, TypeError, IndexError) as error:
+                        print(json.dumps({"status": "REVIEW_FAILED", "reason": str(error)}), flush=True)
+                        sys.exit(1)
+                    print(json.dumps(result), flush=True)
+                break
             threading.Event().wait(2)
     elif arguments.sync_run:
         for destination in arguments.destination:

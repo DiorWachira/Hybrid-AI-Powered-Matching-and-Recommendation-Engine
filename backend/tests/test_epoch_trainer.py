@@ -1,10 +1,14 @@
+import hashlib
 import json
+import subprocess
+import sys
+from pathlib import Path
 
 import numpy as np
 import pytest
 
 from data_pipeline.epoch_trainer import TrainingConfig, isolated_partitions, prepare_synthetic_data, train_epochs, wait_for_local_epoch
-from data_pipeline.epoch_artifacts import sync_local_run
+from data_pipeline.epoch_artifacts import review_returned_run, sync_local_run
 
 
 def sample_data():
@@ -118,3 +122,55 @@ def test_every_epoch_waits_for_verified_local_copies_and_final_bundle(tmp_path):
     for destination in destinations:
         final = destination / "transfer" / "final"
         assert json.loads((final / "artifact_candidate.json").read_bytes())["promotion_status"] == "REVIEW_REQUIRED_NOT_PROMOTED"
+        reviewed = review_returned_run(destination / "transfer", "same")
+        assert reviewed["epochs_verified"] == 3
+        assert reviewed["selected_epoch"] == result["selected_epoch"]
+        assert reviewed["production_artifact_touched"] is False
+    command = [sys.executable, "-m", "data_pipeline.epoch_artifacts", "--watch", "--review-on-completion", "--expected-commit", "same", "--sync-run", str(drive_run)]
+    for destination in destinations:
+        command.extend(["--destination", str(destination)])
+    completed = subprocess.run(command, cwd=Path(__file__).resolve().parents[2], capture_output=True, text=True, timeout=20, check=True)
+    report = json.loads(completed.stdout.splitlines()[-1])
+    assert report["status"] == "COMPLETE_REVIEW_REQUIRED"
+    assert report["review"]["epochs_verified"] == 3
+    for destination in destinations:
+        assert json.loads((destination / "transfer" / "review_report.json").read_bytes()) == report
+    command[command.index("--expected-commit") + 1] = "wrong-commit"
+    rejected = subprocess.run(command, cwd=Path(__file__).resolve().parents[2], capture_output=True, text=True, timeout=20)
+    assert rejected.returncode == 1
+    assert json.loads(rejected.stdout.splitlines()[-1])["status"] == "REVIEW_FAILED"
+
+
+def test_review_refuses_unfinished_run(tmp_path):
+    with pytest.raises(ValueError, match="not ready"):
+        review_returned_run(tmp_path, "same")
+
+
+@pytest.mark.parametrize("damage", ["checkpoint", "missing_epoch", "selected_epoch", "artifact_parameters"])
+def test_final_review_rejects_corruption_and_wrong_selection(tmp_path, damage):
+    features, labels, partitions = sample_data()
+    drive = tmp_path / "drive"
+    result = train_epochs(features, labels, partitions, {}, config=TrainingConfig(max_epochs=2), local_root=tmp_path / "local", drive_root=drive, run_id="review", code_commit="same")
+    destinations = [tmp_path / "first", tmp_path / "second"]
+    sync_local_run(drive / "review", destinations)
+    returned = destinations[0] / "review"
+    if damage == "checkpoint":
+        (returned / "epochs" / "epoch_0001" / "checkpoint.bin").write_bytes(b"corrupt")
+    elif damage == "missing_epoch":
+        (returned / "epochs" / "epoch_0002").rename(returned / "epochs" / "missing")
+    else:
+        filename = "metrics.json" if damage == "selected_epoch" else "artifact_candidate.json"
+        path = returned / "final" / filename
+        content = json.loads(path.read_bytes())
+        if damage == "selected_epoch":
+            content["selected_epoch"] = 3 - result["selected_epoch"]
+        else:
+            content["logistic_regression"]["coefficients"][0] += 1
+        path.write_text(json.dumps(content))
+        seal_path = returned / "final" / "manifest.json"
+        seal = json.loads(seal_path.read_bytes())
+        seal["files"][filename] = hashlib.sha256(path.read_bytes()).hexdigest()
+        seal_path.write_text(json.dumps(seal))
+    with pytest.raises(ValueError):
+        review_returned_run(returned, "same")
+    assert review_returned_run(destinations[1] / "review", "same")["epochs_verified"] == 2

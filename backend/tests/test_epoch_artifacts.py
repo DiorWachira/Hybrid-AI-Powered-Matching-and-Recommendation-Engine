@@ -1,4 +1,6 @@
 import json
+import hashlib
+import subprocess
 import sys
 from pathlib import Path
 
@@ -151,3 +153,23 @@ def test_uncommitted_history_tail_is_not_duplicated(tmp_path):
     history.write_bytes(history.read_bytes() + b'{"epoch": 2, "incomplete": true}\n')
     store.record_epoch(epoch=2, **options)
     assert [json.loads(line)["epoch"] for line in history.read_text().splitlines()] == [1, 2]
+
+
+def test_watcher_exits_after_verified_final_return(tmp_path):
+    store = EpochArtifactStore(tmp_path / "drive", "complete", config={"max_epochs": 1}, split_manifest={}, code_commit="same")
+    store.record_epoch(epoch=1, max_epochs=1, train_loss=0.4, validation_loss=0.5, validation_metrics={}, learning_rate=0.01, elapsed_seconds=1, checkpoint=b"test-checkpoint", dry_run=True)
+    final = store.local_run / "final"
+    final.mkdir()
+    files = {}
+    for name in ("artifact_candidate.json", "metrics.json"):
+        content = b'{"test_fixture": true}'
+        (final / name).write_bytes(content)
+        files[name] = hashlib.sha256(content).hexdigest()
+    (final / "manifest.json").write_text(json.dumps({"run_id": store.run_id, "files": files}))
+    destinations = [tmp_path / "review", tmp_path / "onedrive"]
+    command = [sys.executable, "-m", "data_pipeline.epoch_artifacts", "--watch", "--sync-run", str(store.local_run)]
+    for destination in destinations:
+        command.extend(["--destination", str(destination)])
+    result = subprocess.run(command, cwd=REPO_ROOT, capture_output=True, text=True, timeout=15, check=True)
+    assert json.loads(result.stdout.strip())["final_copied"] is True
+    assert all((destination / store.run_id / "final" / "manifest.json").exists() for destination in destinations)
