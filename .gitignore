@@ -48,6 +48,8 @@ extras/
 
 # Generated data, model artifacts and reports (regenerate via data_pipeline/ scripts)
 data_pipeline/dataset/
+data_pipeline/training_review/
+data_pipeline/training_runs/
 data_pipeline/artifacts/*
 data_pipeline/reports/*
 .ipynb_checkpoints/

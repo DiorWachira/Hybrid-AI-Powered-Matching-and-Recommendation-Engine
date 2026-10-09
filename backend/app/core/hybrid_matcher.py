@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import threading
 from math import exp, isfinite
 from pathlib import Path
@@ -13,6 +14,7 @@ from app.core.text_preprocessing import anonymize_resume_text
 
 ARTIFACT_PATH = Path(__file__).resolve().parents[3] / "data_pipeline" / "artifacts" / "hybrid_match_weights.json"
 _model: SentenceTransformer | None = None
+_model_identity: tuple[str, str | None] | None = None
 _model_lock = threading.Lock()
 
 
@@ -22,6 +24,9 @@ def _artifact() -> dict[str, object]:
         raise ValueError("Unsupported model feature order")
     if artifact.get("embedding_model") != "sentence-transformers/all-MiniLM-L6-v2":
         raise ValueError("Unsupported embedding model")
+    revision = artifact.get("encoder_revision")
+    if revision is not None and (not isinstance(revision, str) or not re.fullmatch(r"[0-9a-f]{40}", revision)):
+        raise ValueError("Invalid encoder revision")
     groups = [artifact["scaler_mean"], artifact["scaler_scale"], artifact["logistic_regression"]["coefficients"]]
     if any(len(group) != 3 or any(not isinstance(value, (int, float)) or not isfinite(value) for value in group) for group in groups):
         raise ValueError("Invalid model vector dimensions or numeric values")
@@ -31,13 +36,16 @@ def _artifact() -> dict[str, object]:
 
 
 def _get_model() -> SentenceTransformer:
-    global _model
-    if _model is None:
+    global _model, _model_identity
+    artifact = _artifact()
+    identity = (artifact["embedding_model"], artifact.get("encoder_revision"))
+    if _model is None or _model_identity != identity:
         with _model_lock:
-            if _model is None:
+            if _model is None or _model_identity != identity:
                 from sentence_transformers import SentenceTransformer
 
-                _model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
+                _model = SentenceTransformer(identity[0], revision=identity[1])
+                _model_identity = identity
     return _model
 
 

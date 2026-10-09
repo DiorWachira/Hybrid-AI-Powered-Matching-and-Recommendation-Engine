@@ -20,17 +20,40 @@ export type JobInput = {
   description: string;
   location: string;
   requiredExperienceYears: number;
-  salaryRangeMax: number;
+  salaryRangeMax: number | null;
+  salaryRangeMin?: number | null;
+  requiresWorkAuthorization?: boolean;
   requiredSkills: string[];
   mandatoryCertifications: string[];
 };
 
+export type JobPosting = {
+  job_id: string; title: string; description: string; location: string | null;
+  required_experience_years: number; salary_range_max: number | string | null;
+  salary_range_min: number | string | null; requires_work_authorization: boolean;
+  required_skills: string[] | null; mandatory_certifications: string[] | null;
+  status: "open" | "closed"; posted_at: string | null;
+};
+export type ApplicationStatus = "submitted" | "reviewing" | "shortlisted" | "rejected" | "hired" | "withdrawn";
+export type RecruiterStatus = "reviewing" | "shortlisted" | "rejected" | "hired";
+export type Application = { application_id: string; candidate_id: string; job_id: string; status: ApplicationStatus; created_at: string; updated_at: string };
+export type Applicant = Application & { candidate_name: string; candidate_location: string | null; years_experience: number; skills: string[]; certifications: string[] };
+export type CandidateApplication = Application & { job_title: string; company_name: string; job_location: string | null; job_status: "open" | "closed" };
+
+const jobPayload = (job: JobInput) => ({
+  title: job.title, description: job.description, location: job.location || null,
+  required_experience_years: job.requiredExperienceYears, salary_range_max: job.salaryRangeMax,
+  salary_range_min: job.salaryRangeMin ?? null, requires_work_authorization: job.requiresWorkAuthorization ?? false,
+  required_skills: job.requiredSkills, mandatory_certifications: job.mandatoryCertifications,
+});
+
 export type CandidateProfileInput = {
   full_name: string;
-  location?: string;
+  location?: string | null;
   years_experience: number;
-  expected_salary?: number;
-  parsed_resume_text?: string;
+  expected_salary?: number | string | null;
+  work_authorized?: boolean | null;
+  parsed_resume_text?: string | null;
   skills: string[];
   certifications: string[];
 };
@@ -112,7 +135,23 @@ export type CandidateDashboard = {
   history: Opportunity[];
 };
 
+export type BrowsedOpportunity = Omit<Opportunity, "match_score" | "location" | "salary_range_max"> & {
+  match_score: null;
+  location: string | null;
+  salary_range_max: number | string | null;
+  job_status: "open" | "closed";
+};
+
 const API_PREFIX = "/api";
+
+export type SimulationEvent = { sequence: number; kind: string; message: string; candidate_id: string | null; job_id: string | null };
+export type SimulationRun = {
+  run_id: string; sandbox: boolean; model_version: string; encoder_revision: string; decision_threshold: number;
+  candidates: Array<{ candidate_id: string; full_name: string; years_experience: number; location: string; expected_salary: number; work_authorized: boolean; skills: string[]; certifications: string[]; resume_text: string }>;
+  jobs: Array<{ job_id: string; title: string; description: string; location: string; required_experience_years: number; salary_range_max: number; required_skills: string[] }>;
+  matches: Array<MatchCandidate & { job_id: string; above_threshold: boolean }>;
+  events: SimulationEvent[];
+};
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const headers = new Headers(init?.headers);
@@ -134,6 +173,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
+  simulate: (token: string, signal?: AbortSignal) => request<SimulationRun>("/admin/simulation", { method: "POST", headers: { Authorization: `Bearer ${token}` }, signal }),
   ontology: (token: string, search: string) => request<OntologyData>(`/admin/ontology?${new URLSearchParams({search})}`, {headers:{Authorization:`Bearer ${token}`}}),
   saveSkill: (token: string, skill: OntologySkill) => request<OntologySkill>("/admin/ontology/skills", {method:"PUT",headers:{Authorization:`Bearer ${token}`},body:JSON.stringify(skill)}),
   saveRelation: (token: string, relation: OntologyRelation, remove: boolean) => request<{status:string}>(`/admin/ontology/relationships?remove=${remove}`, {method:"PUT",headers:{Authorization:`Bearer ${token}`},body:JSON.stringify(relation)}),
@@ -155,19 +195,17 @@ export const api = {
       body: JSON.stringify({ email, password }),
     }),
   createJob: (job: JobInput, token: string) =>
-    request<{ job_id: string }>("/jobs/create", {
+    request<JobPosting>("/jobs/create", {
       method: "POST",
       headers: { Authorization: `Bearer ${token}` },
-      body: JSON.stringify({
-        title: job.title,
-        description: job.description,
-        location: job.location,
-        required_experience_years: job.requiredExperienceYears,
-        salary_range_max: job.salaryRangeMax,
-        required_skills: job.requiredSkills,
-        mandatory_certifications: job.mandatoryCertifications,
-      }),
+      body: JSON.stringify(jobPayload(job)),
     }),
+  myJobs: (token: string, offset = 0, limit = 6) => request<JobPosting[]>(`/jobs/mine?${new URLSearchParams({ offset: String(offset), limit: String(limit) })}`, { headers: { Authorization: `Bearer ${token}` } }),
+  updateJob: (jobId: string, job: JobInput, status: "open" | "closed", token: string) => request<JobPosting>(`/jobs/${jobId}`, { method: "PUT", headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify({ ...jobPayload(job), status }) }),
+  changeOwnJobStatus: (jobId: string, status: "open" | "closed", token: string) => request<JobPosting>(`/jobs/${jobId}/status`, { method: "PATCH", headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify({ status }) }),
+  jobApplications: (jobId: string, token: string, offset = 0, limit = 6) => request<Applicant[]>(`/jobs/${jobId}/applications?${new URLSearchParams({ offset: String(offset), limit: String(limit) })}`, { headers: { Authorization: `Bearer ${token}` } }),
+  changeApplicationStatus: (jobId: string, applicationId: string, status: RecruiterStatus, token: string) => request<Application>(`/jobs/${jobId}/applications/${applicationId}`, { method: "PATCH", headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify({ status }) }),
+  myApplications: (token: string, offset = 0, limit = 6) => request<CandidateApplication[]>(`/candidates/me/applications?${new URLSearchParams({ offset: String(offset), limit: String(limit) })}`, { headers: { Authorization: `Bearer ${token}` } }),
   getCandidateProfile: (token: string) =>
     request<CandidateProfileInput>("/candidates/me", {
       headers: { Authorization: `Bearer ${token}` },
@@ -187,6 +225,8 @@ export const api = {
       body,
     });
   },
+  browseOpportunities: (token: string, filters: Record<string, string>) => request<BrowsedOpportunity[]>(`/candidates/opportunities?${new URLSearchParams(filters)}`, { headers: { Authorization: `Bearer ${token}` } }),
+  removeSavedOpportunity: (jobId: string, token: string) => request<{ removed: boolean }>(`/candidates/opportunities/${jobId}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } }),
   candidateDashboard: (token: string) =>
     request<CandidateDashboard>("/candidates/dashboard", {
       headers: { Authorization: `Bearer ${token}` },

@@ -9,7 +9,8 @@ from sqlalchemy.orm import Session
 from app.api.dependencies import require_roles
 from app.core.rule_filter import CandidateRuleData, JobRuleData, RuleBasedMatcher
 from app.db.models import AuditEvent, Candidate, Employer, JobPosting, MatchResult, User, UserRole
-from app.core.hybrid_matcher import calibrated_score, semantic_similarity
+from app.core.hybrid_matcher import _artifact, calibrated_score, semantic_similarity
+from app.core.match_features import growth_score as feature_growth_score, skill_overlap
 from app.db.postgres import get_db
 from app.schemas import MatchCandidateResponse, MatchEvaluationResponse, StoredMatchResponse
 from app.db.neo4j_db import get_neo4j_driver
@@ -121,12 +122,9 @@ def _score_candidate(candidate: Candidate, job: JobPosting) -> MatchCandidateRes
             final_score=0.0,
         )
 
-    candidate_skills = {skill.casefold() for skill in (candidate.skills or [])}
-    required_skills = {skill.casefold() for skill in (job.required_skills or [])}
-    overlap = len(candidate_skills & required_skills) / len(required_skills) if required_skills else 0.0
+    overlap = skill_overlap(candidate.skills or [], job.required_skills or [])
     semantic_score = semantic_similarity(candidate.parsed_resume_text or "", job.description)
-    experience_score = min(candidate.years_experience / max(job.required_experience_years, 1), 1.0)
-    growth_score = (experience_score + min(len(candidate.certifications or []) / 2, 1.0)) / 2
+    growth_score = feature_growth_score(candidate.years_experience, job.required_experience_years, len(candidate.certifications or []))
     final_score, _ = calibrated_score(semantic_score, overlap, growth_score)
     return MatchCandidateResponse(
         candidate_id=candidate.candidate_id,
@@ -157,6 +155,7 @@ def evaluate_matches(
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You can only evaluate your own job postings")
     candidates = list(db.scalars(select(Candidate).join(User, Candidate.user_id == User.user_id).where(User.is_active.is_(True)).order_by(Candidate.created_at.asc())))
     ranked = sorted((_score_candidate(candidate, job) for candidate in candidates), key=lambda result: (-result.final_score, str(result.candidate_id)))
+    model_version = _artifact()["model_version"]
     evaluated_at = datetime.now(UTC)
     candidates_by_id = {candidate.candidate_id: candidate for candidate in candidates}
     required_skills = {skill.casefold() for skill in (job.required_skills or [])}
@@ -167,7 +166,7 @@ def evaluate_matches(
         missing_skills = sorted({skill for skill in (job.required_skills or []) if skill.casefold() not in {item.casefold() for item in (candidate.skills or [])}})
         result.matched_skills = matched_skills
         result.missing_skills = missing_skills
-        result.model_version = "legacy-calibration-unverified-serving-v1"
+        result.model_version = model_version
         db.add(MatchResult(
             match_id=result.match_id,
             created_at=evaluated_at,
@@ -177,7 +176,7 @@ def evaluate_matches(
             similarity_score=result.semantic_score,
             growth_score=result.growth_score,
             skill_overlap_score=result.skill_overlap,
-            model_version="legacy-calibration-unverified-serving-v1",
+            model_version=model_version,
             final_weighted_score=result.final_score,
             skill_gap_breakdown={"matched_skills": matched_skills, "missing_skills": missing_skills, "rule_reasons": result.rule_reasons},
         ))

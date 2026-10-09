@@ -1,6 +1,46 @@
 HYBRID AI-POWERED WORKFORCE PLACEMENT ENGINE
 PROJECT MILESTONE ROADMAP (8 WEEKS)
-Last updated: 2026-10-04 (public entry and matching explanation increments)
+Last updated: 2026-10-05 (candidate self-service increment verified)
+
+ACTIVE NON-TRAINING TODO LIST (2026-10-05)
+[x] Recruiter job management: list own postings, edit, close and reopen
+[x] Application management: applicant details and permitted status transitions
+[x] Candidate application tracking: display recruiter updates independently of scores
+[x] Candidate profile editor: experience, skills, certificates, salary and authorization
+[x] Job browsing: filters, pagination and removal of saved opportunities
+[ ] Demo-only simulation: fictional activity, isolated from real accounts
+[~] End-to-end workflow tests and accessibility/usability checks for each increment
+Completed scope: recruiter/application workflows, candidate profile editing and
+browsing, with focused tests. Demo-only simulation is the next queued feature.
+No model training, scoring changes, deployment work or recurring sync task changes.
+
+CANDIDATE SELF-SERVICE VERIFICATION (2026-10-05)
+[x] Profile form preserves resume text and unspecified salary/authorization;
+    saved values reload, discard can be cancelled, failed loads support retry
+[x] Database-backed role/company/skill, location, salary-ceiling and experience
+    filters; sorting and five-row paging replace the old capped browse collection
+[x] Activity filters include saved closed roles; unsave deletes only owned saved
+    activity, not applications or another candidate's records
+[x] 78 backend tests pass, including 4 opt-in real-database tests; frontend builds
+[x] Browser checks: profile save/null/discard/retry, browse filters/page reset,
+    paging, closed-role locking, unsave and refresh recovery after simulated 503
+[x] Profile, browse and activity settled page bounds pass at 320/390/1440px;
+    desktop/mobile screenshots inspected; no dashboard/evaluation read requests
+[x] Disposable test accounts and dependent records removed
+[~] Save/apply still use existing scoring. Browser activity/applications were
+    seeded; these checks do not demonstrate browser submission or model quality
+
+RECRUITMENT WORKFLOW VERIFICATION (2026-10-05)
+[x] 65 regular backend tests and 3 opt-in real-database tests pass; frontend builds
+[x] Browser: create/edit/close/reopen, applicant details, reviewing/shortlisted/hired,
+    candidate refresh, terminal-status lock and five-row paging for all three lists
+[x] Candidate tabs support arrows/Home/End with Enter/Space activation; simulated
+    application-read failure recovers on refresh; settled 320/390/1440px bounds pass
+[x] Direct /candidate?view=applications and recruiter list/pipeline checks sent no
+    dashboard or evaluation requests. Browser applications were directly seeded;
+    API application submission is tested against PostgreSQL with scoring mocked
+[x] Disposable browser records removed; graph-sync scheduled task stays disabled
+[~] Broader screen-reader, contrast, clean-machine and remote CI checks remain open
 
 PUBLIC ENTRY UPDATE (2026-10-04)
 [x] Public home at /: photo-backed JobBridge introduction, candidate/recruiter
