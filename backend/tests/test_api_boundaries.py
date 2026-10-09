@@ -40,6 +40,55 @@ def test_recruiter_cannot_evaluate_another_employers_job(api_client):
 
 
 @pytest.mark.parametrize("role", [UserRole.candidate, UserRole.recruiter])
+def test_simulation_is_admin_only(api_client, monkeypatch, role):
+    from app.api import simulation
+    client, database, user = api_client
+    user.role = role
+    build = MagicMock()
+    monkeypatch.setattr(simulation, "build_simulation", build)
+    assert client.post("/api/admin/simulation").status_code == 403
+    build.assert_not_called()
+    database.commit.assert_not_called()
+
+
+def test_simulation_uses_rules_and_model_without_live_database_writes(api_client, monkeypatch):
+    from app.api import matches
+    client, database, user = api_client
+    user.role = UserRole.admin
+    monkeypatch.setattr(matches, "semantic_similarity", lambda candidate, job: 0.8)
+    response = client.post("/api/admin/simulation")
+    assert response.status_code == 200
+    result = response.json()
+    assert result["sandbox"] is True
+    assert result["model_version"] == "2026-10-09-epoch-combiner-r001"
+    assert len(result["candidates"]) == 6
+    assert len(result["jobs"]) == 2
+    assert len(result["matches"]) == 6
+    assert any(not match["hard_rule_passed"] for match in result["matches"])
+    assert any(match["final_score"] > 0 for match in result["matches"])
+    assert result["events"][-1]["kind"] == "completed"
+    for method in (database.add, database.execute, database.scalars, database.commit):
+        method.assert_not_called()
+
+
+def test_simulation_profiles_are_not_training_records(api_client, monkeypatch):
+    import random
+    from app.api import matches
+    from data_pipeline.generate_synthetic_data import generate_candidate, generate_job
+    client, database, user = api_client
+    user.role = UserRole.admin
+    monkeypatch.setattr(matches, "semantic_similarity", lambda candidate, job: 0.5)
+    result = client.post("/api/admin/simulation").json()
+    generator = random.Random(42)
+    training_candidates = [generate_candidate(generator) for _ in range(800)]
+    training_jobs = [generate_job(generator) for _ in range(100)]
+    assert not {item["candidate_id"] for item in result["candidates"]} & {item["candidate_id"] for item in training_candidates}
+    assert not {item["resume_text"] for item in result["candidates"]} & {item["resume_text"] for item in training_candidates}
+    assert not {item["job_id"] for item in result["jobs"]} & {item["job_id"] for item in training_jobs}
+    assert not {item["description"] for item in result["jobs"]} & {item["description"] for item in training_jobs}
+
+
+@pytest.mark.parametrize("role", [UserRole.candidate, UserRole.recruiter])
 def test_non_admin_cannot_access_overview(api_client, role):
     client, database, user = api_client
     user.role = role
@@ -244,3 +293,4 @@ def test_evaluation_uses_candidate_id_to_break_score_ties(api_client, monkeypatc
     response = client.post(f"/api/matches/evaluate/{job_id}")
     assert response.status_code == 200
     assert [item["candidate_id"] for item in response.json()["candidates"]] == [str(UUID(int=1)), str(UUID(int=2))]
+    assert all(item["model_version"] == "2026-10-09-epoch-combiner-r001" for item in response.json()["candidates"])
