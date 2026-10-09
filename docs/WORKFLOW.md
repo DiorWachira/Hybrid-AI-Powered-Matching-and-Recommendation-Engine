@@ -2,6 +2,58 @@
 
 Living document. Update it whenever the process or the increment status changes.
 
+### Epoch Training Preparation (2026-10-09)
+
+Training is approved; the earlier hold is lifted for this increment. Work is on
+`train/epoch-loop`, not main. The old notebook training cells must not be run with
+Run All. Its Colab Python 3 connection and Google Drive mount have been verified.
+A unique Colab JSON probe reached `G:\My Drive` and both local destinations with
+identical SHA-256 hashes. This proves connectivity, not yet a completed training run.
+
+The new runner uses 100 fixed epochs by default, SGD logistic loss, learning rate
+0.01, L2 alpha 0.0003 and batch size 256. No early stopping. MiniLM stays frozen;
+the live feature formulas are shared without changing existing scores or weights.
+Checkpoints are numeric JSON, not executable pickle files. Every epoch carries its
+code/config/data identity and deterministic next-shuffle state. Best validation
+loss selects the checkpoint after all epochs; validation selects thresholds for
+the hybrid and fixed-weight/semantic-only baselines. See DATASET_STRATEGY.md for
+the corrected disjoint splits and synthetic-label limitations.
+
+Publish the tested branch, then check out its full commit SHA in Colab. Pin the
+Colab ML environment with `data_pipeline/requirements-training.txt`; save actual
+runtime versions in the manifest. Focused tests can run without backend services:
+
+```bash
+PYTHONPATH=backend:. python -m pytest --noconftest backend/tests/test_epoch_trainer.py backend/tests/test_epoch_artifacts.py backend/tests/test_match_features.py -q
+```
+
+Before training, start the run-scoped local watcher in one existing terminal:
+
+```powershell
+.\venv\Scripts\python.exe -m data_pipeline.epoch_artifacts --watch --sync-run "G:\My Drive\HybridMatching\runs\<run-id>" --destination "C:\Users\diorw\OneDrive - Strathmore University\Documents\Hybrid Engine Training\runs" --destination ".\data_pipeline\training_review"
+```
+
+It imports complete checksum-verified epochs and acknowledges both copies back to
+Drive. Colab waits for that acknowledgement after every epoch; after 300 seconds
+without it, training pauses with the checkpoint saved. Resume with exactly the same
+run ID, commit, config and prepared dataset. Partial/corrupt cloud copies are not
+acknowledged. Ctrl+C stops the watcher; no scheduled task or startup service is added.
+
+Run from the clean pinned Colab checkout, with Drive already mounted:
+
+```bash
+python -m data_pipeline.run_epoch_training --run-id <run-id> --expected-commit <full-sha>
+```
+
+The final sealed candidate artifact/metrics also return to both local destinations.
+Returned runs and checkpoints are ignored by Git. No automatic model promotion,
+main merge, deployment or recurring graph task is authorized by this procedure.
+Local checkpoint/trainer tests cover exact interruption/resume, isolated identities,
+train-only scaling, test-label independence, serving parity and verified return.
+Actual Colab execution and end-to-end per-epoch acknowledgements remain to be verified.
+Pre-publication local regression run: 98 passed, 4 opt-in database tests skipped,
+2 existing database-health tests failed because local Neo4j was not running.
+
 Audited 2026-10-01. Status is evidence-based, not a count of existing files.
 See [IMPLEMENTATION_AUDIT.md](IMPLEMENTATION_AUDIT.md) for findings and verification.
 

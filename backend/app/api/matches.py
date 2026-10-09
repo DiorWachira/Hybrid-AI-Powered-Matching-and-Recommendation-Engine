@@ -10,6 +10,7 @@ from app.api.dependencies import require_roles
 from app.core.rule_filter import CandidateRuleData, JobRuleData, RuleBasedMatcher
 from app.db.models import AuditEvent, Candidate, Employer, JobPosting, MatchResult, User, UserRole
 from app.core.hybrid_matcher import calibrated_score, semantic_similarity
+from app.core.match_features import growth_score as feature_growth_score, skill_overlap
 from app.db.postgres import get_db
 from app.schemas import MatchCandidateResponse, MatchEvaluationResponse, StoredMatchResponse
 from app.db.neo4j_db import get_neo4j_driver
@@ -121,12 +122,9 @@ def _score_candidate(candidate: Candidate, job: JobPosting) -> MatchCandidateRes
             final_score=0.0,
         )
 
-    candidate_skills = {skill.casefold() for skill in (candidate.skills or [])}
-    required_skills = {skill.casefold() for skill in (job.required_skills or [])}
-    overlap = len(candidate_skills & required_skills) / len(required_skills) if required_skills else 0.0
+    overlap = skill_overlap(candidate.skills or [], job.required_skills or [])
     semantic_score = semantic_similarity(candidate.parsed_resume_text or "", job.description)
-    experience_score = min(candidate.years_experience / max(job.required_experience_years, 1), 1.0)
-    growth_score = (experience_score + min(len(candidate.certifications or []) / 2, 1.0)) / 2
+    growth_score = feature_growth_score(candidate.years_experience, job.required_experience_years, len(candidate.certifications or []))
     final_score, _ = calibrated_score(semantic_score, overlap, growth_score)
     return MatchCandidateResponse(
         candidate_id=candidate.candidate_id,

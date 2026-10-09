@@ -7,6 +7,7 @@ a temporary directory to verify Drive sync and codebase return behavior.
 from __future__ import annotations
 
 import hashlib
+import argparse
 import json
 import math
 import os
@@ -14,6 +15,7 @@ import re
 import shutil
 import subprocess
 import tempfile
+import threading
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -67,7 +69,7 @@ class EpochArtifactStore:
         code_commit: str,
         drive_root: Path | None = None,
     ) -> None:
-        if not re.fullmatch(r"[A-Za-z0-9._-]{1,100}", run_id):
+        if run_id in {".", ".."} or not re.fullmatch(r"[A-Za-z0-9._-]{1,100}", run_id):
             raise ValueError("run_id may contain only letters, digits, dot, underscore, and hyphen")
         self.run_id = run_id
         self.local_run = local_root / run_id
@@ -81,7 +83,18 @@ class EpochArtifactStore:
             "started_at_utc": datetime.now(timezone.utc).isoformat(),
         }
         self.split_manifest = split_manifest
+        for existing in (self.local_run, self.drive_run):
+            if existing is None or not existing.exists():
+                continue
+            prior = json.loads((existing / "run_config.json").read_text(encoding="utf-8"))
+            if any(prior.get(key) != value for key, value in self.run_config.items() if key != "started_at_utc"):
+                raise ValueError("existing run metadata differs; resume with the exact same code commit, config, and split")
+            stored_split = json.loads((existing / "split_manifest.json").read_text(encoding="utf-8"))
+            if hashlib.sha256(_canonical_json(stored_split)).hexdigest() != split_hash:
+                raise ValueError("stored split manifest checksum differs")
         if self.drive_run and self.drive_run.exists():
+            with tempfile.TemporaryDirectory(prefix="epoch-resume-validation-") as temporary:
+                import_completed_epochs(self.drive_run, Path(temporary))
             if not self.local_run.exists():
                 self.local_run.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copytree(self.drive_run, self.local_run)
@@ -106,7 +119,7 @@ class EpochArtifactStore:
                 or not config_matches
             ):
                 raise ValueError("existing run metadata differs; resume with the exact same code commit, config, and split")
-            if not (self.local_run / "progress.json").exists() or not (self.local_run / "checkpoints" / "latest.bin").exists():
+            if not (self.local_run / "progress.json").exists() or (self.progress["last_completed_epoch"] > 0 and not (self.local_run / "checkpoints" / "latest.bin").exists()):
                 raise ValueError("run checkpoint metadata is incomplete; do not resume from a partial run folder")
             self.run_config = prior
         else:
@@ -133,6 +146,10 @@ class EpochArtifactStore:
         checkpoint: bytes,
         dry_run: bool = False,
     ) -> dict[str, Any]:
+        if not 1 <= epoch <= max_epochs or max_epochs != self.run_config.get("max_epochs", max_epochs):
+            raise ValueError("epoch must be within the configured maximum")
+        if not checkpoint:
+            raise ValueError("checkpoint must not be empty")
         if epoch != self.progress["last_completed_epoch"] + 1:
             raise ValueError("epochs must be recorded sequentially; resume from the saved completed epoch")
         values = [train_loss, validation_loss, learning_rate, elapsed_seconds, *validation_metrics.values()]
@@ -164,10 +181,8 @@ class EpochArtifactStore:
         record["checkpoint_path"] = checkpoint_relative
         record["checkpoint_sha256"] = _sha256(checkpoint_path)
         _atomic_json(self.local_run / "epochs" / f"{epoch_name}.json", record)
-        with (self.local_run / "history.jsonl").open("ab") as history:
-            history.write(_canonical_json(record) + b"\n")
-            history.flush()
-            os.fsync(history.fileno())
+        committed_records = [json.loads((self.local_run / "epochs" / f"epoch_{completed:04d}.json").read_bytes()) for completed in range(1, epoch)]
+        _atomic_bytes(self.local_run / "history.jsonl", b"".join(_canonical_json(item) + b"\n" for item in [*committed_records, record]))
         _atomic_bytes(self.local_run / "checkpoints" / "latest.bin", checkpoint)
         updated = {
             "last_completed_epoch": epoch,
@@ -179,7 +194,7 @@ class EpochArtifactStore:
         if is_best:
             _atomic_bytes(self.local_run / "checkpoints" / "best_validation_loss.bin", checkpoint)
             mirror_files.append("checkpoints/best_validation_loss.bin")
-        self._mirror(mirror_files)
+        self._mirror([relative for relative in mirror_files if relative != "progress.json"] + ["progress.json"])
         return record
 
     def _mirror(self, relative_paths: list[str]) -> list[dict[str, str]]:
@@ -217,6 +232,107 @@ class EpochArtifactStore:
         manifest = {"run_id": self.run_id, "selected_epoch": progress["best_epoch"], "validation_loss": progress["best_validation_loss"], "promotion_status": "REVIEW_REQUIRED_NOT_PROMOTED"}
         _atomic_json(bundle / "final" / "review_manifest.json", manifest)
         return bundle
+
+
+def import_completed_epochs(source_run: Path, destination_root: Path) -> list[int]:
+    source_run = source_run.resolve()
+    destination_root = destination_root.resolve()
+    if source_run == destination_root or source_run in destination_root.parents or destination_root in source_run.parents:
+        raise ValueError("source and destination must not overlap")
+    config_bytes = (source_run / "run_config.json").read_bytes()
+    split_bytes = (source_run / "split_manifest.json").read_bytes()
+    config = json.loads(config_bytes)
+    split = json.loads(split_bytes)
+    run_id = config["run_id"]
+    if run_id in {".", ".."} or not isinstance(run_id, str) or not re.fullmatch(r"[A-Za-z0-9._-]{1,100}", run_id) or source_run.name != run_id:
+        raise ValueError("invalid source run identifier")
+    if hashlib.sha256(_canonical_json(split)).hexdigest() != config["split_manifest_sha256"]:
+        raise ValueError("split manifest checksum differs")
+    progress = json.loads((source_run / "progress.json").read_bytes())
+    completed = progress["last_completed_epoch"]
+    if type(completed) is not int or not 0 <= completed <= config["max_epochs"]:
+        raise ValueError("invalid completed epoch count")
+    bundles = []
+    for epoch in range(1, completed + 1):
+        name = f"epoch_{epoch:04d}"
+        record_bytes = (source_run / "epochs" / f"{name}.json").read_bytes()
+        record = json.loads(record_bytes)
+        checkpoint_relative = f"checkpoints/{name}.bin"
+        if any((
+            record.get("epoch") != epoch,
+            record.get("run_id") != run_id,
+            record.get("code_commit") != config["code_commit"],
+            record.get("split_manifest_sha256") != config["split_manifest_sha256"],
+            record.get("max_epochs") != config["max_epochs"],
+            record.get("checkpoint_path") != checkpoint_relative,
+        )):
+            raise ValueError(f"epoch {epoch} metadata differs")
+        checkpoint = (source_run / checkpoint_relative).read_bytes()
+        if not checkpoint or hashlib.sha256(checkpoint).hexdigest() != record.get("checkpoint_sha256"):
+            raise ValueError(f"epoch {epoch} checkpoint checksum differs")
+        files = {"run_config.json": config_bytes, "split_manifest.json": split_bytes, "epoch.json": record_bytes, "checkpoint.bin": checkpoint}
+        destination = destination_root / run_id / "epochs" / name
+        if destination.exists():
+            if any(not (destination / filename).is_file() or (destination / filename).read_bytes() != content for filename, content in files.items()):
+                raise ValueError(f"existing local epoch {epoch} differs; refusing overwrite")
+        else:
+            bundles.append((epoch, destination, files))
+    imported = []
+    for epoch, destination, files in bundles:
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        temporary = Path(tempfile.mkdtemp(prefix=".incoming-", dir=destination.parent))
+        try:
+            for filename, content in files.items():
+                _atomic_bytes(temporary / filename, content)
+                if (temporary / filename).read_bytes() != content:
+                    raise IOError("local checkpoint copy verification failed")
+            temporary.rename(destination)
+        finally:
+            if temporary.exists():
+                shutil.rmtree(temporary)
+        imported.append(epoch)
+    return imported
+
+
+def sync_local_run(source_run: Path, destinations: list[Path]) -> dict:
+    if len(set(path.resolve() for path in destinations)) < 2:
+        raise ValueError("two distinct local destinations are required")
+    copied = {str(destination): import_completed_epochs(source_run, destination) for destination in destinations}
+    config = json.loads((source_run / "run_config.json").read_bytes())
+    progress = json.loads((source_run / "progress.json").read_bytes())
+    completed = progress["last_completed_epoch"]
+    for epoch in range(1, completed + 1):
+        name = f"epoch_{epoch:04d}"
+        record = json.loads((source_run / "epochs" / f"{name}.json").read_bytes())
+        for destination in destinations:
+            copied_checkpoint = destination / config["run_id"] / "epochs" / name / "checkpoint.bin"
+            if _sha256(copied_checkpoint) != record["checkpoint_sha256"]:
+                raise ValueError("local acknowledgement checksum differs")
+        acknowledgement = {"run_id": config["run_id"], "epoch": epoch, "code_commit": config["code_commit"], "checkpoint_sha256": record["checkpoint_sha256"], "verified_destinations": [str(path.resolve()) for path in destinations]}
+        acknowledgement_path = source_run / "local_acknowledgements" / f"{name}.json"
+        if not acknowledgement_path.exists() or json.loads(acknowledgement_path.read_bytes()) != acknowledgement:
+            _atomic_json(acknowledgement_path, acknowledgement)
+    final_copied = False
+    seal = source_run / "final" / "manifest.json"
+    if seal.exists():
+        manifest_bytes = seal.read_bytes()
+        manifest = json.loads(manifest_bytes)
+        if completed != config["max_epochs"] or manifest.get("run_id") != config["run_id"] or set(manifest.get("files", {})) != {"artifact_candidate.json", "metrics.json"}:
+            raise ValueError("invalid final bundle manifest")
+        files = {name: (source_run / "final" / name).read_bytes() for name in manifest["files"]}
+        if any(hashlib.sha256(content).hexdigest() != manifest["files"][name] for name, content in files.items()):
+            raise ValueError("final bundle checksum differs")
+        for destination in destinations:
+            final_root = destination / config["run_id"] / "final"
+            for name, content in {**files, "manifest.json": manifest_bytes}.items():
+                target = final_root / name
+                if target.exists() and target.read_bytes() != content:
+                    raise ValueError("existing final bundle differs; refusing overwrite")
+                _atomic_bytes(target, content)
+                if target.read_bytes() != content:
+                    raise IOError("final local copy verification failed")
+        final_copied = True
+    return {"epoch": completed, "copied": copied, "final_copied": final_copied, "production_artifact_touched": False}
 
 
 def smoke_test() -> dict[str, Any]:
@@ -258,4 +374,30 @@ def smoke_test() -> dict[str, Any]:
 
 
 if __name__ == "__main__":
-    print(json.dumps(smoke_test(), indent=2))
+    parser = argparse.ArgumentParser(description="Checkpoint handoff without production model promotion")
+    parser.add_argument("--sync-run", type=Path)
+    parser.add_argument("--destination", type=Path, action="append")
+    parser.add_argument("--watch", action="store_true")
+    arguments = parser.parse_args()
+    if bool(arguments.sync_run) != bool(arguments.destination):
+        parser.error("--sync-run and --destination must be supplied together")
+    if arguments.watch:
+        if not arguments.sync_run or not arguments.destination or len(arguments.destination) < 2:
+            parser.error("--watch needs --sync-run and two --destination paths")
+        previous_report = None
+        while True:
+            try:
+                status = sync_local_run(arguments.sync_run, arguments.destination)
+                report = {"epoch": status["epoch"], "final_copied": status["final_copied"], "production_artifact_touched": False}
+            except (OSError, ValueError, KeyError) as error:
+                report = {"waiting_for_complete_sync": str(error)}
+            if report != previous_report:
+                print(json.dumps(report), flush=True)
+                previous_report = report
+            threading.Event().wait(2)
+    elif arguments.sync_run:
+        for destination in arguments.destination:
+            imported = import_completed_epochs(arguments.sync_run, destination)
+            print(json.dumps({"destination": str(destination), "imported_epochs": imported, "production_artifact_touched": False}))
+    else:
+        print(json.dumps(smoke_test(), indent=2))

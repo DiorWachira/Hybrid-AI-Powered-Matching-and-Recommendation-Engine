@@ -14,9 +14,35 @@ and `Dataset_sourcing/kenya_specific_datasets.txt` (local, gitignored).
 | Local skill alignment | Planned curated CDACC occupational-standard to ESCO mapping, represented by `MAPS_TO` edges. | Current repository entries are provisional working examples; verify against official CDACC material before treating the crosswalk as authoritative. |
 | Optional validation | JobSearch-XS, PJB Benchmark | Reserved as an **optional, later** cross-check (Week 7 stretch) for ranking quality — not a core dependency. Non-Kenyan, and PJB's redistribution terms need re-checking before any use. |
 | Excluded | Freehire Jobs, Zalize Tech Jobs | Non-Kenyan, no strong reason to prefer over BrighterMonday for this project; Zalize is CC BY-NC which complicates reuse. Skip unless a specific gap appears later. |
-| Methodology check only | Kaggle "Profile Matching and Recommendation Dataset" (`users.csv` + `feedback.csv`, MIT) | **Not** job/skill data — generic profile-to-profile matching with demographic/personality/free-text fields. Its `feedback.csv` has real accept/reject labels, which the project's own synthetic data doesn't have on its own. Used only in `notebooks/hybrid_matching_model_training.ipynb` (Section 17) to confirm the train/val/test-split + regularized-logistic-regression training procedure works on independently-labelled data, kept fully separate from the exported production artifact. |
+| Methodology check only | Kaggle "Profile Matching and Recommendation Dataset" (`users.csv` + `feedback.csv`, MIT) | **Not** candidate-job data. The author's data card, checked 2026-10-09, says both profiles and accept/reject feedback are simulated using templates and controlled logic. It is not independent hiring ground truth. Keep it separate from workforce training and production artifacts; any profile-to-profile experiment must split by both participating identities. |
 
-## Rationale
+## Epoch Dataset Protocol (2026-10-09)
+
+The new epoch runner regenerates 800 candidates and 100 jobs from seed 42 using
+the versioned Kenyan synthetic generator. It uses the live API's exact direct-skill
+overlap and growth formulas plus normalized MiniLM similarity. The legacy feature
+name `S_graph` is retained for artifact compatibility; it does not claim weighted
+Neo4j traversal. API feature formulas and existing weights are unchanged.
+
+Candidate IDs are partitioned within each role into 60% train, 20% validation,
+10% warm test and 10% cold test. Within each job role, 20% of job IDs are cold-only.
+Cold candidates overlap neither training, validation nor warm test. Each candidate
+is paired with up to five same-role jobs from the appropriate job pool. Candidate/job
+identities, data hashes, encoder revision and package versions are saved per run.
+
+Labels remain simulated Bernoulli outcomes driven by skills, experience, domain and
+hidden synthetic traits. Fixed centering constants replace full-dataset means; test
+statistics cannot influence training label construction. Only three named features
+enter the model. Latents, identity and demographic fields are excluded. This revised
+label/split protocol makes metrics non-comparable with the old September experiment;
+neither protocol establishes independent real-world matching quality or fairness.
+
+MiniLM stays frozen and embeddings/features are cached once per code/data snapshot.
+The scaler is fitted only to training rows. Validation selects the checkpoint and
+threshold; held-out labels do not choose training settings. Scores are evaluated
+before the application's hard-rule gate, so this is not end-to-end hiring validation.
+
+## Rationale (Original Decision)
 
 - The project's stated non-functional goal is anti-bias, privacy-respecting matching.
   Scraping and scoring real people's resumes works against that; synthetic candidates
