@@ -30,7 +30,7 @@ PYTHONPATH=backend:. python -m pytest --noconftest backend/tests/test_epoch_trai
 Before training, start the run-scoped local watcher in one existing terminal:
 
 ```powershell
-.\venv\Scripts\python.exe -m data_pipeline.epoch_artifacts --watch --sync-run "G:\My Drive\HybridMatching\runs\<run-id>" --destination "C:\Users\diorw\OneDrive - Strathmore University\Documents\Hybrid Engine Training\runs" --destination ".\data_pipeline\training_review"
+.\venv\Scripts\python.exe -m data_pipeline.epoch_artifacts --watch --review-on-completion --expected-commit <full-training-sha> --sync-run "G:\My Drive\HybridMatching\runs\<run-id>" --destination "C:\Users\diorw\OneDrive - Strathmore University\Documents\Hybrid Engine Training\runs" --destination ".\data_pipeline\training_review"
 ```
 
 It imports complete checksum-verified epochs and acknowledges both copies back to
@@ -38,6 +38,15 @@ Drive. Colab waits for that acknowledgement after every epoch; after 300 seconds
 without it, training pauses with the checkpoint saved. Resume with exactly the same
 run ID, commit, config and prepared dataset. Partial/corrupt cloud copies are not
 acknowledged. Ctrl+C stops the watcher; no scheduled task or startup service is added.
+The local watcher also exits automatically once both final bundles are verified.
+With `--review-on-completion`, it then runs the full returned-run integrity check
+against the pinned training commit and saves identical `review_report.json` files
+at both returned run roots. Success is `COMPLETE_REVIEW_REQUIRED`; failure exits
+nonzero as `REVIEW_FAILED`, not a successful handoff. No model is promoted.
+For r001, notebook Cell 10 now uses `--ack-timeout 1800` after a delayed Drive JSON
+record exceeded the default five minutes. Only transfer patience changed; scientific
+run settings and the pinned training commit are unchanged. Cell 11 plots saved
+train/validation loss without touching held-out test results.
 
 Run from the clean pinned Colab checkout, with Drive already mounted:
 
@@ -50,9 +59,89 @@ Returned runs and checkpoints are ignored by Git. No automatic model promotion,
 main merge, deployment or recurring graph task is authorized by this procedure.
 Local checkpoint/trainer tests cover exact interruption/resume, isolated identities,
 train-only scaling, test-label independence, serving parity and verified return.
-Actual Colab execution and end-to-end per-epoch acknowledgements remain to be verified.
+Run `2026-10-09-epoch-combiner-r001` completed all 100 epochs. Both local return
+folders passed integrity verification and contain the final review report.
+The transfer watcher has exited. The initial review did not promote weights;
+the later user-approved prototype activation is recorded below.
 Pre-publication local regression run: 98 passed, 4 opt-in database tests skipped,
 2 existing database-health tests failed because local Neo4j was not running.
+
+### Final Results (2026-10-09)
+
+Training commit: `77f05fad66434ce3d5e89418f3a71a8d12e19e47`. Selected epoch: 19,
+by minimum validation log loss (0.498369), after completing all 100 epochs.
+Classification threshold: 0.44, selected on validation only.
+
+| Held-out split | Pairs | Hybrid F1 | Fixed-weight F1 | Hybrid ROC-AUC | Fixed-weight ROC-AUC |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Warm test | 400 | 0.8314 | 0.8185 | 0.7987 | 0.7996 |
+| Cold test | 298 | 0.8486 | 0.8402 | 0.8254 | 0.8157 |
+
+Hybrid log loss is 0.5124 warm / 0.4627 cold versus 0.5501 / 0.5190 for the
+fixed-weight baseline. F1 gains are modest (1.29 and 0.85 percentage points);
+warm ROC-AUC is slightly lower. High recall (0.9468 / 0.9614) comes with precision
+of 0.7411 / 0.7595. This is not a uniform improvement or statistical significance
+claim. Both baselines used their own validation-selected thresholds.
+
+These results use synthetic same-role pairs and measure the scoring head before
+hard eligibility filtering. They do not demonstrate independent hiring quality,
+fairness, production latency or whole-application correctness, and are not directly
+comparable with the September experiment's different split/feature/label protocol.
+Recommendation: retain as a verified experimental candidate; do not automatically
+replace production weights. A separate promotion decision should include application
+integration, encoder/preprocessing parity and independently labelled evaluation.
+
+Recorded epoch computation totals 2.58 seconds; the first-to-last saved-epoch
+interval was 128.18 minutes. That interval includes mandatory cloud/local return
+acknowledgements, repeated integrity I/O and network interruptions. It excludes
+initial embedding preparation and is not an inference benchmark. No timing
+breakdown was recorded that attributes the entire interval to any one cause.
+
+Local evidence under `data_pipeline/training_review/2026-10-09-epoch-combiner-r001/`:
+`review_report.json`, `final/metrics.json`, `final/artifact_candidate.json`, and all
+100 immutable epoch bundles. The approved OneDrive destination holds the second copy.
+
+### Prototype Activation and Simulation (2026-10-09)
+
+The user subsequently approved applying the reviewed model to the website for
+prototype testing. The active artifact now uses run r001's epoch-19 parameters,
+threshold 0.44 and pinned encoder revision, with `PROTOTYPE_TESTING_APPROVED`
+metadata and the original reviewed artifact hash. New evaluations record the
+active model version; historical stored evaluations are not rewritten. This is
+not production readiness or independent hiring-quality certification.
+
+The separate admin Simulation page calls an admin-only sandbox endpoint. Six new
+fictional candidate profiles attempt applications to two fictional vacancies.
+The actual rule filter and active scorer compute eligibility and scores; recruiter
+decisions are scripted playback. No live jobs, accounts or applications are written.
+The UI provides play/pause, stepping, speed, replay, candidate inspection and JSON
+download. These fresh fixtures are not training records, but they are demonstration
+cases rather than an independently labelled quality test.
+
+Pre-commit verification: 116 backend tests passed with database integration enabled;
+the frontend production build passed. Tests cover role restrictions, no sandbox
+database writes, fixture separation, encoder pinning and model-version provenance.
+Authenticated browser playback and accessibility acceptance remain pending.
+Private credentials, notebooks, checkpoint bundles and local extras notes remain
+excluded from the published changes.
+
+### Review Returned Training
+
+After the watcher has returned the sealed final bundle, run this read-only check
+from the repository root. Use the actual run ID and its pinned training commit:
+
+```powershell
+.\venv\Scripts\python.exe -m data_pipeline.epoch_artifacts --review-run ".\data_pipeline\training_review\<run-id>" --review-run "C:\Users\diorw\OneDrive - Strathmore University\Documents\Hybrid Engine Training\runs\<run-id>" --expected-commit <full-training-sha>
+```
+
+The check verifies the planned epoch count, every returned checkpoint hash,
+consistent provenance, the lowest-validation-loss selection, matching selected
+checkpoint/artifact parameters, valid reported metrics and identical final files
+in both destinations. It reports recorded F1 differences versus the fixed-weight
+and semantic-only baselines, without rerunning held-out evaluation or writing files.
+An unfinished run exits nonzero with `NOT_READY_OR_INVALID` and a missing-final
+manifest explanation. Integrity success is `INTEGRITY_VERIFIED_REVIEW_REQUIRED`,
+not approval of real-world quality or permission to promote the candidate artifact.
 
 Audited 2026-10-01. Status is evidence-based, not a count of existing files.
 See [IMPLEMENTATION_AUDIT.md](IMPLEMENTATION_AUDIT.md) for findings and verification.
