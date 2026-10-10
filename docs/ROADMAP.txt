@@ -1,18 +1,40 @@
 HYBRID AI-POWERED WORKFORCE PLACEMENT ENGINE
 PROJECT MILESTONE ROADMAP (8 WEEKS)
-Last updated: 2026-10-05 (candidate self-service increment verified)
+Last updated: 2026-10-10 (Week 1-4 verification increment)
 
-ACTIVE NON-TRAINING TODO LIST (2026-10-05)
+WEEK 1-4 VERIFICATION UPDATE (2026-10-10)
+[x] Reviewed main CI aae5809: fresh hosted checkout, Python 3.12 dependencies,
+    Compose validation, migrations, backend tests and Node 22 frontend build pass
+    Evidence: https://github.com/DiorWachira/Hybrid-AI-Powered-Matching-and-Recommendation-Engine/actions/runs/37955892189
+[x] Local API database health and repeatable Neo4j baseline/import checks: 3 passed
+    Fixed CDACCStandard mapping counts and stable-identity baseline MERGE behavior
+[x] Generated DOCX -> authenticated API -> PostgreSQL -> Neo4j: 1 integration test
+    passed, including permissions, profile preservation, redaction and failed-upload
+    preservation. Uses disposable database records; no scoring or personal CVs
+[x] Week 4 data tools: 9 tests passed; two isolated CLI preparations produce
+    byte-identical exports from a fixed seed and exclude training-only latent fields
+[x] Compose startup grace updated; existing PostgreSQL/Neo4j both became healthy
+    without volume deletion. Neo4j still needed about 232 seconds on this machine
+[~] Current branch changes have focused local evidence, not a new remote CI run
+[~] Full clean-machine launch/seed/browser walkthrough and current UI acceptance
+    remain pending. API TestClient coverage is not browser upload evidence
+[~] Official ESCO/CDACC source verification, permitted real-job inputs and
+    independent quality/fairness evidence cannot be closed with synthetic fixtures
+Working branch: feat/weeks1-4-verification. Publication and main merge need separate approval.
+Older dated snapshots below are historical when superseded by this update.
+October 9 model activation/training and sandbox status: docs/WORKFLOW.md.
+
+ACTIVE NON-TRAINING TODO LIST (2026-10-10)
 [x] Recruiter job management: list own postings, edit, close and reopen
 [x] Application management: applicant details and permitted status transitions
 [x] Candidate application tracking: display recruiter updates independently of scores
 [x] Candidate profile editor: experience, skills, certificates, salary and authorization
 [x] Job browsing: filters, pagination and removal of saved opportunities
-[ ] Demo-only simulation: fictional activity, isolated from real accounts
+[~] Demo-only simulation implemented and API-tested; browser acceptance pending
 [~] End-to-end workflow tests and accessibility/usability checks for each increment
-Completed scope: recruiter/application workflows, candidate profile editing and
-browsing, with focused tests. Demo-only simulation is the next queued feature.
-No model training, scoring changes, deployment work or recurring sync task changes.
+Completed implementation: recruiter/application workflows, candidate profile editing,
+browsing and admin sandbox. This increment verifies Week 1-4 infrastructure/data
+paths; it does not test simulation playback, retrain, deploy or enable recurring sync.
 
 CANDIDATE SELF-SERVICE VERIFICATION (2026-10-05)
 [x] Profile form preserves resume text and unspecified salary/authorization;
@@ -120,7 +142,7 @@ Legend: [x] narrowly stated deliverable implemented, with evidence where noted
     [ ] not implemented or not demonstrated
 An [x] is NOT production approval. Week exit criteria require separate evidence.
 Audit details: docs/IMPLEMENTATION_AUDIT.md. Workflow: docs/WORKFLOW.md.
-Sprint 1: source preparation substantial; current runtime sign-off BLOCKED.
+Sprint 1: local runtime and main CI verified; full setup/browser sign-off pending.
 Public demo: Oracle Always Free-only proposed; no public endpoint deployed.
 No new training, main-branch merge/push, or native PostgreSQL changes authorized.
 Note: academic documentation tasks (Chapter 5, UML write-ups, report) are
@@ -259,21 +281,24 @@ WEEK 1  Foundations and Database Architecture
 --------------------------------------------------------------------
 [x] Initialise Git repository and project directory structure
 [x] Define/migrate relational schema: migrations and isolated roundtrip tests pass
-[x] Run PostgreSQL/Neo4j via Compose: local services verified 2026-10-04
+[x] Run PostgreSQL/Neo4j via Compose: local services verified 2026-10-10
 [~] Local API/databases work; full clean-machine setup reproduction still pending
-[~] Add the Neo4j Bolt driver and a connection module (app/db/neo4j_db.py)
+[x] Add the Neo4j Bolt driver and a connection module (app/db/neo4j_db.py)
     with a combined /api/health readiness check covering both databases
-[~] Create the baseline Neo4j ontology: constraints plus seed Cypher for
+[x] Create the baseline Neo4j ontology: constraints plus seed Cypher for
     Skill, Certification, JobRole, Industry nodes and the RELATED_TO /
-    SKILL_REQUIRED / REQUIRES_CERT relationships
+    SKILL_REQUIRED / REQUIRES_CERT relationships; repeated loads verified locally
 [x] Decide and record the dataset strategy (docs/DATASET_STRATEGY.md):
     synthetic Kenyan candidates + real BrighterMonday job posts + ESCO
     ontology, with CDACC mapped onto ESCO for local relevance
 [x] Add pytest and a first smoke test (backend/tests/test_database_health.py)
-[~] Backend CI configuration exists; verify a green run on the reviewed commit
+[x] Backend and frontend CI green on reviewed main aae5809; run 37955892189
+    includes clean hosted checkout/install/migrations/tests/build. This verification
+    increment still needs its own remote run after publication is authorized
 Exit criterion: both databases reachable from the API, ontology seed
 script re-runnable, CI green on every push.
-Audit: NOT currently met. No clean-checkout/current remote-CI proof.
+Audit: API health and repeatable ontology verified locally; clean hosted CI verified
+for main aae5809. Full local setup walkthrough and this branch's remote CI pending.
 
 --------------------------------------------------------------------
 WEEK 2  Backend Core, Authentication and Rule Engine
@@ -319,8 +344,8 @@ WEEK 3  Frontend Shell and Resume Parsing
 [x] Candidate dashboard (profile + PDF/DOCX resume intake validation) and
     recruiter dashboard (job creation form + hard-filter criteria) as
     functional shells
-[~] Candidate profile API stores structured skills, certifications, experience
-    and resume text in PostgreSQL
+[x] Candidate profile API stores structured skills, certifications, experience
+    and resume text in PostgreSQL; update and upload persistence verified
 [~] Candidate activity table stores saved/applied/viewed relationships;
     timestamp updates, concurrency and state transitions need work
 [~] Candidate dashboard API returns available jobs, ranked For You jobs, and
@@ -328,7 +353,10 @@ WEEK 3  Frontend Shell and Resume Parsing
     data_pipeline/seed_database.py
 [~] FR-04 first pass: /api/matches/evaluate/{job_id} applies Tier 1 rules,
     local scoring and persists match results with skill-gap explanations
-[~] FR-02: /api/candidates/upload-resume with PDF/DOCX text extraction
+[x] DOCX upload extracts text/skills, preserves profile fields and enqueues graph
+    updates; authenticated API-to-PostgreSQL-to-Neo4j integration verified
+[~] FR-02 PDF/DOCX acceptance: DOCX integration and invalid-signature checks pass;
+    valid PDF end-to-end and current browser upload acceptance remain pending
 [x] Basic section text extraction and known-skill detection from uploaded files
 [x] Resume/profile writes enqueue graph changes transactionally; manual worker retries
 [~] Upload baseline: 10 MB and extension allow-list; no original file storage.
@@ -338,7 +366,8 @@ WEEK 3  Frontend Shell and Resume Parsing
     threshold claim until the trained feature contract is corrected
 Exit criterion: uploading a real CV through the UI produces stored
 parsed text plus skill nodes in the graph.
-Audit: NOT reverified against the current live stack.
+Audit: generated DOCX passes the complete API/database/manual-graph path locally.
+The real-CV browser exit criterion is not yet reverified; no personal CV was used.
 
 WEEK 4  Dataset Preparation and Anti-Bias Pipeline
 [x] data_pipeline/generate_synthetic_data.py: synthetic Kenyan candidate
@@ -347,9 +376,9 @@ WEEK 4  Dataset Preparation and Anti-Bias Pipeline
     (started early to unblock the Week 5/6 training notebook)
 [x] data_pipeline/import_brightermonday_jobs.py normalizes a permitted local
     BrighterMonday/Apify JSON export; it does not scrape or require a paid API
-[~] data_pipeline/load_esco_ontology.py parses trimmed ESCO skills CSV and
-    optional related-skill CSV data; live Neo4j import awaits Docker
-    verification
+[x] Trimmed ESCO CSV parsing tests and live Neo4j ontology-loader tests pass;
+    repeat imports are stable and CDACCStandard mapping counts are correct
+    These fixture checks do not constitute a full official ESCO dataset import
 [~] CDACC-to-ESCO JSON working mappings are included; examples are provisional
     pending verification against the relevant official CDACC standards
 [x] Shared text preprocessing is called by resume ingestion, cleaned exports,
@@ -358,11 +387,15 @@ WEEK 4  Dataset Preparation and Anti-Bias Pipeline
     anonymity or bias removal. Unlabelled names/proxies can remain in embeddings
 [x] data_pipeline/prepare_week4.py exports documented JSON with fixed seed,
     quality checks, and hidden label-generation fields removed; raw training
-    data is preserved and generated exports stay local
+    data is preserved. --output-dir supports isolated verification; repeated
+    file-only CLI runs are byte-identical and reject empty datasets before writing
 [~] Demo seed loader/graph projections verified locally; full real-source
     prepare_week4 execution and provenance remain pending
-[~] Synthetic labels/outer splits defined; row-wise inner CV and cold/validation
-    candidate overlap require correction before any leakage-safe claim
+[x] Active epoch pipeline uses disjoint train/validation/warm-test/cold-test
+    candidate groups plus cold-only job IDs and train-only scaling; isolation and
+    test-label independence tested in the October 9 run. No retraining in this task
+[~] Historical notebook split/CV methods are not the active epoch protocol;
+    synthetic labels still do not establish independent matching quality or fairness
 Exit criterion: [~] one command prepares cleaned data; integrated PostgreSQL
 and Neo4j demo seeding verified; real-source quality/provenance remains partial.
 

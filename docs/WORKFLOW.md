@@ -2,6 +2,40 @@
 
 Living document. Update it whenever the process or the increment status changes.
 
+### Week 1-4 Verification (2026-10-10)
+
+Work on `feat/weeks1-4-verification` adds focused evidence without retraining or
+changing the active model. Remote main CI at `aae5809` was inspected:
+[run 37955892189](https://github.com/DiorWachira/Hybrid-AI-Powered-Matching-and-Recommendation-Engine/actions/runs/37955892189)
+passed fresh backend/frontend dependency installation, Compose validation,
+migrations, backend tests and frontend build. This is evidence for that revision,
+not for the new verification-branch changes or a complete desktop/browser setup.
+
+Verified local changes:
+- DOCX upload-to-profile-to-graph integration: 1 test passed against a disposable
+  PostgreSQL database and uniquely scoped Neo4j candidate nodes. Checks include
+  unauthenticated/role denial, text redaction, retained profile fields, invalid-file
+  rejection without overwriting the profile, and score-free upload/manual sync.
+- Health and ontology: 3 tests passed. Baseline seed MERGE uses stable identities
+  and preserves existing categories/weights; repeated calls leave counts stable.
+  The import summary now counts the same `CDACCStandard` label the loader writes.
+  UUID-tagged ontology fixtures were removed after the test. Official-source
+  provenance and CDACC crosswalk validity are not established by these fixtures.
+- Week 4 tools: 9 tests passed. `prepare_week4.py --output-dir <folder> --no-seed`
+  can run from outside the repo, preserves generated raw latents separately from
+  cleaned exports, produces byte-identical output for repeated seeds, and rejects
+  nonpositive dataset counts before writing. These runs did not seed live accounts.
+- Compose: Neo4j health checks have a 120-second startup grace and 10-second probe
+  timeout. Configuration validation and real startup passed; Neo4j required about
+  232 seconds on this machine. Existing volumes were retained, not reset.
+
+No long checks were repeated solely for documentation. These 13 focused passes are
+not a claim that the whole expanded suite was rerun. Fresh browser upload/login,
+valid PDF integration, full clean-machine launch, broader accessibility/session
+acceptance, official datasets and independent fairness evaluation remain open.
+No simulation playback, new training, deployment, push/main merge or recurring
+graph-sync task changes were performed in this increment.
+
 ### Epoch Training Preparation (2026-10-09)
 
 Training is approved; the earlier hold is lifted for this increment. Work is on
