@@ -120,7 +120,7 @@ def load_skill_ontology(skills: list[dict[str, str]], relationships: list[dict[s
                 ).consume()
             skill_count = session.run("MATCH (s:Skill) RETURN count(s) AS count").single()["count"]
             relation_count = session.run("MATCH (:Skill)-[r:RELATED_TO]->(:Skill) RETURN count(r) AS count").single()["count"]
-            mapping_count = session.run("MATCH (:CDACCCertification)-[r:MAPS_TO]->(:Skill) RETURN count(r) AS count").single()["count"]
+            mapping_count = session.run("MATCH (:CDACCStandard)-[r:MAPS_TO]->(:Skill) RETURN count(r) AS count").single()["count"]
             return {"skills": int(skill_count), "related_to": int(relation_count), "cdacc_mappings": int(mapping_count)}
     finally:
         driver.close()
@@ -170,23 +170,23 @@ def seed_neo4j_ontology() -> dict[str, int]:
                 for name, category in payload:
                     if label == "JobRole":
                         session.run(
-                            "MERGE (j:JobRole {title: $name, name: $name, category: $category})",
+                            "MERGE (j:JobRole {title: $name}) ON CREATE SET j.name = $name, j.category = $category",
                             {"name": name, "category": category},
                         )
                     else:
                         session.run(
-                            f"MERGE ({label.lower()}:`{label}` {{name: $name, category: $category}})",
+                            f"MERGE (node:`{label}` {{name: $name}}) ON CREATE SET node.category = $category",
                             {"name": name, "category": category},
                         )
 
             relationship_statements = [
-                "MATCH (s:Skill {name: 'Python'}), (t:Skill {name: 'Data Analysis'}) MERGE (s)-[:RELATED_TO {weight: 0.8}]->(t)",
-                "MATCH (s:Skill {name: 'SQL'}), (t:Skill {name: 'Data Analysis'}) MERGE (s)-[:RELATED_TO {weight: 0.7}]->(t)",
-                "MATCH (s:Skill {name: 'Financial Accounting'}), (t:Skill {name: 'Taxation'}) MERGE (s)-[:RELATED_TO {weight: 0.9}]->(t)",
-                "MATCH (s:JobRole {title: 'Software Engineer'}), (t:Skill {name: 'Python'}) MERGE (s)-[:SKILL_REQUIRED {weight: 0.9}]->(t)",
-                "MATCH (s:JobRole {title: 'Software Engineer'}), (t:Skill {name: 'SQL'}) MERGE (s)-[:SKILL_REQUIRED {weight: 0.6}]->(t)",
-                "MATCH (s:JobRole {title: 'Data Analyst'}), (t:Skill {name: 'Data Analysis'}) MERGE (s)-[:SKILL_REQUIRED {weight: 0.9}]->(t)",
-                "MATCH (s:JobRole {title: 'Accountant'}), (t:Skill {name: 'Financial Accounting'}) MERGE (s)-[:SKILL_REQUIRED {weight: 0.9}]->(t)",
+                "MATCH (s:Skill {name: 'Python'}), (t:Skill {name: 'Data Analysis'}) MERGE (s)-[r:RELATED_TO]->(t) ON CREATE SET r.weight = 0.8",
+                "MATCH (s:Skill {name: 'SQL'}), (t:Skill {name: 'Data Analysis'}) MERGE (s)-[r:RELATED_TO]->(t) ON CREATE SET r.weight = 0.7",
+                "MATCH (s:Skill {name: 'Financial Accounting'}), (t:Skill {name: 'Taxation'}) MERGE (s)-[r:RELATED_TO]->(t) ON CREATE SET r.weight = 0.9",
+                "MATCH (s:JobRole {title: 'Software Engineer'}), (t:Skill {name: 'Python'}) MERGE (s)-[r:SKILL_REQUIRED]->(t) ON CREATE SET r.weight = 0.9",
+                "MATCH (s:JobRole {title: 'Software Engineer'}), (t:Skill {name: 'SQL'}) MERGE (s)-[r:SKILL_REQUIRED]->(t) ON CREATE SET r.weight = 0.6",
+                "MATCH (s:JobRole {title: 'Data Analyst'}), (t:Skill {name: 'Data Analysis'}) MERGE (s)-[r:SKILL_REQUIRED]->(t) ON CREATE SET r.weight = 0.9",
+                "MATCH (s:JobRole {title: 'Accountant'}), (t:Skill {name: 'Financial Accounting'}) MERGE (s)-[r:SKILL_REQUIRED]->(t) ON CREATE SET r.weight = 0.9",
                 "MATCH (s:JobRole {title: 'Accountant'}), (t:Certification {name: 'CPA'}) MERGE (s)-[:REQUIRES_CERT]->(t)",
                 "MATCH (s:JobRole {title: 'Software Engineer'}), (t:Certification {name: 'AWS Certified Cloud Practitioner'}) MERGE (s)-[:REQUIRES_CERT]->(t)",
             ]
