@@ -1,10 +1,12 @@
 import os
+from io import BytesIO
 from pathlib import Path
 from types import SimpleNamespace
 from uuid import uuid4
 from unittest.mock import Mock
 
 import pytest
+from docx import Document
 from alembic import command
 from alembic.autogenerate import compare_metadata
 from alembic.config import Config
@@ -146,6 +148,81 @@ def test_graph_projection_update_delete_and_same_title_jobs(migrated_database):
             with driver.session(database="neo4j") as graph:
                 graph.run("MATCH (node) WHERE node.id IN $ids DETACH DELETE node", ids=[str(identifier) for identifier in identifiers]).consume()
                 graph.run("MATCH (node) WHERE node.name IN $names AND NOT (node)--() DELETE node", names=[skill_name, industry]).consume()
+
+
+def test_resume_upload_persists_profile_and_projects_skills(migrated_database, monkeypatch):
+    engine, configuration = migrated_database
+    candidate_id = uuid4()
+    candidate_user_id = uuid4()
+    recruiter_user_id = uuid4()
+    other_user_id = uuid4()
+
+    def database_dependency():
+        with Session(engine) as database:
+            yield database
+
+    with Session(engine) as database:
+        database.add_all([
+            User(user_id=candidate_user_id, email="upload@example.test", password_hash="disabled", role=UserRole.candidate),
+            User(user_id=recruiter_user_id, email="recruiter@example.test", password_hash="disabled", role=UserRole.recruiter),
+            User(user_id=other_user_id, email="other@example.test", password_hash="disabled", role=UserRole.candidate),
+        ])
+        database.flush()
+        database.add_all([
+            Candidate(candidate_id=candidate_id, user_id=candidate_user_id, full_name="Upload Candidate", years_experience=4, expected_salary=50000, work_authorized=True, certifications=["CPA"]),
+            Candidate(user_id=other_user_id, full_name="Other Candidate", years_experience=0),
+        ])
+        database.commit()
+    scorer = Mock(side_effect=AssertionError("Resume upload must not invoke scoring"))
+    monkeypatch.setattr(candidates, "_score_candidate", scorer)
+    previous = app.dependency_overrides.copy()
+    app.dependency_overrides[get_db] = database_dependency
+    headers = {"Authorization": "Bearer " + create_access_token(candidate_user_id, "candidate")}
+    document = Document()
+    document.add_paragraph("Name: Upload Candidate")
+    document.add_paragraph("Email: upload@example.test. Phone: +254712345678")
+    document.add_paragraph("SQL and Python reporting in Nairobi.")
+    resume = BytesIO()
+    document.save(resume)
+    files = {"resume": ("sample.docx", resume.getvalue(), "application/vnd.openxmlformats-officedocument.wordprocessingml.document")}
+    with get_neo4j_driver() as driver:
+        try:
+            ensure_graph_schema(driver)
+            with TestClient(app) as client:
+                assert client.post("/api/candidates/upload-resume", files=files).status_code == 401
+                recruiter_headers = {"Authorization": "Bearer " + create_access_token(recruiter_user_id, "recruiter")}
+                assert client.post("/api/candidates/upload-resume", files=files, headers=recruiter_headers).status_code == 403
+                response = client.post("/api/candidates/upload-resume", files=files, headers=headers)
+                assert response.status_code == 200
+                profile = response.json()
+                assert set(profile["skills"]) == {"sql", "python"}
+                assert profile["years_experience"] == 4
+                assert profile["expected_salary"] == "50000.00"
+                assert profile["work_authorized"] is True
+                assert profile["certifications"] == ["CPA"]
+                for identifier in ("Upload Candidate", "upload@example.test", "+254712345678", "Nairobi"):
+                    assert identifier not in profile["parsed_resume_text"]
+                assert client.get("/api/candidates/me", headers=headers).json() == profile
+                other_headers = {"Authorization": "Bearer " + create_access_token(other_user_id, "candidate")}
+                assert not client.get("/api/candidates/me", headers=other_headers).json()["skills"]
+                assert client.post("/api/candidates/upload-resume", files={"resume": ("invalid.docx", b"not a docx")}, headers=headers).status_code == 415
+                assert client.get("/api/candidates/me", headers=headers).json() == profile
+                with Session(engine) as database:
+                    assert database.get(Candidate, candidate_id).parsed_resume_text == profile["parsed_resume_text"]
+                    database.rollback()
+                    assert sync_graph_events(database, driver) > 0
+                    assert sync_graph_events(database, driver) == 0
+                with driver.session(database="neo4j") as graph:
+                    names = graph.run("MATCH (:Candidate {id: $id})-[:HAS_SKILL]->(skill:Skill) RETURN toLower(skill.name) AS name", id=str(candidate_id)).value("name")
+                    assert set(names) == {"sql", "python"}
+                scorer.assert_not_called()
+        finally:
+            app.dependency_overrides.clear()
+            app.dependency_overrides.update(previous)
+            with Session(engine) as database:
+                identifiers = [str(profile.candidate_id) for profile in database.query(Candidate).all()]
+            with driver.session(database="neo4j") as graph:
+                graph.run("MATCH (node:Candidate) WHERE node.id IN $ids DETACH DELETE node", ids=identifiers).consume()
 
 
 def test_candidate_profile_browsing_and_saved_removal(migrated_database, monkeypatch):

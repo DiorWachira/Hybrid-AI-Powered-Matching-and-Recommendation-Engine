@@ -42,8 +42,10 @@ def run(command: list[str]) -> None:
     subprocess.run(command, cwd=ROOT, check=True)
 
 
-def prepare(candidates_count: int, jobs_count: int, random_seed: int, no_seed: bool, skip_graph: bool, brightermonday_export: Path | None) -> dict[str, object]:
-    processed_dir = PIPELINE / "processed"
+def prepare(candidates_count: int, jobs_count: int, random_seed: int, no_seed: bool, skip_graph: bool, brightermonday_export: Path | None, output_dir: Path | None = None) -> dict[str, object]:
+    if candidates_count < 1 or jobs_count < 1:
+        raise ValueError("candidate and job counts must be positive")
+    processed_dir = output_dir if output_dir is not None else PIPELINE / "processed"
     raw_dir = processed_dir / "raw_generated"
     export_dir = processed_dir / "export"
     processed_dir.mkdir(parents=True, exist_ok=True)
@@ -108,8 +110,9 @@ def main() -> None:
     parser.add_argument("--no-seed", action="store_true", help="prepare files only")
     parser.add_argument("--skip-graph", action="store_true", help="skip candidate/job graph projection during database seeding")
     parser.add_argument("--brightermonday-export", type=Path, help="optional permitted local JSON export to use instead of synthetic jobs")
+    parser.add_argument("--output-dir", type=Path, help="isolated destination for generated raw data, cleaned exports and quality report")
     args = parser.parse_args()
-    report = prepare(args.candidates, args.jobs, args.seed, args.no_seed, args.skip_graph, args.brightermonday_export)
+    report = prepare(args.candidates, args.jobs, args.seed, args.no_seed, args.skip_graph, args.brightermonday_export, args.output_dir)
     print(json.dumps(report, indent=2))
 
 

@@ -57,8 +57,9 @@ services:
       - neo4j-plugins:/plugins
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://localhost:7474 || exit 1"]
+      start_period: 120s
       interval: 10s
-      timeout: 5s
+      timeout: 10s
       retries: 10
 
 volumes:

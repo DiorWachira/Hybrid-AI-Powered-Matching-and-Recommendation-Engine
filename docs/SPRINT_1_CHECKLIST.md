@@ -1,6 +1,18 @@
 # Sprint 1: Data Preparation and Development Environment
 
-Status: Local source/runtime checks pass; clean-checkout and remote CI sign-off pending.
+Status: Local runtime and reviewed main CI verified; full setup/browser sign-off pending.
+Update 2026-10-10: inspected successful main CI at
+`aae5809ba38b1847636f206f9b0ed01a8b4ddf41`,
+[run 37955892189](https://github.com/DiorWachira/Hybrid-AI-Powered-Matching-and-Recommendation-Engine/actions/runs/37955892189).
+Fresh hosted jobs installed Python 3.12 and Node 22 dependencies, validated Compose,
+applied migrations, ran backend tests and built the frontend. This is clean hosted
+build/test evidence, not a full desktop setup or browser walkthrough.
+Local focused checks: 3 health/ontology tests, 9 Week 4 data-tool tests and 1
+DOCX-to-PostgreSQL-to-Neo4j integration test passed. Updated Compose health settings
+passed actual startup without deleting volumes; Neo4j took about 232 seconds.
+The new branch changes have focused local test evidence but have not run in remote CI.
+
+Earlier dated updates below describe the evidence available at those times.
 Update 2026-10-04: 65 backend tests pass from CI's backend working directory;
 frontend build passes. Fixed data_pipeline import root, declared test dependencies,
 and added frontend build/database integration CI steps. No remote run was claimed.
@@ -17,12 +29,14 @@ Audit: 2026-10-01. See [implementation audit](IMPLEMENTATION_AUDIT.md).
 - [x] Codebase organisation: backend, frontend, data pipeline, notebooks, tests,
   documentation, and CI configuration are separated into clear directories.
 - [x] Git version control scaffolding: feature branch and CI configuration exist.
-    No merge or push to main is authorized; audit changes are not committed.
+    No push or main merge is authorized by this commit-only step.
 - [x] Synthetic resources: generator, quality report, migrations, ontology seed
     logic and historical weights exist. This does not certify real-job sourcing,
     official CDACC mappings, model quality or the live scoring feature contract.
-- [ ] Automation sign-off: backend and frontend CI are configured, including
-    isolated DB tests, but no current remote green run was inspected.
+- [x] Reviewed baseline automation: backend and frontend CI passed on main aae5809,
+    including fresh dependency installation, migrations and database integration.
+- [ ] Publish and verify remote CI for the new Week 1-4 branch when authorized.
+- [ ] Full clean-machine setup with seed data, launched API/Vite and browser checks.
 
 ## Historical Evidence (2026-10-01)
 
@@ -34,9 +48,9 @@ Audit: 2026-10-01. See [implementation audit](IMPLEMENTATION_AUDIT.md).
 - Two database integration tests were deliberately not run against an unavailable
     stack. Earlier successful local runs are historical evidence, not current proof.
 
-Sprint 1 is not yet fully signed off. Closure requires the integrated checks below
-on disposable/demo data, an inspected green CI run at the reviewed commit, and a
-clean-checkout reproduction. No native PostgreSQL configuration was changed.
+Sprint 1 is not yet fully signed off. The inspected hosted CI gate is satisfied for
+main aae5809; complete desktop setup/seed/browser reproduction and the new branch's
+remote run remain open. No native PostgreSQL configuration was changed.
 
 ## Local verification
 
