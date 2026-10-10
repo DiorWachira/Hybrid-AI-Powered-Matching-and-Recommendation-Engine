@@ -1,5 +1,7 @@
 import sys
 import random
+import json
+import subprocess
 from pathlib import Path
 from types import SimpleNamespace
 from uuid import uuid4
@@ -15,6 +17,7 @@ from data_pipeline.import_brightermonday_jobs import normalize_job
 from data_pipeline.generate_synthetic_data import generate_candidate
 from data_pipeline.load_esco_ontology import load_relationships, load_skills
 from data_pipeline.prepare_week4 import clean_candidate_for_export, clean_job_for_export
+from data_pipeline.prepare_week4 import prepare
 from app.api import matches
 
 
@@ -108,3 +111,28 @@ def test_rule_gate_rejects_candidate_before_calling_ml(monkeypatch: pytest.Monke
     assert result.hard_rule_passed is False
     assert result.final_score == 0
     assert len(result.rule_reasons) == 3
+
+
+def test_preparation_cli_produces_repeatable_isolated_exports(tmp_path):
+    output = tmp_path / "prepared"
+    command = [sys.executable, str(REPO_ROOT / "data_pipeline" / "prepare_week4.py"), "--candidates", "12", "--jobs", "8", "--seed", "42", "--no-seed", "--output-dir", str(output)]
+    subprocess.run(command, cwd=tmp_path, capture_output=True, text=True, check=True)
+    first = {path.relative_to(output): path.read_bytes() for path in output.rglob("*.json")}
+    raw = json.loads((output / "raw_generated" / "candidates.json").read_bytes())
+    cleaned = json.loads((output / "export" / "candidates.json").read_bytes())
+    assert len(raw) == len(cleaned) == 12
+    assert all("latent_competence" in row for row in raw)
+    assert all(not {"latent_competence", "latent_adaptability"} & row.keys() for row in cleaned)
+    report = json.loads((output / "export" / "data_quality_report.json").read_bytes())
+    assert report["candidates"]["duplicate_ids"] == report["jobs"]["duplicate_ids"] == 0
+    assert report["jobs"]["rows"] == 8
+    assert not any(report["candidates"]["missing_by_field"].values())
+    assert not any(report["jobs"]["missing_by_field"].values())
+    subprocess.run(command, cwd=tmp_path, capture_output=True, text=True, check=True)
+    assert first == {path.relative_to(output): path.read_bytes() for path in output.rglob("*.json")}
+
+
+def test_preparation_rejects_empty_dataset_before_writing(tmp_path):
+    with pytest.raises(ValueError, match="positive"):
+        prepare(0, 8, 42, True, True, None, tmp_path / "invalid")
+    assert not (tmp_path / "invalid").exists()
