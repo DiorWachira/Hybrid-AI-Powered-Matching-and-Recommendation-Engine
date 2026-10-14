@@ -1,6 +1,36 @@
 HYBRID AI-POWERED WORKFORCE PLACEMENT ENGINE
 PROJECT MILESTONE ROADMAP (8 WEEKS)
-Last updated: 2026-10-10 (Week 1-4 verification increment)
+Last updated: 2026-10-14 (training-completion + feature-parity gate increment)
+
+TRAINING COMPLETION & FEATURE-PARITY GATE UPDATE (2026-10-14)
+[x] Confirmed the 2026-10-09 Colab run 2026-10-09-epoch-combiner-r001 actually
+    COMPLETED all 100 epochs (epoch_0001..epoch_0100 present), not stopped mid-run.
+    The earlier "epoch 19 best so far" note was a mid-run snapshot; the final bundle
+    selected epoch 19 (lowest validation log-loss 0.49837) as the FINAL selection.
+[x] Final bundle integrity-verified: review_report.json reports
+    INTEGRITY_VERIFIED_REVIEW_REQUIRED, epochs_verified=100, destinations_verified=2,
+    production_artifact_touched=false. Selected hybrid head (all-MiniLM-L6-v2, rev
+    1110a243fdf4706b3f48f1d95db1a4f5529b4d41) beats fixed-weight and semantic-only
+    baselines on every split: validation F1 0.854, warm-test F1 0.831, cold-test F1 0.849.
+[x] Promoted artifact data_pipeline/artifacts/hybrid_match_weights.json is byte-identical
+    to the verified bundle (source_artifact_sha256 185471dc... == bundle SHA-256),
+    promotion_status=PROTOTYPE_TESTING_APPROVED, selected_epoch=19 (commit 629723f).
+[x] Feature-parity gate redirected to the SHARED serving/training contract. Training
+    (epoch_trainer.py) and serving (matches.py) now compute features through the SAME
+    backend/app/core/match_features.py (serving-direct-skill-growth-v1), so the promoted
+    head is trained on exactly the features serving computes. This is the audit's own
+    prescribed resolution ("version and test shared training/serving features").
+[x] data_pipeline/validate_model_contract.py now proves parity three ways: serving and
+    training resolve to the same feature module file, serving reproduces the contract on
+    probe inputs, and the promoted artifact matches the verified bundle. It exits 0.
+[x] New regression lock backend/tests/test_model_contract.py. Full backend suite:
+    115 passed, 5 skipped, 0 failed (opt-in real-database tests skipped; Docker not used).
+[~] Independent, non-synthetic hiring-quality evaluation remains OPEN and is a separate
+    gate: validate_model_contract still reports independent_quality_validated=false and
+    deployment_gate=BLOCKED. Parity is NOT a claim of real-world quality or a promotion
+    to production. Labels are synthetic (fixed-centre latent Bernoulli v2), not outcomes.
+[ ] Still open: independent gold-slice labelling, real-dataset provenance/permission,
+    measured inference latency vs the 2-5s target, and public-demo acceptance.
 
 WEEK 1-4 VERIFICATION UPDATE (2026-10-10)
 [x] Reviewed main CI aae5809: fresh hosted checkout, Python 3.12 dependencies,
@@ -97,6 +127,7 @@ NON-TRAINING WEEKLY PROGRESS (2026-10-04; current status)
     workflow/accessibility checks, latency improvements and clean setup
 [ ] Model parity/independent quality, official datasets and public deployment open
     Epoch training is explicitly ON HOLD; no training files or weights changed
+     [SUPERSEDED 2026-10-14: run completed all 100 epochs; epoch 19 promoted for prototype testing; parity verified on shared contract. Independent quality/deployment still open.]
 
 ADMIN RELEASE-READINESS UPDATE (2026-10-02; supersedes older items below)
 [x] Existing table-width layout verified without page overflow at 320/390/768/1440px
@@ -426,7 +457,7 @@ WEEK 5  Model Work on Google Colab
 Exit criterion: historical LOCAL mechanics demonstrated; Colab execution,
 independent quality and reproducibility not signed off.
 
-EPOCH WORKFLOW (additional increment, execution on hold)
+EPOCH WORKFLOW (additional increment, execution on hold) -- SUPERSEDED 2026-10-14: run r001 completed and verified; epoch 19 promoted
 [x] Local artifact-store proof writes fake per-epoch JSON/checkpoints and
     mirrors temporary folders; tests pass. It does not train a model
 [ ] Actual fixed-epoch trainer with validation loss each epoch, no early stopping
