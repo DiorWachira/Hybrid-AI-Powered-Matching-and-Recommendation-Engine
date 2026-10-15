@@ -4,7 +4,7 @@ Hybrid AI-Powered Matching and Recommendation Engine
 The repository remote is
 `https://github.com/DiorWachira/Hybrid-AI-Powered-Matching-and-Recommendation-Engine`.
 Check the current branch and remote state before running these commands; branch
-names and commit hashes below describe the October 2025 handoff and may be stale.
+names and commit hashes below describe the October 2026 handoff and may be stale.
 
 Git author identity and GitHub authentication are separate
 ----------------------------------------------------------
