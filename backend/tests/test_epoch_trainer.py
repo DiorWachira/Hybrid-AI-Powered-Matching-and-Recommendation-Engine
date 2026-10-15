@@ -2,6 +2,7 @@ import hashlib
 import json
 import subprocess
 import sys
+from types import ModuleType
 from pathlib import Path
 
 import numpy as np
@@ -85,6 +86,35 @@ def test_preparation_caches_encoder_and_isolates_pair_identities(tmp_path):
     for row in manifest["pair_identities"]:
         assert row["candidate_id"] in manifest["candidate_groups"][row["split"]]
         assert row["job_id"] in manifest["job_groups"]["cold" if row["split"] == "cold_test" else "warm"]
+
+
+def test_preparation_uses_pinned_encoder_revision(tmp_path, monkeypatch):
+    loaded = {}
+
+    class Encoder:
+        def __init__(self, model_name, revision):
+            loaded["model_name"] = model_name
+            loaded["revision"] = revision
+
+        def encode(self, texts, **kwargs):
+            return np.tile([1.0, 0.0], (len(texts), 1))
+
+    sentence_transformers = ModuleType("sentence_transformers")
+    sentence_transformers.SentenceTransformer = Encoder
+    monkeypatch.setitem(sys.modules, "sentence_transformers", sentence_transformers)
+    revision = "a" * 40
+
+    _, _, _, manifest = prepare_synthetic_data(
+        tmp_path,
+        code_commit="test",
+        candidate_count=200,
+        job_count=100,
+        pinned_encoder_revision=revision,
+    )
+
+    assert loaded["revision"] == revision
+    assert manifest["encoder_revision"] == revision
+    assert manifest["specification"]["pinned_encoder_revision"] == revision
 
 
 def test_candidate_artifact_has_same_probabilities_as_serving_loader(tmp_path, monkeypatch):
