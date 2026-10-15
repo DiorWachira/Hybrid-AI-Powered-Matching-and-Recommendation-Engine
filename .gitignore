@@ -45,6 +45,9 @@ credentials.txt
 
 #Extras
 extras/
+!/docs/extras/
+docs/extras/*
+!docs/extras/commit.txt
 
 # Generated data, model artifacts and reports (regenerate via data_pipeline/ scripts)
 data_pipeline/dataset/

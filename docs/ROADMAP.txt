@@ -1,6 +1,21 @@
 HYBRID AI-POWERED WORKFORCE PLACEMENT ENGINE
 PROJECT MILESTONE ROADMAP (8 WEEKS)
-Last updated: 2026-10-14 (training-completion + feature-parity gate increment)
+Last updated: 2026-10-15 (branch and Week 1-4 status reconciled)
+
+CURRENT REPOSITORY STATUS (2026-10-15)
+Week 1-4 verification changes were merged and pushed to main at c3fdec3 on
+2026-10-10. The current local branch, feat/weeks1-4-verification, is clean at
+3845e14 and adds the shared serving/training feature-contract validator and its
+regression test. That commit has not yet been pushed; its branch-specific remote
+CI has not run. Main still points to c3fdec3 until this follow-up is reviewed.
+See docs/extras/commit.txt for user-run branch push, PR and optional merge commands.
+
+Week 1-4 status: local API/DB/graph checks, focused CV upload integration and
+repeatable data-preparation tests pass. Main CI passed at c3fdec3. Full fresh-machine
+launch/browser acceptance, new-branch CI, official-source provenance and independent
+fairness/quality remain separate gates. Admin Simulation is implemented and API-tested;
+browser playback has not been verified. The epoch-19 artifact is approved for
+prototype testing only, not independent hiring-quality validation or public deployment.
 
 TRAINING COMPLETION & FEATURE-PARITY GATE UPDATE (2026-10-14)
 [x] Confirmed the 2026-10-09 Colab run 2026-10-09-epoch-combiner-r001 actually
@@ -50,7 +65,8 @@ WEEK 1-4 VERIFICATION UPDATE (2026-10-10)
     remain pending. API TestClient coverage is not browser upload evidence
 [~] Official ESCO/CDACC source verification, permitted real-job inputs and
     independent quality/fairness evidence cannot be closed with synthetic fixtures
-Working branch: feat/weeks1-4-verification. Publication and main merge need separate approval.
+Historical at the time of this 2026-10-10 entry: Week 1-4 branch had not yet been
+merged. It was merged to main at c3fdec3 on 2026-10-10; see current status above.
 Older dated snapshots below are historical when superseded by this update.
 October 9 model activation/training and sandbox status: docs/WORKFLOW.md.
 
