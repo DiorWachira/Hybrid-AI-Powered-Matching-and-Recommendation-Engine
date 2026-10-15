@@ -1,0 +1,101 @@
+GIT COMMIT / PUSH / MERGE COMMANDS
+Hybrid AI-Powered Matching and Recommendation Engine
+
+The repository remote is
+`https://github.com/DiorWachira/Hybrid-AI-Powered-Matching-and-Recommendation-Engine`.
+Check the current branch and remote state before running these commands; branch
+names and commit hashes below describe the October 2025 handoff and may be stale.
+
+Git author identity and GitHub authentication are separate
+----------------------------------------------------------
+`git config user.name` / `user.email` control the author recorded on commits.
+They do not choose which GitHub account is allowed to push. The remote URL above
+identifies the repository. GitHub CLI / Git Credential Manager authentication
+provides push permission. Check which GitHub CLI account is active:
+
+```powershell
+gh auth status --hostname github.com
+git config user.name
+git config user.email
+git remote -v
+```
+
+The handoff environment reported author `DiorWachira` with
+`njoroge.wachira@strathmore.edu`, and GitHub CLI account `DiorWachira`.
+GitHub attributes commits to an account when the commit email is verified on
+that account. Copilot sign-in is separate from Git commit authorship and push
+authentication. A commit made with one author's identity will not show multiple
+contributors. Do not impersonate another contributor; each person should make
+their own commits with their own configured identity.
+
+If needed, select an already-authenticated GitHub CLI account (no token goes in
+the repository or this file):
+
+```powershell
+gh auth switch --hostname github.com --user YOUR_GITHUB_USERNAME
+```
+
+If that account lacks write access to the repository, the push will be rejected.
+Ask a repository owner to grant access, or push to your fork and open a PR from
+the fork. Changing Git author name/email alone does not grant access.
+
+Publish the current feature branch
+----------------------------------
+Run from the repository root. Review the status first; do not stage private
+credentials, notebooks, CVs, generated checkpoints, or local review bundles.
+
+```powershell
+git status --short --branch
+git fetch origin
+git switch feat/weeks1-4-verification
+git log -1 --oneline
+git push -u origin feat/weeks1-4-verification
+```
+
+Open a pull request for review and branch-specific CI:
+
+```powershell
+gh pr create --base main --head feat/weeks1-4-verification --title "feat: verify shared model feature contract" --body "Adds a shared serving/training feature contract and regression coverage. The model uses synthetic labels and remains approved for prototype testing only; independent hiring-quality evaluation is still open."
+```
+
+Prefer merging the reviewed PR in GitHub after its CI passes. The steps below
+are an alternative for a direct local merge; do not do both.
+
+Optional direct merge to main
+-----------------------------
+Only use this after the branch has been reviewed and its CI passes. The remote
+main may advance, so fetch and fast-forward local main before merging. Stop and
+resolve conflicts deliberately if Git reports any; do not reset or discard work.
+
+```powershell
+git fetch origin
+git switch main
+git pull --ff-only origin main
+git merge --no-ff origin/feat/weeks1-4-verification -m "merge: verify shared training and serving feature contract"
+git push origin main
+git status --short --branch
+git log -1 --oneline
+```
+
+Commits made directly on a feature branch
+-----------------------------------------
+For later edits, use an area-focused conventional commit and explicit paths:
+
+```powershell
+git status --short --branch
+git add -- path/to/related-file path/to/related-test
+git diff --cached --check
+git diff --cached --stat
+git commit -m "type(area): concise description"
+git push
+```
+
+Examples: `feat(backend): ...`, `test(data): ...`, `docs(workflow): ...`.
+Stage only the files intended for that commit. Never commit `.env`, credentials,
+real CVs, the local training notebook, or per-epoch checkpoints. Do not force-push.
+
+Prototype model note
+--------------------
+The reviewed epoch-19 artifact is marked `PROTOTYPE_TESTING_APPROVED`; that is
+not production approval. Independent non-synthetic hiring-quality and fairness
+evaluation, clean-machine/browser acceptance, and deployment review remain open.

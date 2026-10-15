@@ -3,7 +3,13 @@
 Historical audit below. The 2026-10-02 follow-up implements password recovery,
 ontology editing, local graph scheduling and targeted security guards; dependency
 updates pass regression checks. See [WORKFLOW.md](WORKFLOW.md) for current evidence.
-Model-contract validation now explicitly fails; public deployment remains blocked.
+2026-10-14 increment (below is superseded where noted): the 2026-10-09 Colab run
+completed all 100 epochs and was integrity-verified; epoch 19 was promoted for
+prototype testing (PROTOTYPE_TESTING_APPROVED). The model-contract validator was
+redirected to the SHARED serving/training feature module and now passes feature
+parity; independent non-synthetic quality evaluation and public deployment remain
+BLOCKED. The earlier "model-contract validation now explicitly fails" line referred
+to the abandoned-notebook comparison, which no longer defines the contract.
 
 Date: 2026-10-01. Scope: roadmap, workflow increments, Sprint 1, current API
 boundaries, training evidence and public-demo readiness. This is not a penetration

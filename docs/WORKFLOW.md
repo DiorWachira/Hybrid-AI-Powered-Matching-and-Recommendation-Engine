@@ -2,6 +2,33 @@
 
 Living document. Update it whenever the process or the increment status changes.
 
+### Training Completion & Feature-Parity Gate (2026-10-14)
+
+No retraining or model-weight changes were made in this increment; it reconciles
+evidence and redirects the parity gate. Confirmed the 2026-10-09 Colab run
+`2026-10-09-epoch-combiner-r001` completed all 100 epochs (epoch_0001..epoch_0100)
+and was integrity-verified (`INTEGRITY_VERIFIED_REVIEW_REQUIRED`, epochs_verified=100,
+destinations_verified=2, production_artifact_touched=false). Epoch 19 (lowest
+validation log-loss 0.49837) is the final selected epoch and was already promoted to
+`data_pipeline/artifacts/hybrid_match_weights.json` as `PROTOTYPE_TESTING_APPROVED`;
+the promoted artifact is byte-identical to the verified bundle (source SHA 185471dc...).
+Selected hybrid head beats fixed-weight and semantic-only baselines on every split
+(validation F1 0.854, warm-test 0.831, cold-test 0.849) on synthetic labels.
+
+The top audit blocker (training/serving feature parity) is now verified against the
+SHARED contract rather than the abandoned notebook: `epoch_trainer.py` and
+`matches.py` both compute features through `backend/app/core/match_features.py`
+(`serving-direct-skill-growth-v1`). `data_pipeline/validate_model_contract.py` was
+rewritten to prove (1) serving and training resolve to the same feature module file,
+(2) serving reproduces the contract on probe inputs, and (3) the promoted artifact
+matches the verified bundle; it now exits 0. A regression lock was added at
+`backend/tests/test_model_contract.py`. Full backend suite: 115 passed, 5 skipped,
+0 failed (opt-in real-database tests skipped; Docker not used).
+
+Independent, non-synthetic hiring-quality evaluation and public deployment remain
+OPEN and intentionally BLOCKED; parity is not a real-world quality claim.
+
+
 ### Week 1-4 Verification (2026-10-10)
 
 Work on `feat/weeks1-4-verification` adds focused evidence without retraining or
@@ -42,7 +69,8 @@ Training is approved; the earlier hold is lifted for this increment. Work is on
 `train/epoch-loop`, not main. The old notebook training cells must not be run with
 Run All. Its Colab Python 3 connection and Google Drive mount have been verified.
 A unique Colab JSON probe reached `G:\My Drive` and both local destinations with
-identical SHA-256 hashes. This proves connectivity, not yet a completed training run.
+identical SHA-256 hashes. This proved connectivity; the run has since completed all
+100 epochs and been integrity-verified (see the 2026-10-14 increment below).
 
 The new runner uses 100 fixed epochs by default, SGD logistic loss, learning rate
 0.01, L2 alpha 0.0003 and batch size 256. No early stopping. MiniLM stays frozen;
@@ -351,7 +379,7 @@ Related documents:
 | FastAPI backend | Local venv (`venv`) | `uvicorn main:app --reload` from `backend/` |
 | React frontend | Local, implemented | Vite 5173 proxies `/api` to FastAPI 8000 |
 | Historical model run | Local Python runtime | Saved notebook metrics; not a certified Colab run |
-| Next training workflow | Colab planned, execution on hold | GitHub -> Colab -> Drive -> local review; no epoch trainer yet |
+| Epoch training workflow | Completed 2026-10-09 | GitHub -> Colab -> Drive -> local review; run r001 finished 100 epochs, verified, epoch 19 promoted for prototype testing |
 | Public demo | Oracle Always Free proposed | No VM, domain or public endpoint provisioned; see [DEPLOYMENT.md](DEPLOYMENT.md) |
 
 Colab is reserved for training and experimentation, not API hosting. The API loads
@@ -438,10 +466,10 @@ base design is finalised.
 | 5 | Resume ingestion and parsing (FR-02) | Partial; PDF/DOCX extraction exists; adversarial files and live storage/graph tests pending |
 | 6 | Job posting and weighting criteria (FR-03) | Partial; create/open-list only, not CRUD; no custom weighting workflow |
 | 7 | Neo4j skill ontology and graph service | Partial; seed/query/projection code; stale-edge consistency and live tests pending |
-| 8 | Tier 1 rule filter + Tier 2 semantic scoring (FR-04) | Partial; rules-first tested, trained feature parity blocked |
+| 8 | Tier 1 rule filter + Tier 2 semantic scoring (FR-04) | Partial; rules-first tested, trained feature parity verified against shared contract (2026-10-14); independent quality eval still pending |
 | 9 | Results and explainability API + React dashboards (FR-05) | Partial; built UI, selected fixture checks; live E2E/cached GET/graph UI pending |
-| 10 | Evaluation pipeline (precision / recall / F1) | Historical synthetic notebook results only; independent gold data and parity evaluation pending |
-| 11 | Epoch workflow and artifact review | Local fake-checkpoint proof only; real trainer/Colab/Drive/resume not verified |
+| 10 | Evaluation pipeline (precision / recall / F1) | Selected epoch-19 synthetic-head metrics recorded (val F1 0.854); independent gold data and external parity evaluation pending |
+| 11 | Epoch workflow and artifact review | 100-epoch Colab run completed and integrity-verified; epoch 19 promoted for prototype testing (2026-10-14) |
 | 12 | Public demo | Not deployed; Always Free account/capacity, TLS, security and live acceptance gates required |
 
 ### Stage Gates

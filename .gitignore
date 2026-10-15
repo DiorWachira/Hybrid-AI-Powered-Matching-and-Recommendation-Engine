@@ -45,6 +45,9 @@ credentials.txt
 
 #Extras
 extras/
+!/docs/extras/
+docs/extras/*
+!docs/extras/commit.txt
 
 # Generated data, model artifacts and reports (regenerate via data_pipeline/ scripts)
 data_pipeline/dataset/
@@ -60,3 +63,12 @@ data_pipeline/reports/*
 !data_pipeline/artifacts/hybrid_match_weights.json
 !data_pipeline/reports/*.json
 !data_pipeline/reports/*.png
+
+# Local runtime artifacts (dev servers, tokens, logs) - never commit
+backend_api.log
+backend_api.err
+frontend_dev.log
+frontend_build.log
+admin_token.txt
+contract_out.txt
+*.local.log
