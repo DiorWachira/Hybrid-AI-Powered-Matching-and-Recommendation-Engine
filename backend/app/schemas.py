@@ -125,6 +125,12 @@ class JobResponse(BaseModel):
     status: str
 
 
+class AdminJobResponse(JobResponse):
+    company_name: str
+    recruiter_email: EmailStr
+    applicant_count: int
+
+
 class JobUpdateRequest(JobCreateRequest):
     status: JobStatus = JobStatus.open
 

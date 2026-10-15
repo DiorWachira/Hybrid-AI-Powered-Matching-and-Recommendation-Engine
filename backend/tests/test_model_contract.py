@@ -8,6 +8,7 @@ import importlib
 import sys
 from pathlib import Path
 
+import numpy as np
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -37,6 +38,27 @@ def test_serving_and_training_read_the_same_feature_module_file():
     serving = importlib.import_module("app.core.match_features")
     training = importlib.import_module("backend.app.core.match_features")
     assert Path(serving.__file__).resolve() == Path(training.__file__).resolve()
+
+
+def test_batched_semantic_scores_reuse_one_job_embedding(monkeypatch):
+    from app.core import hybrid_matcher
+
+    calls = []
+
+    class Encoder:
+        def encode(self, texts, **options):
+            calls.append((texts, options))
+            return np.asarray([[0.6, 0.8], [0.0, 1.0], [1.0, 0.0]])
+
+    monkeypatch.setattr(hybrid_matcher, "_get_model", lambda: Encoder())
+    scores = hybrid_matcher.semantic_similarities(["Candidate one", "Candidate two"], "Job description", batch_size=8)
+
+    assert scores == [0.6, 0.0]
+    assert len(calls) == 1
+    assert len(calls[0][0]) == 3
+    assert calls[0][0][-1] == "Job description"
+    assert calls[0][1]["batch_size"] == 8
+    assert calls[0][1]["normalize_embeddings"] is True
 
 
 def test_verified_bundle_mismatch_fails_parity(monkeypatch):

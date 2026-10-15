@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from app.api.dependencies import require_roles
 from app.core.rule_filter import CandidateRuleData, JobRuleData, RuleBasedMatcher
 from app.db.models import AuditEvent, Candidate, Employer, JobPosting, MatchResult, User, UserRole
-from app.core.hybrid_matcher import _artifact, calibrated_score, semantic_similarity
+from app.core.hybrid_matcher import _artifact, calibrated_score, semantic_similarities, semantic_similarity
 from app.core.match_features import growth_score as feature_growth_score, skill_overlap
 from app.db.postgres import get_db
 from app.schemas import MatchCandidateResponse, MatchEvaluationResponse, StoredMatchResponse
@@ -93,8 +93,8 @@ def read_match_graph(match_id: UUID, user: User = Depends(require_roles(UserRole
         raise HTTPException(status_code=503, detail="Skill graph is unavailable; saved evaluation is still accessible") from None
 
 
-def _score_candidate(candidate: Candidate, job: JobPosting) -> MatchCandidateResponse:
-    rule_result = RuleBasedMatcher().check_hard_filters(
+def _candidate_rule_result(candidate: Candidate, job: JobPosting):
+    return RuleBasedMatcher().check_hard_filters(
         CandidateRuleData(
             years_experience=candidate.years_experience,
             location=candidate.location,
@@ -110,6 +110,10 @@ def _score_candidate(candidate: Candidate, job: JobPosting) -> MatchCandidateRes
             requires_work_authorization=getattr(job, "requires_work_authorization", False),
         ),
     )
+
+
+def _score_candidate(candidate: Candidate, job: JobPosting, semantic_score: float | None = None) -> MatchCandidateResponse:
+    rule_result = _candidate_rule_result(candidate, job)
     if not rule_result.passed:
         return MatchCandidateResponse(
             candidate_id=candidate.candidate_id,
@@ -123,7 +127,8 @@ def _score_candidate(candidate: Candidate, job: JobPosting) -> MatchCandidateRes
         )
 
     overlap = skill_overlap(candidate.skills or [], job.required_skills or [])
-    semantic_score = semantic_similarity(candidate.parsed_resume_text or "", job.description)
+    if semantic_score is None:
+        semantic_score = semantic_similarity(candidate.parsed_resume_text or "", job.description)
     growth_score = feature_growth_score(candidate.years_experience, job.required_experience_years, len(candidate.certifications or []))
     final_score, _ = calibrated_score(semantic_score, overlap, growth_score)
     return MatchCandidateResponse(
@@ -154,7 +159,13 @@ def evaluate_matches(
         if employer is None or employer.user_id != user.user_id:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You can only evaluate your own job postings")
     candidates = list(db.scalars(select(Candidate).join(User, Candidate.user_id == User.user_id).where(User.is_active.is_(True)).order_by(Candidate.created_at.asc())))
-    ranked = sorted((_score_candidate(candidate, job) for candidate in candidates), key=lambda result: (-result.final_score, str(result.candidate_id)))
+    eligible = [candidate for candidate in candidates if _candidate_rule_result(candidate, job).passed]
+    semantic_scores = semantic_similarities([candidate.parsed_resume_text or "" for candidate in eligible], job.description) if eligible else []
+    scores_by_candidate = {candidate.candidate_id: score for candidate, score in zip(eligible, semantic_scores)}
+    ranked = sorted(
+        (_score_candidate(candidate, job, scores_by_candidate.get(candidate.candidate_id)) for candidate in candidates),
+        key=lambda result: (-result.final_score, str(result.candidate_id)),
+    )
     model_version = _artifact()["model_version"]
     evaluated_at = datetime.now(UTC)
     candidates_by_id = {candidate.candidate_id: candidate for candidate in candidates}

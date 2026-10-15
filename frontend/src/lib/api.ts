@@ -34,6 +34,7 @@ export type JobPosting = {
   required_skills: string[] | null; mandatory_certifications: string[] | null;
   status: "open" | "closed"; posted_at: string | null;
 };
+export type AdminJob = JobPosting & { company_name: string; recruiter_email: string; applicant_count: number };
 export type ApplicationStatus = "submitted" | "reviewing" | "shortlisted" | "rejected" | "hired" | "withdrawn";
 export type RecruiterStatus = "reviewing" | "shortlisted" | "rejected" | "hired";
 export type Application = { application_id: string; candidate_id: string; job_id: string; status: ApplicationStatus; created_at: string; updated_at: string };
@@ -250,6 +251,11 @@ export const api = {
     request<AdminOverview>("/admin/overview", {
       headers: { Authorization: `Bearer ${token}` },
     }),
+  adminJobs: (token: string, search: string, status: "" | "open" | "closed", offset: number, limit = 11) => {
+    const params = new URLSearchParams({ search, offset: String(offset), limit: String(limit) });
+    if (status) params.set("status", status);
+    return request<AdminJob[]>(`/admin/jobs?${params}`, { headers: { Authorization: `Bearer ${token}` } });
+  },
   adminUsers: (token: string, search: string, offset: number) =>
     request<AdminUser[]>(`/admin/users?${new URLSearchParams({ search, offset: String(offset) })}`, {
       headers: { Authorization: `Bearer ${token}` },

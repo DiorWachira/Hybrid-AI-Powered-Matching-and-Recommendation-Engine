@@ -5,13 +5,13 @@ from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from app.core.rate_limit import limiter
-from sqlalchemy import func, select
+from sqlalchemy import String, cast, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import require_roles
-from app.db.models import AuditEvent, Candidate, Employer, GraphSyncEvent, JobApplication, JobPosting, MatchResult, User, UserRole
+from app.db.models import AuditEvent, Candidate, Employer, GraphSyncEvent, JobApplication, JobPosting, JobStatus, MatchResult, User, UserRole
 from app.db.postgres import get_db
-from app.schemas import AccountStatusUpdate, AdminOverviewResponse, AdminUserResponse, AuditEventResponse, JobResponse, JobStatusUpdate, OntologyRelationRequest, OntologySkillRequest, ResetAuthorization
+from app.schemas import AccountStatusUpdate, AdminJobResponse, AdminOverviewResponse, AdminUserResponse, AuditEventResponse, JobResponse, JobStatusUpdate, OntologyRelationRequest, OntologySkillRequest, ResetAuthorization
 from app.db.neo4j_db import get_neo4j_driver
 from neo4j.exceptions import Neo4jError, ServiceUnavailable, SessionExpired
 from app.utils.security import verify_password
@@ -129,6 +129,51 @@ def moderate_job(job_id: UUID, payload: JobStatusUpdate, user: User = Depends(re
         db.commit()
         db.refresh(job)
     return job
+
+
+@router.get("/jobs", response_model=list[AdminJobResponse])
+def list_all_jobs(
+    search: str = Query(default="", max_length=120),
+    status_filter: JobStatus | None = Query(default=None, alias="status"),
+    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=25, ge=1, le=100),
+    user: User = Depends(require_roles(UserRole.admin)),
+    db: Session = Depends(get_db),
+):
+    statement = (
+        select(JobPosting, Employer.company_name, User.email, func.count(JobApplication.application_id))
+        .join(Employer, Employer.employer_id == JobPosting.employer_id)
+        .join(User, User.user_id == Employer.user_id)
+        .outerjoin(JobApplication, JobApplication.job_id == JobPosting.job_id)
+    )
+    if search.strip():
+        term = search.strip()
+        statement = statement.where(
+            or_(
+                JobPosting.title.icontains(term, autoescape=True),
+                Employer.company_name.icontains(term, autoescape=True),
+                User.email.icontains(term, autoescape=True),
+                cast(JobPosting.required_skills, String).icontains(term, autoescape=True),
+            )
+        )
+    if status_filter is not None:
+        statement = statement.where(JobPosting.status == status_filter)
+    statement = (
+        statement.group_by(JobPosting.job_id, Employer.company_name, User.email)
+        .order_by(JobPosting.posted_at.desc(), JobPosting.job_id)
+        .offset(offset)
+        .limit(limit)
+    )
+    rows = db.execute(statement).all()
+    return [
+        AdminJobResponse(
+            **JobResponse.model_validate(job).model_dump(),
+            company_name=company_name,
+            recruiter_email=recruiter_email,
+            applicant_count=applicant_count,
+        )
+        for job, company_name, recruiter_email, applicant_count in rows
+    ]
 
 
 @router.get("/overview", response_model=AdminOverviewResponse)

@@ -289,6 +289,38 @@ button, a { transition: background-color .18s, color .18s, border-color .18s; }
 .admin-page .admin-stats svg { margin-bottom: 10px; }
 .admin-page .data-table td { padding-block: 10px; }
 .admin-page .recovery-account { padding-block: 10px; }
+.admin-jobs-toolbar { display: flex; align-items: end; justify-content: space-between; flex-wrap: wrap; gap: 16px; }
+.admin-jobs-toolbar .section-heading { margin-bottom: 0; }
+.admin-jobs-filters { display: flex; align-items: end; flex-wrap: wrap; gap: 10px; flex: 1 1 520px; justify-content: flex-end; }
+.admin-jobs-filters .search-field { max-width: 390px; }
+.admin-jobs-page .data-table { min-width: 680px; }
+.admin-job-employer { margin-top: 5px; color: var(--muted); font-size: 11px; }
+.admin-job-status, .admin-application-status { display: inline-block; padding: 4px 7px; border: 1px solid var(--line); border-radius: 4px; color: var(--muted); text-transform: capitalize; font-size: 10px; }
+.admin-job-status.open, .admin-application-status.shortlisted, .admin-application-status.hired { color: var(--accent); border-color: #596b47; }
+.admin-job-status.closed, .admin-application-status.rejected, .admin-application-status.withdrawn { color: #e9a69a; border-color: #70483d; }
+.admin-job-detail { border-top: 1px solid var(--line); padding-top: 28px; }
+.admin-job-detail-heading, .admin-applicant-heading { display: flex; justify-content: space-between; align-items: end; flex-wrap: wrap; gap: 18px; }
+.admin-job-detail-heading h2 { margin-top: 12px; font-size: 26px; font-weight: 500; overflow-wrap: anywhere; }
+.admin-job-detail-heading .eyebrow { margin-top: 20px; }
+.admin-job-detail-actions { display: flex; flex-wrap: wrap; gap: 9px; }
+.admin-job-facts { display: flex; flex-wrap: wrap; gap: 10px 20px; margin-top: 15px; color: var(--muted); font-size: 11px; }
+.admin-job-facts span { display: inline-flex; align-items: center; gap: 6px; overflow-wrap: anywhere; }
+.admin-job-facts svg { flex: none; color: var(--accent); }
+.admin-applicant-heading { margin-top: 30px; padding-block: 16px; border-block: 1px solid var(--line); }
+.admin-applicant-heading h3 { font-size: 16px; font-weight: 500; }
+.admin-applicant-heading p, .admin-score-scope { margin-top: 6px; color: var(--muted); font-size: 11px; line-height: 1.6; }
+.admin-score-scope { margin-block: 12px; }
+.admin-applicant-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(130px, auto) 110px; align-items: center; gap: 20px; padding: 18px 0; border-bottom: 1px solid var(--line); }
+.admin-applicant-identity { min-width: 0; }
+.admin-applicant-identity h4 { font-size: 14px; font-weight: 500; overflow-wrap: anywhere; }
+.admin-applicant-identity > p { margin-top: 5px; color: var(--muted); font-size: 11px; }
+.admin-applicant-identity .skill-tags { margin-block: 10px 0; }
+.admin-applicant-meta { display: grid; justify-items: start; gap: 8px; color: var(--muted); font-size: 10px; }
+.admin-applicant-score { display: grid; justify-items: end; gap: 5px; text-align: right; }
+.admin-applicant-score strong { color: var(--accent); font: 19px var(--font-mono); }
+.admin-applicant-score span { color: var(--muted); font-size: 10px; }
+.admin-applicant-empty { padding: 30px 0; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 12px; }
+.admin-applicant-list { min-width: 0; }
 .ontology-editing { margin-block: 18px; border-block: 1px solid var(--line); }
 .ontology-editing > summary { padding-block: 14px; cursor: pointer; font-size: 14px; }
 .ontology-editing .form-grid { padding-block: 8px 24px; }
@@ -341,6 +373,19 @@ button, a { transition: background-color .18s, color .18s, border-color .18s; }
   .auth-content h1 { font-size: 29px; }
   .auth-caption { display: none; }
   .admin-stats { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .admin-jobs-filters { align-items: stretch; }
+  .admin-jobs-filters .search-field { max-width: none; flex-basis: 100%; }
+  .admin-jobs-page .data-table { min-width: 0; table-layout: fixed; }
+  .admin-jobs-page .data-table th, .admin-jobs-page .data-table td { padding-inline: 6px; }
+  .admin-jobs-page .data-table th:nth-child(2), .admin-jobs-page .data-table td:nth-child(2) { display: none; }
+  .admin-jobs-page .admin-job-employer { overflow-wrap: anywhere; }
+  .admin-job-detail-heading { align-items: start; }
+  .admin-job-detail-actions { width: 100%; }
+  .admin-job-detail-actions button { flex: 1 1 140px; }
+  .admin-applicant-heading { align-items: start; }
+  .admin-applicant-row { grid-template-columns: minmax(0, 1fr) auto; gap: 12px; }
+  .admin-applicant-meta { grid-column: 1; grid-row: 2; }
+  .admin-applicant-score { grid-column: 2; grid-row: 1 / span 2; }
 }
 
 .public-site { --public-ink: #1a2a25; --public-muted: #58665f; --public-line: #d2ddd6; --public-bg: #f4f7f5; --public-surface: #fff; --public-subtle: #e9efea; --public-kicker: #577049; color-scheme: light; background: var(--public-bg); color: var(--public-ink); letter-spacing: 0; }

@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
+from sqlalchemy.dialects import postgresql
 
 from app.api.dependencies import get_current_user
 from app.api import candidates, jobs
@@ -96,6 +97,50 @@ def test_non_admin_cannot_access_overview(api_client, role):
     database.scalar.assert_not_called()
 
 
+@pytest.mark.parametrize("role", [UserRole.candidate, UserRole.recruiter])
+def test_all_jobs_oversight_is_admin_only(api_client, role):
+    client, database, user = api_client
+    user.role = role
+    response = client.get("/api/admin/jobs")
+    assert response.status_code == 403
+    database.execute.assert_not_called()
+
+
+def test_admin_lists_all_employers_jobs_with_filters_and_applicant_counts(api_client):
+    client, database, user = api_client
+    user.role = UserRole.admin
+    job = SimpleNamespace(
+        job_id=uuid4(), posted_at=datetime.now(UTC), title="Reporting Analyst",
+        description="Build operational reporting and decision support for teams.",
+        location="Nairobi", required_experience_years=2, salary_range_min=50000,
+        salary_range_max=100000, requires_work_authorization=True,
+        required_skills=["SQL", "Excel"], mandatory_certifications=["CPA"], status=JobStatus.open,
+    )
+    database.execute.return_value.all.return_value = [(job, "Independent Employer", "owner@example.com", 3)]
+    response = client.get("/api/admin/jobs", params={"search": "Reporting", "status": "open", "offset": 5, "limit": 6})
+    assert response.status_code == 200
+    assert response.json() == [{
+        "job_id": str(job.job_id), "posted_at": job.posted_at.isoformat().replace("+00:00", "Z"),
+        "title": "Reporting Analyst", "description": job.description, "location": "Nairobi",
+        "required_experience_years": 2, "salary_range_max": "100000", "salary_range_min": "50000",
+        "requires_work_authorization": True, "required_skills": ["SQL", "Excel"],
+        "mandatory_certifications": ["CPA"], "status": "open", "company_name": "Independent Employer",
+        "recruiter_email": "owner@example.com", "applicant_count": 3,
+    }]
+    statement = str(database.execute.call_args.args[0].compile(dialect=postgresql.dialect()))
+    assert "ILIKE" in statement
+    assert "job_postings.status" in statement
+    assert "LIMIT" in statement and "OFFSET" in statement
+
+
+def test_admin_cannot_create_jobs_through_recruiter_endpoint(api_client):
+    client, database, user = api_client
+    user.role = UserRole.admin
+    response = client.post("/api/jobs/create", json={"title": "Example role", "description": "A detailed description of this example role."})
+    assert response.status_code == 403
+    database.scalar.assert_not_called()
+
+
 def test_invalid_match_job_id_is_validation_error(api_client):
     client, database, user = api_client
     response = client.post("/api/matches/evaluate/not-a-uuid")
@@ -114,6 +159,43 @@ def test_owner_and_admin_can_evaluate_job(api_client, role):
     response = client.post(f"/api/matches/evaluate/{job.job_id}")
     assert response.status_code == 200
     database.commit.assert_called_once()
+
+
+def test_job_evaluation_batches_only_hard_rule_eligible_candidates(api_client, monkeypatch):
+    from app.api import matches
+
+    client, database, user = api_client
+    user.role = UserRole.recruiter
+    job = SimpleNamespace(
+        job_id=uuid4(), employer_id=uuid4(), status=JobStatus.open,
+        title="Analyst", description="A sufficiently detailed analyst job description",
+        location="Nairobi", required_experience_years=2, salary_range_max=None,
+        requires_work_authorization=False, mandatory_certifications=[], required_skills=["SQL"],
+    )
+    employer = SimpleNamespace(user_id=user.user_id)
+    eligible = SimpleNamespace(
+        candidate_id=uuid4(), full_name="Eligible Candidate", years_experience=3,
+        location="Nairobi", expected_salary=None, certifications=[], skills=["SQL"],
+        parsed_resume_text="Analyst with SQL skills", work_authorized=True,
+    )
+    filtered = SimpleNamespace(
+        candidate_id=uuid4(), full_name="Filtered Candidate", years_experience=0,
+        location="Nairobi", expected_salary=None, certifications=[], skills=["SQL"],
+        parsed_resume_text="Entry-level analyst", work_authorized=True,
+    )
+    database.get.side_effect = lambda model, identifier: job if model is JobPosting else employer
+    database.scalars.return_value = [eligible, filtered]
+    embed = MagicMock(return_value=[0.8])
+    monkeypatch.setattr(matches, "semantic_similarities", embed)
+
+    response = client.post(f"/api/matches/evaluate/{job.job_id}")
+
+    assert response.status_code == 200
+    embed.assert_called_once_with([eligible.parsed_resume_text], job.description)
+    results = {item["candidate_id"]: item for item in response.json()["candidates"]}
+    assert results[str(eligible.candidate_id)]["semantic_score"] == 0.8
+    assert results[str(filtered.candidate_id)]["hard_rule_passed"] is False
+    assert results[str(filtered.candidate_id)]["semantic_score"] == 0
 
 
 @pytest.mark.parametrize("eligible_ids", [[], [1]])
