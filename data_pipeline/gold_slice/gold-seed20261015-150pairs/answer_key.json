@@ -1,0 +1,1215 @@
+{
+  "slice_id": "gold-seed20261015-150pairs",
+  "seed": 20261015,
+  "label_source": "synthetic-fixed-centres-latent-bernoulli-v3-skill-aliases",
+  "dataset_identity": "gold-slice-population-v1",
+  "dataset_sha256": "7c304f701c54ebef74b41f9b388d6df37607525563fab87af0afcd6c6f9083d4",
+  "encoder_revision": "1110a243fdf4706b3f48f1d95db1a4f5529b4d41",
+  "sampled_with_model": "2026-10-09-epoch-combiner-r001",
+  "score_bands": 5,
+  "excluded_roles": [
+    "Accountant"
+  ],
+  "pairs": [
+    {
+      "pair_id": "G001",
+      "row": 3358,
+      "candidate_id": "6094e801-76ad-41c7-8134-8b4e9a6e26b9",
+      "job_id": "e3975880-e849-4843-93e0-1622045da351",
+      "split": "warm_test",
+      "score_band": 4
+    },
+    {
+      "pair_id": "G002",
+      "row": 3364,
+      "candidate_id": "c5beabee-3059-4d95-81af-02050e70ee45",
+      "job_id": "6cdefd57-1512-4f94-b856-763c3aa943ce",
+      "split": "warm_test",
+      "score_band": 1
+    },
+    {
+      "pair_id": "G003",
+      "row": 3480,
+      "candidate_id": "5e7c39fe-7e94-4091-99c9-1a367be39511",
+      "job_id": "bb5b27c0-e1bc-4307-bcf9-11ba9b566c63",
+      "split": "warm_test",
+      "score_band": 2
+    },
+    {
+      "pair_id": "G004",
+      "row": 3757,
+      "candidate_id": "e517fc2c-0bbb-4036-beb2-28f6ce452075",
+      "job_id": "96e0a0e7-fed0-4c95-a7b5-b25e4b0b22c4",
+      "split": "cold_test",
+      "score_band": 1
+    },
+    {
+      "pair_id": "G005",
+      "row": 3508,
+      "candidate_id": "bd6a5f09-806a-48e2-a4a9-6d1904d9fd7a",
+      "job_id": "46eede33-efb6-491e-aba6-49119ba78257",
+      "split": "warm_test",
+      "score_band": 3
+    },
+    {
+      "pair_id": "G006",
+      "row": 3545,
+      "candidate_id": "7f73dbae-b4db-4ded-a9ed-733d9aeab3cc",
+      "job_id": "d1702f02-7428-460f-9d33-4a40af05e5d7",
+      "split": "warm_test",
+      "score_band": 1
+    },
+    {
+      "pair_id": "G007",
+      "row": 3827,
+      "candidate_id": "9c8d67eb-89d9-4a7f-a8d8-c4ec82be8405",
+      "job_id": "5d2d583b-00f6-40a7-a0e6-54f04b13bfde",
+      "split": "cold_test",
+      "score_band": 2
+    },
+    {
+      "pair_id": "G008",
+      "row": 3306,
+      "candidate_id": "b236165c-85d1-4af5-a98b-efbef1831218",
+      "job_id": "5ea50e2b-56e2-40d0-a1f7-a82ec64ec499",
+      "split": "warm_test",
+      "score_band": 3
+    },
+    {
+      "pair_id": "G009",
+      "row": 3343,
+      "candidate_id": "9f52597e-2216-43bb-917c-a6ef0a11f4d6",
+      "job_id": "718d099a-eb34-4664-8cc3-81990c00ad2d",
+      "split": "warm_test",
+      "score_band": 0
+    },
+    {
+      "pair_id": "G010",
+      "row": 3535,
+      "candidate_id": "099519ef-54c3-494c-9d93-43afd3ebc9b1",
+      "job_id": "6991394a-ce59-4d32-9c30-08cb655d54f7",
+      "split": "warm_test",
+      "score_band": 3
+    },
+    {
+      "pair_id": "G011",
+      "row": 3761,
+      "candidate_id": "88e36012-e1f8-421a-a752-8926675b2b56",
+      "job_id": "a0571928-1151-4ccc-9955-a667a85d5a1b",
+      "split": "cold_test",
+      "score_band": 0
+    },
+    {
+      "pair_id": "G012",
+      "row": 3835,
+      "candidate_id": "35134658-cb74-43e3-adb1-ffb8a7ec6bb8",
+      "job_id": "5d2d583b-00f6-40a7-a0e6-54f04b13bfde",
+      "split": "cold_test",
+      "score_band": 3
+    },
+    {
+      "pair_id": "G013",
+      "row": 3334,
+      "candidate_id": "0e3d202d-39f5-47c7-bde8-2eabc2ee2fbd",
+      "job_id": "254e6668-c19a-438a-a610-8e5e300cb6e5",
+      "split": "warm_test",
+      "score_band": 1
+    },
+    {
+      "pair_id": "G014",
+      "row": 3316,
+      "candidate_id": "447789f2-0128-4aab-9d59-43f497ba71eb",
+      "job_id": "4a8cf269-a2ac-45fd-93eb-f9f95d96ed89",
+      "split": "warm_test",
+      "score_band": 1
+    },
+    {
+      "pair_id": "G015",
+      "row": 3394,
+      "candidate_id": "978ee957-7760-447a-8414-51beb50ee522",
+      "job_id": "09a92769-986c-44a2-858d-f18e3680ec96",
+      "split": "warm_test",
+      "score_band": 0
+    },
+    {
+      "pair_id": "G016",
+      "row": 3667,
+      "candidate_id": "0befa160-5230-40a5-827c-b0f00dfaf9de",
+      "job_id": "0407ea00-5ba3-4afa-8b93-74a48b3a7914",
+      "split": "cold_test",
+      "score_band": 3
+    },
+    {
+      "pair_id": "G017",
+      "row": 3752,
+      "candidate_id": "8ec1197d-6424-4f4c-a1d1-fcff393748fa",
+      "job_id": "eac34129-e64d-4417-8760-f0a170adcb82",
+      "split": "cold_test",
+      "score_band": 0
+    },
+    {
+      "pair_id": "G018",
+      "row": 3832,
+      "candidate_id": "19ef9160-254c-484a-a675-e014a99e9644",
+      "job_id": "82f231af-1394-4ed7-9b5d-0c42f6380a94",
+      "split": "cold_test",
+      "score_band": 3
+    },
+    {
+      "pair_id": "G019",
+      "row": 3766,
+      "candidate_id": "7a75289b-e61b-471a-b521-6384c5e55de4",
+      "job_id": "a0571928-1151-4ccc-9955-a667a85d5a1b",
+      "split": "cold_test",
+      "score_band": 1
+    },
+    {
+      "pair_id": "G020",
+      "row": 3654,
+      "candidate_id": "e391d648-91fc-4cd6-8839-04c993748193",
+      "job_id": "baa5abe0-2a19-45df-bb70-71ecfe1a7d26",
+      "split": "cold_test",
+      "score_band": 2
+    },
+    {
+      "pair_id": "G021",
+      "row": 3703,
+      "candidate_id": "a6a3b116-7435-4627-912a-f619df91c20a",
+      "job_id": "17fe7597-766f-4a32-a3dd-0cb2bba7bf93",
+      "split": "cold_test",
+      "score_band": 4
+    },
+    {
+      "pair_id": "G022",
+      "row": 3649,
+      "candidate_id": "a00e885b-ac22-4479-89af-cea3515aeee5",
+      "job_id": "baa5abe0-2a19-45df-bb70-71ecfe1a7d26",
+      "split": "cold_test",
+      "score_band": 3
+    },
+    {
+      "pair_id": "G023",
+      "row": 3450,
+      "candidate_id": "f9e93766-fc9a-4a59-ac49-4c4ecc0fcbc1",
+      "job_id": "bb5b27c0-e1bc-4307-bcf9-11ba9b566c63",
+      "split": "warm_test",
+      "score_band": 1
+    },
+    {
+      "pair_id": "G024",
+      "row": 3546,
+      "candidate_id": "7f73dbae-b4db-4ded-a9ed-733d9aeab3cc",
+      "job_id": "ac1bde92-7725-4baf-ad47-d87588404ba1",
+      "split": "warm_test",
+      "score_band": 1
+    },
+    {
+      "pair_id": "G025",
+      "row": 3510,
+      "candidate_id": "a3777de1-c137-43a8-bd19-5f6245307097",
+      "job_id": "c6743640-1fbf-4292-b7e8-cbf030a00f15",
+      "split": "warm_test",
+      "score_band": 4
+    },
+    {
+      "pair_id": "G026",
+      "row": 3410,
+      "candidate_id": "8639ada6-acfe-4726-aae1-7261a5d97a30",
+      "job_id": "f574fc96-f092-42c5-9cde-e071c9ab89c5",
+      "split": "warm_test",
+      "score_band": 4
+    },
+    {
+      "pair_id": "G027",
+      "row": 3534,
+      "candidate_id": "496b21f3-5e7b-423b-bf3c-1abd4775529c",
+      "job_id": "48105be2-b7db-4539-8845-f78ae0bfd260",
+      "split": "warm_test",
+      "score_band": 2
+    },
+    {
+      "pair_id": "G028",
+      "row": 3687,
+      "candidate_id": "6141284a-264e-4479-917c-99414dc502c9",
+      "job_id": "95e3f8fd-1ca5-4e73-9b8e-9149d6fa3583",
+      "split": "cold_test",
+      "score_band": 2
+    },
+    {
+      "pair_id": "G029",
+      "row": 3723,
+      "candidate_id": "8a3ea1ab-3367-473c-9e55-4bd2ed56f632",
+      "job_id": "a0571928-1151-4ccc-9955-a667a85d5a1b",
+      "split": "cold_test",
+      "score_band": 4
+    },
+    {
+      "pair_id": "G030",
+      "row": 3542,
+      "candidate_id": "78b842bd-e5bf-4082-b6c2-1f3655855fc0",
+      "job_id": "d1702f02-7428-460f-9d33-4a40af05e5d7",
+      "split": "warm_test",
+      "score_band": 3
+    },
+    {
+      "pair_id": "G031",
+      "row": 3882,
+      "candidate_id": "9903fad1-c75b-47d0-b9bb-93ac5daa557a",
+      "job_id": "a9dbc612-749e-47ee-912a-ae4bc47ad071",
+      "split": "cold_test",
+      "score_band": 4
+    },
+    {
+      "pair_id": "G032",
+      "row": 3556,
+      "candidate_id": "5538a7a6-9df7-4f26-9bea-0944170e4aca",
+      "job_id": "11605759-729a-4107-9e5d-fa211db55388",
+      "split": "warm_test",
+      "score_band": 2
+    },
+    {
+      "pair_id": "G033",
+      "row": 3848,
+      "candidate_id": "9327f177-2994-4d36-9287-b4fe89d37f31",
+      "job_id": "82f231af-1394-4ed7-9b5d-0c42f6380a94",
+      "split": "cold_test",
+      "score_band": 2
+    },
+    {
+      "pair_id": "G034",
+      "row": 3507,
+      "candidate_id": "bd6a5f09-806a-48e2-a4a9-6d1904d9fd7a",
+      "job_id": "a28c2189-4bb4-4416-9823-f39d5aad367a",
+      "split": "warm_test",
+      "score_band": 3
+    },
+    {
+      "pair_id": "G035",
+      "row": 3696,
+      "candidate_id": "be8b7e9f-a0a1-465f-bfe8-b62adad7f45b",
+      "job_id": "0407ea00-5ba3-4afa-8b93-74a48b3a7914",
+      "split": "cold_test",
+      "score_band": 1
+    },
+    {
+      "pair_id": "G036",
+      "row": 3748,
+      "candidate_id": "e459d6cd-c120-495c-8144-8747c6531e62",
+      "job_id": "eac34129-e64d-4417-8760-f0a170adcb82",
+      "split": "cold_test",
+      "score_band": 4
+    },
+    {
+      "pair_id": "G037",
+      "row": 3898,
+      "candidate_id": "c8952a50-3ea7-44fe-8752-7df84dc855d3",
+      "job_id": "a9dbc612-749e-47ee-912a-ae4bc47ad071",
+      "split": "cold_test",
+      "score_band": 0
+    },
+    {
+      "pair_id": "G038",
+      "row": 3744,
+      "candidate_id": "d9ca6992-2b65-4339-b950-1381591f26b4",
+      "job_id": "a0571928-1151-4ccc-9955-a667a85d5a1b",
+      "split": "cold_test",
+      "score_band": 2
+    },
+    {
+      "pair_id": "G039",
+      "row": 3707,
+      "candidate_id": "a6a3b116-7435-4627-912a-f619df91c20a",
+      "job_id": "95e3f8fd-1ca5-4e73-9b8e-9149d6fa3583",
+      "split": "cold_test",
+      "score_band": 3
+    },
+    {
+      "pair_id": "G040",
+      "row": 3335,
+      "candidate_id": "4aa162fc-82af-4a0c-94c2-95f75b191a03",
+      "job_id": "67471f28-4c9e-4931-9c18-e4c4264c05e5",
+      "split": "warm_test",
+      "score_band": 4
+    },
+    {
+      "pair_id": "G041",
+      "row": 3440,
+      "candidate_id": "7840a1a4-e66b-4fb5-886d-bace36e1d79a",
+      "job_id": "0b990a7b-fdd5-4897-94a5-ddc56389881e",
+      "split": "warm_test",
+      "score_band": 4
+    },
+    {
+      "pair_id": "G042",
+      "row": 3772,
+      "candidate_id": "fa89dcb3-c0f4-4a9c-b724-ea56d21a9414",
+      "job_id": "96e0a0e7-fed0-4c95-a7b5-b25e4b0b22c4",
+      "split": "cold_test",
+      "score_band": 1
+    },
+    {
+      "pair_id": "G043",
+      "row": 3391,
+      "candidate_id": "978ee957-7760-447a-8414-51beb50ee522",
+      "job_id": "cfe92615-b7c3-4284-8b56-6c97347efeb3",
+      "split": "warm_test",
+      "score_band": 0
+    },
+    {
+      "pair_id": "G044",
+      "row": 3379,
+      "candidate_id": "fd9ffeaa-3351-4310-90de-b43d8a7b0620",
+      "job_id": "bc02ca8a-abb8-4836-b672-eb1ae285806d",
+      "split": "warm_test",
+      "score_band": 2
+    },
+    {
+      "pair_id": "G045",
+      "row": 3375,
+      "candidate_id": "fd9ffeaa-3351-4310-90de-b43d8a7b0620",
+      "job_id": "09a92769-986c-44a2-858d-f18e3680ec96",
+      "split": "warm_test",
+      "score_band": 0
+    },
+    {
+      "pair_id": "G046",
+      "row": 3868,
+      "candidate_id": "17c418c8-3bf2-4353-88d1-d556dda5a86d",
+      "job_id": "7196b5ca-935b-4267-9a43-46223b648c98",
+      "split": "cold_test",
+      "score_band": 0
+    },
+    {
+      "pair_id": "G047",
+      "row": 3275,
+      "candidate_id": "a24ecda9-012c-4b0d-855f-9f2ae23353ed",
+      "job_id": "438ddc6c-cf04-4790-8616-6ae240644e03",
+      "split": "warm_test",
+      "score_band": 4
+    },
+    {
+      "pair_id": "G048",
+      "row": 3323,
+      "candidate_id": "ed607287-0a49-47a4-8105-40371f52928e",
+      "job_id": "e7afff6c-3502-4d20-8f1e-b83c34018932",
+      "split": "warm_test",
+      "score_band": 1
+    },
+    {
+      "pair_id": "G049",
+      "row": 3800,
+      "candidate_id": "c8c40f63-3cef-4e63-91aa-d974cebeb912",
+      "job_id": "577ae3ff-2e75-4780-8794-c501ac29be37",
+      "split": "cold_test",
+      "score_band": 4
+    },
+    {
+      "pair_id": "G050",
+      "row": 3408,
+      "candidate_id": "5c885f5b-92de-4a57-92b1-efa4ae15941a",
+      "job_id": "c3c3d51f-2bcc-4fde-8069-faa596ff9993",
+      "split": "warm_test",
+      "score_band": 1
+    },
+    {
+      "pair_id": "G051",
+      "row": 3643,
+      "candidate_id": "38369bf6-985a-4cd7-af51-54cae3f437c7",
+      "job_id": "baa5abe0-2a19-45df-bb70-71ecfe1a7d26",
+      "split": "cold_test",
+      "score_band": 4
+    },
+    {
+      "pair_id": "G052",
+      "row": 3476,
+      "candidate_id": "0a4b4750-007f-4291-80ea-853ceb8f8259",
+      "job_id": "f13c4a19-a9f9-421c-a039-d0ce647d94a3",
+      "split": "warm_test",
+      "score_band": 0
+    },
+    {
+      "pair_id": "G053",
+      "row": 3551,
+      "candidate_id": "c1f41aed-7e1a-4cec-9c52-23637a898304",
+      "job_id": "701f5b18-9f16-4c83-8d2b-f345b7447ece",
+      "split": "warm_test",
+      "score_band": 0
+    },
+    {
+      "pair_id": "G054",
+      "row": 3746,
+      "candidate_id": "d9ca6992-2b65-4339-b950-1381591f26b4",
+      "job_id": "96e0a0e7-fed0-4c95-a7b5-b25e4b0b22c4",
+      "split": "cold_test",
+      "score_band": 2
+    },
+    {
+      "pair_id": "G055",
+      "row": 3564,
+      "candidate_id": "2f512730-c33d-4ddb-9e1a-ba795f8edfc3",
+      "job_id": "d1702f02-7428-460f-9d33-4a40af05e5d7",
+      "split": "warm_test",
+      "score_band": 3
+    },
+    {
+      "pair_id": "G056",
+      "row": 3419,
+      "candidate_id": "d2a0f511-34a2-466a-bd71-865a00057b5e",
+      "job_id": "c4a9da63-98fc-4b26-8b35-5a69bf665a70",
+      "split": "warm_test",
+      "score_band": 0
+    },
+    {
+      "pair_id": "G057",
+      "row": 3834,
+      "candidate_id": "35134658-cb74-43e3-adb1-ffb8a7ec6bb8",
+      "job_id": "c4a002c1-99a5-4a22-b6db-c07538acf4ea",
+      "split": "cold_test",
+      "score_band": 2
+    },
+    {
+      "pair_id": "G058",
+      "row": 3753,
+      "candidate_id": "36110162-13fe-4bcb-b8be-0beb7321357e",
+      "job_id": "eac34129-e64d-4417-8760-f0a170adcb82",
+      "split": "cold_test",
+      "score_band": 1
+    },
+    {
+      "pair_id": "G059",
+      "row": 3279,
+      "candidate_id": "a24ecda9-012c-4b0d-855f-9f2ae23353ed",
+      "job_id": "ff526e7e-a3c5-4168-8836-eae62f04873a",
+      "split": "warm_test",
+      "score_band": 2
+    },
+    {
+      "pair_id": "G060",
+      "row": 3359,
+      "candidate_id": "6094e801-76ad-41c7-8134-8b4e9a6e26b9",
+      "job_id": "0adf2869-21cd-49e3-8c5b-1c01bd7f1388",
+      "split": "warm_test",
+      "score_band": 3
+    },
+    {
+      "pair_id": "G061",
+      "row": 3900,
+      "candidate_id": "c8952a50-3ea7-44fe-8752-7df84dc855d3",
+      "job_id": "e645f44b-e5f2-4ccf-b81b-f6b5aa3b2a02",
+      "split": "cold_test",
+      "score_band": 1
+    },
+    {
+      "pair_id": "G062",
+      "row": 3532,
+      "candidate_id": "496b21f3-5e7b-423b-bf3c-1abd4775529c",
+      "job_id": "5dc35d7e-dae7-4043-baf5-2aa2214888c9",
+      "split": "warm_test",
+      "score_band": 4
+    },
+    {
+      "pair_id": "G063",
+      "row": 3372,
+      "candidate_id": "5045ba1a-0d99-48f8-86aa-2a167ce2975f",
+      "job_id": "e3975880-e849-4843-93e0-1622045da351",
+      "split": "warm_test",
+      "score_band": 3
+    },
+    {
+      "pair_id": "G064",
+      "row": 3891,
+      "candidate_id": "d0c6c640-d03f-46e1-a257-80fd390ff144",
+      "job_id": "a9dbc612-749e-47ee-912a-ae4bc47ad071",
+      "split": "cold_test",
+      "score_band": 3
+    },
+    {
+      "pair_id": "G065",
+      "row": 3498,
+      "candidate_id": "63300abb-4eef-4292-96c5-5c3dc6ba2148",
+      "job_id": "29637367-ae00-4ba4-acdd-1687bf330a64",
+      "split": "warm_test",
+      "score_band": 0
+    },
+    {
+      "pair_id": "G066",
+      "row": 3351,
+      "candidate_id": "03ada466-3c42-4405-a029-bf48c5ec216e",
+      "job_id": "20f26f32-653b-420f-b675-2482c6ce18d5",
+      "split": "warm_test",
+      "score_band": 4
+    },
+    {
+      "pair_id": "G067",
+      "row": 3876,
+      "candidate_id": "62e9ae1d-13b9-41fe-a62c-a5cb6c8ba98c",
+      "job_id": "7196b5ca-935b-4267-9a43-46223b648c98",
+      "split": "cold_test",
+      "score_band": 0
+    },
+    {
+      "pair_id": "G068",
+      "row": 3466,
+      "candidate_id": "42c3f671-267d-4c9c-99f1-1cc38f2fb0fc",
+      "job_id": "46eede33-efb6-491e-aba6-49119ba78257",
+      "split": "warm_test",
+      "score_band": 2
+    },
+    {
+      "pair_id": "G069",
+      "row": 3486,
+      "candidate_id": "6ad36875-6d88-45d2-9e63-01a3fa12df46",
+      "job_id": "f13c4a19-a9f9-421c-a039-d0ce647d94a3",
+      "split": "warm_test",
+      "score_band": 2
+    },
+    {
+      "pair_id": "G070",
+      "row": 3652,
+      "candidate_id": "a00e885b-ac22-4479-89af-cea3515aeee5",
+      "job_id": "95e3f8fd-1ca5-4e73-9b8e-9149d6fa3583",
+      "split": "cold_test",
+      "score_band": 4
+    },
+    {
+      "pair_id": "G071",
+      "row": 3416,
+      "candidate_id": "d2a0f511-34a2-466a-bd71-865a00057b5e",
+      "job_id": "cfe92615-b7c3-4284-8b56-6c97347efeb3",
+      "split": "warm_test",
+      "score_band": 0
+    },
+    {
+      "pair_id": "G072",
+      "row": 3569,
+      "candidate_id": "1f24923b-c67d-47bb-a861-1a0fd64f23d4",
+      "job_id": "d1702f02-7428-460f-9d33-4a40af05e5d7",
+      "split": "warm_test",
+      "score_band": 1
+    },
+    {
+      "pair_id": "G073",
+      "row": 3706,
+      "candidate_id": "a6a3b116-7435-4627-912a-f619df91c20a",
+      "job_id": "0407ea00-5ba3-4afa-8b93-74a48b3a7914",
+      "split": "cold_test",
+      "score_band": 4
+    },
+    {
+      "pair_id": "G074",
+      "row": 3659,
+      "candidate_id": "6f979df0-41c9-4538-970d-a6264a4e0dda",
+      "job_id": "91a2f5f7-73b2-46ed-910b-64ddb7fc0a38",
+      "split": "cold_test",
+      "score_band": 1
+    },
+    {
+      "pair_id": "G075",
+      "row": 3584,
+      "candidate_id": "a0643376-3a69-4b5e-afa0-cbc3f737cf3e",
+      "job_id": "b42340d4-4caf-4732-b769-bebb58131b50",
+      "split": "warm_test",
+      "score_band": 2
+    },
+    {
+      "pair_id": "G076",
+      "row": 3778,
+      "candidate_id": "95e24582-ebc2-422d-854d-c238c85e43a6",
+      "job_id": "577ae3ff-2e75-4780-8794-c501ac29be37",
+      "split": "cold_test",
+      "score_band": 2
+    },
+    {
+      "pair_id": "G077",
+      "row": 3713,
+      "candidate_id": "daceeeb3-7c8c-4c9a-8bc7-81ea8cdcae0a",
+      "job_id": "95e3f8fd-1ca5-4e73-9b8e-9149d6fa3583",
+      "split": "cold_test",
+      "score_band": 1
+    },
+    {
+      "pair_id": "G078",
+      "row": 3714,
+      "candidate_id": "daceeeb3-7c8c-4c9a-8bc7-81ea8cdcae0a",
+      "job_id": "91a2f5f7-73b2-46ed-910b-64ddb7fc0a38",
+      "split": "cold_test",
+      "score_band": 4
+    },
+    {
+      "pair_id": "G079",
+      "row": 3875,
+      "candidate_id": "62e9ae1d-13b9-41fe-a62c-a5cb6c8ba98c",
+      "job_id": "a9dbc612-749e-47ee-912a-ae4bc47ad071",
+      "split": "cold_test",
+      "score_band": 1
+    },
+    {
+      "pair_id": "G080",
+      "row": 3782,
+      "candidate_id": "ef3d2af8-33f3-4c19-9333-43d9dec2b828",
+      "job_id": "68bf400d-5517-4224-8ccf-c7fdde9797ce",
+      "split": "cold_test",
+      "score_band": 3
+    },
+    {
+      "pair_id": "G081",
+      "row": 3818,
+      "candidate_id": "a1a4f8e2-69fe-4c0d-b53c-bd1224638b51",
+      "job_id": "577ae3ff-2e75-4780-8794-c501ac29be37",
+      "split": "cold_test",
+      "score_band": 0
+    },
+    {
+      "pair_id": "G082",
+      "row": 3849,
+      "candidate_id": "ee8a6420-4565-40ed-98a6-9770386b0ddf",
+      "job_id": "68bf400d-5517-4224-8ccf-c7fdde9797ce",
+      "split": "cold_test",
+      "score_band": 2
+    },
+    {
+      "pair_id": "G083",
+      "row": 3461,
+      "candidate_id": "3c79d18e-1596-456b-9f76-5b38c26c12ea",
+      "job_id": "f4c9337a-1455-4722-81c6-27a23f145414",
+      "split": "warm_test",
+      "score_band": 0
+    },
+    {
+      "pair_id": "G084",
+      "row": 3349,
+      "candidate_id": "bd7549f2-79fc-4df9-9e1e-6c843c462bde",
+      "job_id": "4a8cf269-a2ac-45fd-93eb-f9f95d96ed89",
+      "split": "warm_test",
+      "score_band": 4
+    },
+    {
+      "pair_id": "G085",
+      "row": 3668,
+      "candidate_id": "90627287-a1ea-4c59-892c-1ee2c1d0e0a4",
+      "job_id": "17fe7597-766f-4a32-a3dd-0cb2bba7bf93",
+      "split": "cold_test",
+      "score_band": 3
+    },
+    {
+      "pair_id": "G086",
+      "row": 3293,
+      "candidate_id": "90d217ba-2ca7-4fed-9366-51ecb2b1991d",
+      "job_id": "28158ca4-c5f1-4f6b-894c-370411855b54",
+      "split": "warm_test",
+      "score_band": 4
+    },
+    {
+      "pair_id": "G087",
+      "row": 3500,
+      "candidate_id": "7bf5409b-b458-4221-b740-10028e07b817",
+      "job_id": "856b90c4-3272-4f1f-9fb7-0953c3fb5d78",
+      "split": "warm_test",
+      "score_band": 2
+    },
+    {
+      "pair_id": "G088",
+      "row": 3639,
+      "candidate_id": "03305318-2dbb-46d9-80b5-8ca9043689ee",
+      "job_id": "0407ea00-5ba3-4afa-8b93-74a48b3a7914",
+      "split": "cold_test",
+      "score_band": 0
+    },
+    {
+      "pair_id": "G089",
+      "row": 3441,
+      "candidate_id": "7840a1a4-e66b-4fb5-886d-bace36e1d79a",
+      "job_id": "81fb1542-03d0-40ed-9aea-b71e0ecc1fa7",
+      "split": "warm_test",
+      "score_band": 4
+    },
+    {
+      "pair_id": "G090",
+      "row": 3434,
+      "candidate_id": "acd7cb1f-7139-4717-8d6d-194fd2385255",
+      "job_id": "c4a9da63-98fc-4b26-8b35-5a69bf665a70",
+      "split": "warm_test",
+      "score_band": 2
+    },
+    {
+      "pair_id": "G091",
+      "row": 3320,
+      "candidate_id": "ed607287-0a49-47a4-8105-40371f52928e",
+      "job_id": "4a8cf269-a2ac-45fd-93eb-f9f95d96ed89",
+      "split": "warm_test",
+      "score_band": 1
+    },
+    {
+      "pair_id": "G092",
+      "row": 3789,
+      "candidate_id": "e273c5ff-e256-445d-a9d0-e4df0106cc01",
+      "job_id": "68bf400d-5517-4224-8ccf-c7fdde9797ce",
+      "split": "cold_test",
+      "score_band": 2
+    },
+    {
+      "pair_id": "G093",
+      "row": 3420,
+      "candidate_id": "2b4e265c-6959-45b1-b58d-98a2d46da356",
+      "job_id": "f574fc96-f092-42c5-9cde-e071c9ab89c5",
+      "split": "warm_test",
+      "score_band": 3
+    },
+    {
+      "pair_id": "G094",
+      "row": 3360,
+      "candidate_id": "c5beabee-3059-4d95-81af-02050e70ee45",
+      "job_id": "24976a14-1714-4a80-a5ff-bca9e76a889b",
+      "split": "warm_test",
+      "score_band": 1
+    },
+    {
+      "pair_id": "G095",
+      "row": 3698,
+      "candidate_id": "ff16a81f-bb7d-4ec6-893a-a879652aa28f",
+      "job_id": "91a2f5f7-73b2-46ed-910b-64ddb7fc0a38",
+      "split": "cold_test",
+      "score_band": 1
+    },
+    {
+      "pair_id": "G096",
+      "row": 3529,
+      "candidate_id": "33bd97d5-01a1-4a0b-a523-6226c0bb9225",
+      "job_id": "5dc35d7e-dae7-4043-baf5-2aa2214888c9",
+      "split": "warm_test",
+      "score_band": 0
+    },
+    {
+      "pair_id": "G097",
+      "row": 3453,
+      "candidate_id": "f9e93766-fc9a-4a59-ac49-4c4ecc0fcbc1",
+      "job_id": "0b990a7b-fdd5-4897-94a5-ddc56389881e",
+      "split": "warm_test",
+      "score_band": 2
+    },
+    {
+      "pair_id": "G098",
+      "row": 3477,
+      "candidate_id": "0a4b4750-007f-4291-80ea-853ceb8f8259",
+      "job_id": "f4c9337a-1455-4722-81c6-27a23f145414",
+      "split": "warm_test",
+      "score_band": 4
+    },
+    {
+      "pair_id": "G099",
+      "row": 3653,
+      "candidate_id": "e391d648-91fc-4cd6-8839-04c993748193",
+      "job_id": "95e3f8fd-1ca5-4e73-9b8e-9149d6fa3583",
+      "split": "cold_test",
+      "score_band": 4
+    },
+    {
+      "pair_id": "G100",
+      "row": 3386,
+      "candidate_id": "71fa04ac-a0b6-46bb-b885-b38c8cfe3eb1",
+      "job_id": "e3975880-e849-4843-93e0-1622045da351",
+      "split": "warm_test",
+      "score_band": 1
+    },
+    {
+      "pair_id": "G101",
+      "row": 3580,
+      "candidate_id": "a0643376-3a69-4b5e-afa0-cbc3f737cf3e",
+      "job_id": "5abad8b1-9a01-45e0-828c-4fdf335646a1",
+      "split": "warm_test",
+      "score_band": 1
+    },
+    {
+      "pair_id": "G102",
+      "row": 3764,
+      "candidate_id": "1fdce8b5-ee7f-4fde-bee7-2e5a3a1828ea",
+      "job_id": "96e0a0e7-fed0-4c95-a7b5-b25e4b0b22c4",
+      "split": "cold_test",
+      "score_band": 3
+    },
+    {
+      "pair_id": "G103",
+      "row": 3874,
+      "candidate_id": "62e9ae1d-13b9-41fe-a62c-a5cb6c8ba98c",
+      "job_id": "e645f44b-e5f2-4ccf-b81b-f6b5aa3b2a02",
+      "split": "cold_test",
+      "score_band": 2
+    },
+    {
+      "pair_id": "G104",
+      "row": 3526,
+      "candidate_id": "33bd97d5-01a1-4a0b-a523-6226c0bb9225",
+      "job_id": "701f5b18-9f16-4c83-8d2b-f345b7447ece",
+      "split": "warm_test",
+      "score_band": 3
+    },
+    {
+      "pair_id": "G105",
+      "row": 3878,
+      "candidate_id": "e7948961-3c71-45c3-91ff-26f9c810aa80",
+      "job_id": "e645f44b-e5f2-4ccf-b81b-f6b5aa3b2a02",
+      "split": "cold_test",
+      "score_band": 3
+    },
+    {
+      "pair_id": "G106",
+      "row": 3483,
+      "candidate_id": "5e7c39fe-7e94-4091-99c9-1a367be39511",
+      "job_id": "b2cc64cf-3454-496c-8c44-917b61d43f07",
+      "split": "warm_test",
+      "score_band": 3
+    },
+    {
+      "pair_id": "G107",
+      "row": 3276,
+      "candidate_id": "a24ecda9-012c-4b0d-855f-9f2ae23353ed",
+      "job_id": "921ecefc-5226-4194-8fb7-9c8c7f329fea",
+      "split": "warm_test",
+      "score_band": 3
+    },
+    {
+      "pair_id": "G108",
+      "row": 3798,
+      "candidate_id": "43754706-8608-413f-a684-f9b4e24e3605",
+      "job_id": "c4a002c1-99a5-4a22-b6db-c07538acf4ea",
+      "split": "cold_test",
+      "score_band": 1
+    },
+    {
+      "pair_id": "G109",
+      "row": 3396,
+      "candidate_id": "1f519755-ed92-4f2b-a618-330318f36f33",
+      "job_id": "6cdefd57-1512-4f94-b856-763c3aa943ce",
+      "split": "warm_test",
+      "score_band": 0
+    },
+    {
+      "pair_id": "G110",
+      "row": 3301,
+      "candidate_id": "39fd0d34-bc82-40d2-b31e-1ffe51f05bb3",
+      "job_id": "a5c4a69d-1dc2-45c6-90ec-a7710796a0c6",
+      "split": "warm_test",
+      "score_band": 1
+    },
+    {
+      "pair_id": "G111",
+      "row": 3553,
+      "candidate_id": "c1f41aed-7e1a-4cec-9c52-23637a898304",
+      "job_id": "6991394a-ce59-4d32-9c30-08cb655d54f7",
+      "split": "warm_test",
+      "score_band": 0
+    },
+    {
+      "pair_id": "G112",
+      "row": 3577,
+      "candidate_id": "994fcc73-53b8-482a-9a93-05e1fdb28cc1",
+      "job_id": "ac1bde92-7725-4baf-ad47-d87588404ba1",
+      "split": "warm_test",
+      "score_band": 0
+    },
+    {
+      "pair_id": "G113",
+      "row": 3346,
+      "candidate_id": "bd7549f2-79fc-4df9-9e1e-6c843c462bde",
+      "job_id": "67471f28-4c9e-4931-9c18-e4c4264c05e5",
+      "split": "warm_test",
+      "score_band": 1
+    },
+    {
+      "pair_id": "G114",
+      "row": 3735,
+      "candidate_id": "54e56acc-cae9-49f5-b5f2-a074dc145be7",
+      "job_id": "96e0a0e7-fed0-4c95-a7b5-b25e4b0b22c4",
+      "split": "cold_test",
+      "score_band": 3
+    },
+    {
+      "pair_id": "G115",
+      "row": 3554,
+      "candidate_id": "c1f41aed-7e1a-4cec-9c52-23637a898304",
+      "job_id": "ac1bde92-7725-4baf-ad47-d87588404ba1",
+      "split": "warm_test",
+      "score_band": 0
+    },
+    {
+      "pair_id": "G116",
+      "row": 3721,
+      "candidate_id": "5eb6288c-8cc3-4d54-b559-75c9d2d42973",
+      "job_id": "0407ea00-5ba3-4afa-8b93-74a48b3a7914",
+      "split": "cold_test",
+      "score_band": 2
+    },
+    {
+      "pair_id": "G117",
+      "row": 3514,
+      "candidate_id": "a3777de1-c137-43a8-bd19-5f6245307097",
+      "job_id": "81fb1542-03d0-40ed-9aea-b71e0ecc1fa7",
+      "split": "warm_test",
+      "score_band": 4
+    },
+    {
+      "pair_id": "G118",
+      "row": 3727,
+      "candidate_id": "f9cdc96d-0487-4d1d-8be2-75b4cd2536c0",
+      "job_id": "a0571928-1151-4ccc-9955-a667a85d5a1b",
+      "split": "cold_test",
+      "score_band": 4
+    },
+    {
+      "pair_id": "G119",
+      "row": 3270,
+      "candidate_id": "6f5c2abf-bf9f-4ee3-b703-60296680830e",
+      "job_id": "eeb67d9e-6ab8-42ce-acc5-eb44a34cd55f",
+      "split": "warm_test",
+      "score_band": 3
+    },
+    {
+      "pair_id": "G120",
+      "row": 3393,
+      "candidate_id": "978ee957-7760-447a-8414-51beb50ee522",
+      "job_id": "24976a14-1714-4a80-a5ff-bca9e76a889b",
+      "split": "warm_test",
+      "score_band": 0
+    },
+    {
+      "pair_id": "G121",
+      "row": 3865,
+      "candidate_id": "501ed2bd-fdf5-4315-af9d-a66b6ecb6b22",
+      "job_id": "7196b5ca-935b-4267-9a43-46223b648c98",
+      "split": "cold_test",
+      "score_band": 0
+    },
+    {
+      "pair_id": "G122",
+      "row": 3369,
+      "candidate_id": "6d77e8d2-98fe-4113-bd54-31cd0a973612",
+      "job_id": "24976a14-1714-4a80-a5ff-bca9e76a889b",
+      "split": "warm_test",
+      "score_band": 1
+    },
+    {
+      "pair_id": "G123",
+      "row": 3773,
+      "candidate_id": "fa89dcb3-c0f4-4a9c-b724-ea56d21a9414",
+      "job_id": "a0571928-1151-4ccc-9955-a667a85d5a1b",
+      "split": "cold_test",
+      "score_band": 4
+    },
+    {
+      "pair_id": "G124",
+      "row": 3899,
+      "candidate_id": "c8952a50-3ea7-44fe-8752-7df84dc855d3",
+      "job_id": "7196b5ca-935b-4267-9a43-46223b648c98",
+      "split": "cold_test",
+      "score_band": 0
+    },
+    {
+      "pair_id": "G125",
+      "row": 3695,
+      "candidate_id": "be8b7e9f-a0a1-465f-bfe8-b62adad7f45b",
+      "job_id": "baa5abe0-2a19-45df-bb70-71ecfe1a7d26",
+      "split": "cold_test",
+      "score_band": 2
+    },
+    {
+      "pair_id": "G126",
+      "row": 3557,
+      "candidate_id": "5538a7a6-9df7-4f26-9bea-0944170e4aca",
+      "job_id": "b42340d4-4caf-4732-b769-bebb58131b50",
+      "split": "warm_test",
+      "score_band": 0
+    },
+    {
+      "pair_id": "G127",
+      "row": 3533,
+      "candidate_id": "496b21f3-5e7b-423b-bf3c-1abd4775529c",
+      "job_id": "b42340d4-4caf-4732-b769-bebb58131b50",
+      "split": "warm_test",
+      "score_band": 4
+    },
+    {
+      "pair_id": "G128",
+      "row": 3402,
+      "candidate_id": "90d76e18-007b-4878-b053-46eafadcb43a",
+      "job_id": "09a92769-986c-44a2-858d-f18e3680ec96",
+      "split": "warm_test",
+      "score_band": 4
+    },
+    {
+      "pair_id": "G129",
+      "row": 3390,
+      "candidate_id": "978ee957-7760-447a-8414-51beb50ee522",
+      "job_id": "0adf2869-21cd-49e3-8c5b-1c01bd7f1388",
+      "split": "warm_test",
+      "score_band": 2
+    },
+    {
+      "pair_id": "G130",
+      "row": 3642,
+      "candidate_id": "03305318-2dbb-46d9-80b5-8ca9043689ee",
+      "job_id": "91a2f5f7-73b2-46ed-910b-64ddb7fc0a38",
+      "split": "cold_test",
+      "score_band": 0
+    },
+    {
+      "pair_id": "G131",
+      "row": 3280,
+      "candidate_id": "86d2caac-f7db-4a6d-af0f-65ffb8077d7d",
+      "job_id": "34499fcd-e497-4809-9230-32b03b1fab76",
+      "split": "warm_test",
+      "score_band": 2
+    },
+    {
+      "pair_id": "G132",
+      "row": 3902,
+      "candidate_id": "401c785a-5b5e-468d-87da-82a12f8e0465",
+      "job_id": "a9dbc612-749e-47ee-912a-ae4bc47ad071",
+      "split": "cold_test",
+      "score_band": 3
+    },
+    {
+      "pair_id": "G133",
+      "row": 3523,
+      "candidate_id": "809d5552-9e6a-4e1d-a5d5-808e6933b4d2",
+      "job_id": "b42340d4-4caf-4732-b769-bebb58131b50",
+      "split": "warm_test",
+      "score_band": 2
+    },
+    {
+      "pair_id": "G134",
+      "row": 3739,
+      "candidate_id": "199e3ae4-7428-4477-8f12-5c93f7f3738a",
+      "job_id": "96e0a0e7-fed0-4c95-a7b5-b25e4b0b22c4",
+      "split": "cold_test",
+      "score_band": 3
+    },
+    {
+      "pair_id": "G135",
+      "row": 3901,
+      "candidate_id": "401c785a-5b5e-468d-87da-82a12f8e0465",
+      "job_id": "e645f44b-e5f2-4ccf-b81b-f6b5aa3b2a02",
+      "split": "cold_test",
+      "score_band": 4
+    },
+    {
+      "pair_id": "G136",
+      "row": 3425,
+      "candidate_id": "2f969d7d-74af-4d7e-bd55-9b4fc0a65a2b",
+      "job_id": "24976a14-1714-4a80-a5ff-bca9e76a889b",
+      "split": "warm_test",
+      "score_band": 3
+    },
+    {
+      "pair_id": "G137",
+      "row": 3711,
+      "candidate_id": "fe4a62a4-8487-4fca-986e-0ce588144086",
+      "job_id": "95e3f8fd-1ca5-4e73-9b8e-9149d6fa3583",
+      "split": "cold_test",
+      "score_band": 3
+    },
+    {
+      "pair_id": "G138",
+      "row": 3314,
+      "candidate_id": "2dd1a1f6-9edb-4321-8e6c-f21607d07106",
+      "job_id": "0aeff06c-2c20-4be9-950d-df4d9cb93bb0",
+      "split": "warm_test",
+      "score_band": 1
+    },
+    {
+      "pair_id": "G139",
+      "row": 3814,
+      "candidate_id": "a1a4f8e2-69fe-4c0d-b53c-bd1224638b51",
+      "job_id": "c4a002c1-99a5-4a22-b6db-c07538acf4ea",
+      "split": "cold_test",
+      "score_band": 0
+    },
+    {
+      "pair_id": "G140",
+      "row": 3688,
+      "candidate_id": "6750dc4b-ea41-4397-be1c-b6ca9a47dfa7",
+      "job_id": "91a2f5f7-73b2-46ed-910b-64ddb7fc0a38",
+      "split": "cold_test",
+      "score_band": 1
+    },
+    {
+      "pair_id": "G141",
+      "row": 3426,
+      "candidate_id": "2f969d7d-74af-4d7e-bd55-9b4fc0a65a2b",
+      "job_id": "dfe99082-1a6f-4ec9-9805-94d56fa086a9",
+      "split": "warm_test",
+      "score_band": 2
+    },
+    {
+      "pair_id": "G142",
+      "row": 3850,
+      "candidate_id": "ee8a6420-4565-40ed-98a6-9770386b0ddf",
+      "job_id": "82f231af-1394-4ed7-9b5d-0c42f6380a94",
+      "split": "cold_test",
+      "score_band": 4
+    },
+    {
+      "pair_id": "G143",
+      "row": 3318,
+      "candidate_id": "447789f2-0128-4aab-9d59-43f497ba71eb",
+      "job_id": "921ecefc-5226-4194-8fb7-9c8c7f329fea",
+      "split": "warm_test",
+      "score_band": 3
+    },
+    {
+      "pair_id": "G144",
+      "row": 3481,
+      "candidate_id": "5e7c39fe-7e94-4091-99c9-1a367be39511",
+      "job_id": "ec5ed8bb-161f-4850-af3b-f109b49cfb93",
+      "split": "warm_test",
+      "score_band": 2
+    },
+    {
+      "pair_id": "G145",
+      "row": 3286,
+      "candidate_id": "75552c24-40a4-4852-a5c0-27645e39e700",
+      "job_id": "eeb67d9e-6ab8-42ce-acc5-eb44a34cd55f",
+      "split": "warm_test",
+      "score_band": 2
+    },
+    {
+      "pair_id": "G146",
+      "row": 3650,
+      "candidate_id": "a00e885b-ac22-4479-89af-cea3515aeee5",
+      "job_id": "0407ea00-5ba3-4afa-8b93-74a48b3a7914",
+      "split": "cold_test",
+      "score_band": 1
+    },
+    {
+      "pair_id": "G147",
+      "row": 3560,
+      "candidate_id": "2f512730-c33d-4ddb-9e1a-ba795f8edfc3",
+      "job_id": "0a869ab3-26c9-4b7c-8881-4ff9b362b17b",
+      "split": "warm_test",
+      "score_band": 4
+    },
+    {
+      "pair_id": "G148",
+      "row": 3398,
+      "candidate_id": "1f519755-ed92-4f2b-a618-330318f36f33",
+      "job_id": "c4a9da63-98fc-4b26-8b35-5a69bf665a70",
+      "split": "warm_test",
+      "score_band": 0
+    },
+    {
+      "pair_id": "G149",
+      "row": 3640,
+      "candidate_id": "03305318-2dbb-46d9-80b5-8ca9043689ee",
+      "job_id": "baa5abe0-2a19-45df-bb70-71ecfe1a7d26",
+      "split": "cold_test",
+      "score_band": 0
+    },
+    {
+      "pair_id": "G150",
+      "row": 3717,
+      "candidate_id": "daceeeb3-7c8c-4c9a-8bc7-81ea8cdcae0a",
+      "job_id": "baa5abe0-2a19-45df-bb70-71ecfe1a7d26",
+      "split": "cold_test",
+      "score_band": 3
+    }
+  ]
+}
