@@ -45,6 +45,8 @@ button, a { transition: background-color .18s, color .18s, border-color .18s; }
 .identity-avatar { width: 34px; height: 34px; flex: none; display: grid; place-items: center; font: 11px var(--font-mono); border: 1px solid #545e4a; border-radius: 50%; color: var(--accent); background: #242c21; }
 .workspace-identity strong { display: block; font-size: 12px; }
 .workspace-identity div > span { display: block; margin-top: 3px; font-size: 11px; color: var(--muted); text-transform: capitalize; }
+.workspace-identity div { min-width: 0; }
+.workspace-identity .identity-email { text-transform: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .eyebrow { font: 11px var(--font-mono); color: var(--accent); text-transform: uppercase; letter-spacing: 0; }
 .nav-label { margin: 30px 12px 12px; color: #879486; }
 .workspace-links { display: grid; gap: 6px; }
@@ -288,7 +290,6 @@ button, a { transition: background-color .18s, color .18s, border-color .18s; }
 .admin-page .admin-stats div { padding-block: 16px; }
 .admin-page .admin-stats svg { margin-bottom: 10px; }
 .admin-page .data-table td { padding-block: 10px; }
-.admin-page .recovery-account { padding-block: 10px; }
 .admin-jobs-toolbar { display: flex; align-items: end; justify-content: space-between; flex-wrap: wrap; gap: 16px; }
 .admin-jobs-toolbar .section-heading { margin-bottom: 0; }
 .admin-jobs-filters { display: flex; align-items: end; flex-wrap: wrap; gap: 10px; flex: 1 1 520px; justify-content: flex-end; }
@@ -319,16 +320,36 @@ button, a { transition: background-color .18s, color .18s, border-color .18s; }
 .admin-applicant-score { display: grid; justify-items: end; gap: 5px; text-align: right; }
 .admin-applicant-score strong { color: var(--accent); font: 19px var(--font-mono); }
 .admin-applicant-score span { color: var(--muted); font-size: 10px; }
+.admin-oversight-card { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 18px; }
+.admin-oversight-card .section-heading { margin-bottom: 8px; }
+.admin-oversight-card p { color: var(--muted); font-size: 12px; line-height: 1.6; }
+.admin-oversight-alert { display: flex; align-items: center; gap: 7px; margin-top: 6px; color: #e9a69a !important; }
+.admin-oversight-links { display: flex; flex-wrap: wrap; gap: 9px; }
+.admin-row-actions { display: flex; flex-wrap: wrap; gap: 6px 14px; }
+.admin-row-note { color: var(--muted); font-size: 11px; }
+.oversight-stats { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)) minmax(0, 1.6fr); border-block: 1px solid var(--line); margin-bottom: 34px; }
+.oversight-stats > * { padding: 16px 18px; border-right: 1px solid var(--line); min-width: 0; }
+.oversight-stats > :last-child { border-right: 0; }
+.oversight-stats span { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); }
+.oversight-stats strong { display: block; margin-top: 8px; font-size: 26px; }
+.oversight-stats small { display: block; margin-top: 6px; color: var(--muted); font-size: 10px; line-height: 1.5; }
+.oversight-attention { text-align: left; color: inherit; background: transparent; font: inherit; cursor: pointer; }
+.oversight-attention:hover, .oversight-attention[aria-pressed="true"] { background: #242c21; }
+.oversight-attention.has-items strong, .oversight-attention.has-items span { color: #e9a69a; }
+.oversight-flags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 7px; }
+.oversight-flag { padding: 2px 6px; border: 1px solid var(--line); border-radius: 4px; color: var(--muted); font-size: 10px; }
+.oversight-flag.warn { color: #e9a69a; border-color: #70483d; }
+.oversight-scope { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-block: 14px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 6px; font-size: 12px; color: var(--muted); }
+.oversight-scope strong { color: var(--ink); }
+.data-table tr.is-selected td { background: #242c21; }
+@media (max-width: 1100px) { .oversight-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); } .oversight-stats > :nth-child(3) { border-right: 0; } .oversight-stats > :nth-child(-n+3) { border-bottom: 1px solid var(--line); } }
+@media (max-width: 600px) { .oversight-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } .oversight-stats > * { border-bottom: 1px solid var(--line); } .oversight-stats > :nth-child(odd) { border-right: 1px solid var(--line); } .oversight-stats > :nth-child(even) { border-right: 0; } .oversight-attention { grid-column: 1 / -1; } }
 .admin-applicant-empty { padding: 30px 0; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 12px; }
 .admin-applicant-list { min-width: 0; }
 .ontology-editing { margin-block: 18px; border-block: 1px solid var(--line); }
 .ontology-editing > summary { padding-block: 14px; cursor: pointer; font-size: 14px; }
 .ontology-editing .form-grid { padding-block: 8px 24px; }
-.recovery-account { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 16px 0; border-bottom: 1px solid var(--line); }
-.recovery-identity { display: grid; gap: 5px; flex: 1 1 240px; min-width: 0; overflow-wrap: anywhere; font-size: 13px; }
-.recovery-identity span { color: var(--muted); }
 .recovery-email { overflow-wrap: anywhere; }
-.recovery-action { max-width: 100%; font-size: 12px; color: var(--muted); }
 .data-table select { padding: 8px; color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 4px; min-width: 90px; }
 .data-table input[role="switch"] { width: 18px; height: 18px; accent-color: var(--accent); cursor: pointer; }
 .data-table input:disabled { cursor: not-allowed; }
