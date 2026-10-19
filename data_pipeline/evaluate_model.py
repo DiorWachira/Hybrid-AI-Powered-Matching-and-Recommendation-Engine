@@ -13,10 +13,10 @@ from typing import Callable
 
 import numpy as np
 
-from backend.app.core.match_features import FEATURE_CONTRACT, FEATURE_ORDER
-from backend.app.core.hybrid_matcher import _artifact, calibrated_score
+from backend.app.core.match_features import FEATURE_CONTRACT, FEATURE_ORDER, SUPPORTED_CONTRACTS
+from backend.app.core.hybrid_matcher import _artifact, _load_artifact, calibrated_score_for
 from data_pipeline.epoch_artifacts import get_git_commit
-from data_pipeline.epoch_trainer import classification_metrics, prepare_synthetic_data
+from data_pipeline.epoch_trainer import LABEL_SOURCES, LABEL_V2, classification_metrics, prepare_synthetic_data
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CACHE_ROOT = ROOT / "data_pipeline" / "training_runs" / "evaluation_cache"
@@ -58,8 +58,9 @@ def evaluate_holdouts(
         or not np.isin(labels, [0, 1]).all()
     ):
         raise ValueError("evaluation features or labels are invalid")
-    if artifact.get("feature_contract") != FEATURE_CONTRACT or artifact.get("feature_order") != FEATURE_ORDER:
-        raise ValueError("active model does not match the serving feature contract")
+    contract = manifest.get("specification", {}).get("feature_contract", FEATURE_CONTRACT)
+    if artifact.get("feature_contract") not in SUPPORTED_CONTRACTS or artifact.get("feature_contract") != contract or artifact.get("feature_order") != FEATURE_ORDER:
+        raise ValueError("model does not match the evaluation feature contract")
     if manifest.get("encoder_revision") != artifact.get("encoder_revision"):
         raise ValueError("evaluation embeddings do not match the active encoder revision")
     threshold = float(artifact["decision_threshold"])
@@ -78,7 +79,7 @@ def evaluate_holdouts(
     if train_validation.intersection(warm_indices) or train_validation.intersection(cold_indices) or set(warm_indices).intersection(cold_indices):
         raise ValueError("training, validation, warm-test, and cold-test indices must be disjoint")
 
-    score = scorer or calibrated_score
+    score = scorer or (lambda semantic, overlap, growth: calibrated_score_for(artifact, semantic, overlap, growth))
     results = {}
     for split, indices in (("warm_test", warm_indices), ("cold_test", cold_indices)):
         probabilities = np.asarray([score(*map(float, features[index]))[0] for index in indices], dtype=float)
@@ -92,7 +93,7 @@ def evaluate_holdouts(
     return {
         "status": "complete",
         "model_version": artifact["model_version"],
-        "feature_contract": FEATURE_CONTRACT,
+        "feature_contract": contract,
         "feature_order": FEATURE_ORDER,
         "decision_threshold": threshold,
         "dataset": {
@@ -125,9 +126,11 @@ def main() -> None:
     parser.add_argument("--jobs", type=int, default=100)
     parser.add_argument("--cache-root", type=Path, default=DEFAULT_CACHE_ROOT)
     parser.add_argument("--output", type=Path, help="Optional JSON report path; otherwise print only")
+    parser.add_argument("--artifact", type=Path, help="Evaluate this candidate artifact instead of the active one")
+    parser.add_argument("--label-source", choices=LABEL_SOURCES, default=LABEL_V2)
     args = parser.parse_args()
 
-    artifact = _artifact()
+    artifact = _load_artifact(args.artifact) if args.artifact else _artifact()
     features, labels, partitions, manifest = prepare_synthetic_data(
         args.cache_root,
         code_commit=_cache_identity(),
@@ -135,6 +138,8 @@ def main() -> None:
         candidate_count=args.candidates,
         job_count=args.jobs,
         pinned_encoder_revision=artifact.get("encoder_revision"),
+        feature_contract=artifact["feature_contract"],
+        label_source=args.label_source,
     )
     report = evaluate_holdouts(features, labels, partitions, manifest, artifact)
     serialized = json.dumps(report, indent=2, sort_keys=True, allow_nan=False)

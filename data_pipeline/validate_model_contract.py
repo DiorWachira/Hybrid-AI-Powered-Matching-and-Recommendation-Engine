@@ -4,10 +4,12 @@ Parity model
 ------------
 Training (``data_pipeline/epoch_trainer.py``) and serving
 (``backend/app/api/matches.py``) compute the three scoring features through ONE
-shared module: ``backend/app/core/match_features.py`` (feature contract
-``serving-direct-skill-growth-v1``). Both import that same source file, so the
-promoted model is, by construction, trained on exactly the features serving
-computes.
+shared module: ``backend/app/core/match_features.py``. The artifact names the
+feature contract it was trained on (``serving-direct-skill-growth-v1`` or
+``serving-related-skill-readiness-v2``) and serving computes exactly that
+contract. Both import the same source file, so the promoted model is, by
+construction, trained on exactly the features serving computes. A v2 artifact
+also pins the SHA-256 of the skill-relationship file its features were built from.
 
 This gate verifies:
   1. serving and training resolve their feature functions to the same shared
@@ -46,11 +48,8 @@ def _shared_feature_source() -> dict:
     training_module = importlib.import_module("backend.app.core.match_features")
     training_file = Path(training_module.__file__).resolve()
     trainer_source = (ROOT / "data_pipeline" / "epoch_trainer.py").read_text(encoding="utf-8")
-    trainer_imports_shared = "from backend.app.core.match_features import" in trainer_source and "skill_overlap" in trainer_source and "growth_score" in trainer_source
-    serving_routes_shared = (
-        serving_matches.skill_overlap is match_features.skill_overlap
-        and serving_matches.feature_growth_score is match_features.growth_score
-    )
+    trainer_imports_shared = "from backend.app.core.match_features import" in trainer_source and "contract_features" in trainer_source
+    serving_routes_shared = serving_matches.contract_features is match_features.contract_features
     return {
         "serving_feature_source": str(serving_file),
         "training_feature_source": str(training_file),
@@ -74,10 +73,14 @@ def _artifact_is_verified_bundle(artifact: dict) -> dict:
 def validate_contract() -> dict:
     artifact = _artifact()
     source = _shared_feature_source()
+    contract = artifact.get("feature_contract")
+    relations_sha256 = match_features.skill_relations()[1]
     artifact_contract_ok = (
-        artifact.get("feature_contract") == match_features.FEATURE_CONTRACT
+        contract in match_features.SUPPORTED_CONTRACTS
         and artifact.get("feature_order") == match_features.FEATURE_ORDER
         and artifact.get("embedding_model") == "sentence-transformers/all-MiniLM-L6-v2"
+        # v2 features depend on the relationship file; the artifact must pin the exact file it was trained with.
+        and (contract == match_features.CONTRACT_V1 or artifact.get("skill_relations_sha256") == relations_sha256)
     )
     bundle = _artifact_is_verified_bundle(artifact)
     cases = []
@@ -85,13 +88,13 @@ def validate_contract() -> dict:
         (["Python"], ["Data Analysis"], 4, 4, 1),
         (["SQL"], ["SQL"], 4, 4, 0),
         (["SQL"], [], 6, 4, 2),
+        (["PostgreSQL", "Docker"], ["SQL", "Kubernetes"], 5, 4, 0),
     ]:
         candidate = SimpleNamespace(candidate_id=UUID(int=1), full_name="Validation only", years_experience=years, location=None, expected_salary=None, certifications=[f"cert-{index}" for index in range(certification_count)], skills=candidate_skills, parsed_resume_text="Validation text", work_authorized=True)
         job = SimpleNamespace(required_experience_years=required_years, location=None, salary_range_max=None, mandatory_certifications=[], required_skills=required_skills, description="Validation description", requires_work_authorization=False)
         with patch("app.api.matches.semantic_similarity", return_value=0.7):
             serving = _score_candidate(candidate, job)
-        expected_skill = match_features.skill_overlap(candidate_skills, required_skills)
-        expected_growth = match_features.growth_score(years, required_years, certification_count)
+        expected_skill, expected_growth = match_features.contract_features(contract, candidate_skills=candidate_skills, required_skills=required_skills, years_experience=years, required_experience_years=required_years, certification_count=certification_count)
         cases.append({
             "candidate_skills": candidate_skills,
             "required_skills": required_skills,
@@ -112,7 +115,8 @@ def validate_contract() -> dict:
         "artifact_schema_valid": True,
         "artifact_sha256": hashlib.sha256(ARTIFACT_PATH.read_bytes()).hexdigest(),
         "model_version": artifact["model_version"],
-        "feature_contract": match_features.FEATURE_CONTRACT,
+        "feature_contract": contract,
+        "skill_relations_sha256": relations_sha256 if contract != match_features.CONTRACT_V1 else None,
         "feature_order": match_features.FEATURE_ORDER,
         "reference_formulas_recognized": True,
         "shared_feature_source": source,

@@ -76,6 +76,8 @@ export type MatchCandidate = {
   match_id?: string | null;
   matched_skills?: string[] | null;
   missing_skills?: string[] | null;
+  /** Required skills credited through a related listed skill (feature contract v2). */
+  related_skills?: Array<{ required: string; via: string; credit: number }> | null;
   model_version?: string | null;
   candidate_id: string;
   full_name: string;

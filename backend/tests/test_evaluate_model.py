@@ -65,7 +65,11 @@ def test_report_scores_only_warm_and_cold_holdouts_and_marks_synthetic_limits():
 def test_cli_uses_active_artifact_encoder_revision(monkeypatch, capsys, tmp_path):
     from data_pipeline import evaluate_model
 
+    from backend.app.core.hybrid_matcher import _artifact
+
     features, labels, partitions, manifest, artifact = evaluation_inputs()
+    # The evaluator scores with the artifact it evaluates, so the stub carries real weights.
+    artifact.update({key: _artifact()[key] for key in ("scaler_mean", "scaler_scale", "logistic_regression")})
     revision = "a" * 40
     artifact["encoder_revision"] = revision
     manifest["encoder_revision"] = revision

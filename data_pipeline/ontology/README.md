@@ -4,6 +4,15 @@
 ESCO export is supplied. It contains weighted related-skill links for the
 roles currently used in the demo.
 
+It is also the skill graph behind matching feature contract
+`serving-related-skill-readiness-v2`: a required skill the candidate does not
+list earns the product of the relationship weights along the strongest path of
+at most two links from a skill they do list. Scoring reads this file rather than
+live Neo4j, so admin edits to the graph never change a trained model's inputs.
+A v2 model artifact pins this file's SHA-256, and serving refuses to score with a
+v2 model if the file has changed since training. Edit the file, then retrain
+and re-promote; do not edit it under a promoted v2 model.
+
 To add a trimmed ESCO export, pass a CSV with a `preferredLabel` column (the
 loader also accepts `name` or `label`) and optional `skillType` or `category`:
 

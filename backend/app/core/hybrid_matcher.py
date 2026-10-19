@@ -12,28 +12,35 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from sentence_transformers import SentenceTransformer
 
+from app.core.match_features import CONTRACT_V1, SKILL_RELATIONS_PATH, SUPPORTED_CONTRACTS, skill_relations
 from app.core.text_preprocessing import anonymize_resume_text
 
 ARTIFACT_PATH = Path(__file__).resolve().parents[3] / "data_pipeline" / "artifacts" / "hybrid_match_weights.json"
 _model: SentenceTransformer | None = None
 _model_identity: tuple[str, str | None] | None = None
 _model_lock = threading.Lock()
-_artifact_cache: tuple[tuple[str, int, int], dict[str, object]] | None = None
+_artifact_cache: tuple[tuple[str, int, int, int], dict[str, object]] | None = None
 logger = logging.getLogger(__name__)
 
 
 def _artifact() -> dict[str, object]:
-    # Scoring calls this once per candidate; re-read and re-validate only when the file itself changes.
+    # Scoring calls this once per candidate; re-read and re-validate only when the artifact or the skill
+    # relationship file (pinned by v2 artifacts) changes.
     global _artifact_cache
     stat = ARTIFACT_PATH.stat()
-    key = (str(ARTIFACT_PATH), stat.st_mtime_ns, stat.st_size)
+    key = (str(ARTIFACT_PATH), stat.st_mtime_ns, stat.st_size, SKILL_RELATIONS_PATH.stat().st_mtime_ns)
     if _artifact_cache is None or _artifact_cache[0] != key:
         _artifact_cache = (key, _load_artifact())
     return copy.deepcopy(_artifact_cache[1])
 
 
-def _load_artifact() -> dict[str, object]:
-    artifact = json.loads(ARTIFACT_PATH.read_text(encoding="utf-8"))
+def _load_artifact(path: Path | None = None) -> dict[str, object]:
+    artifact = json.loads((path or ARTIFACT_PATH).read_text(encoding="utf-8"))
+    contract = artifact.get("feature_contract")
+    if contract not in SUPPORTED_CONTRACTS:
+        raise ValueError("Unsupported feature contract")
+    if contract != CONTRACT_V1 and artifact.get("skill_relations_sha256") != skill_relations()[1]:
+        raise ValueError("Skill relationship file differs from the one this model was trained with")
     if artifact.get("feature_order") != ["S_bert", "S_graph", "S_growth"]:
         raise ValueError("Unsupported model feature order")
     if artifact.get("embedding_model") != "sentence-transformers/all-MiniLM-L6-v2":
@@ -98,7 +105,10 @@ def job_similarities(candidate_text: str, job_texts: list[str], batch_size: int 
 
 
 def calibrated_score(semantic: float, graph: float, growth: float) -> tuple[float, bool]:
-    artifact = _artifact()
+    return calibrated_score_for(_artifact(), semantic, graph, growth)
+
+
+def calibrated_score_for(artifact: dict[str, object], semantic: float, graph: float, growth: float) -> tuple[float, bool]:
     means = artifact["scaler_mean"]
     scales = artifact["scaler_scale"]
     model = artifact["logistic_regression"]

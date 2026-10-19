@@ -282,6 +282,8 @@ class MatchCandidateResponse(BaseModel):
     match_id: UUID | None = None
     matched_skills: list[str] | None = None
     missing_skills: list[str] | None = None
+    # Required skills credited through a related listed skill (v2 contract): {"required", "via", "credit"}.
+    related_skills: list[dict] | None = None
     model_version: str | None = None
     candidate_id: UUID
     full_name: str

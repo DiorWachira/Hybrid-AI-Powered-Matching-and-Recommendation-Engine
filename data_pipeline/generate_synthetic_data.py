@@ -263,6 +263,54 @@ def generate_job(rng: random.Random) -> dict[str, object]:
     }
 
 
+# --- Label v3: CV wording differs from true ability -------------------------------------------------
+# Real CVs name tools ("PostgreSQL", "GitHub Actions") rather than the canonical skill a job posts ("SQL",
+# "CI/CD"). Under label v3 a candidate's true skills drive the label while the listed skills may use such
+# aliases, so exact name matching under-reads ability. These tables are generator ground truth and are
+# deliberately NOT the ontology weights the v2 feature uses: the ontology must earn its credit.
+SKILL_ALIASES = {
+    "SQL": ["PostgreSQL", "MySQL"], "CI/CD": ["GitHub Actions", "Jenkins"], "AWS": ["Amazon Web Services"],
+    "Kubernetes": ["K8s"], "Git": ["GitHub"], "Linux": ["Ubuntu"], "Excel": ["Microsoft Excel"],
+    "Power BI": ["Power BI DAX"], "Data Analysis": ["Data Analytics"], "Financial Accounting": ["IFRS Reporting"],
+    "Taxation": ["Tax Compliance"], "Business Analysis": ["Requirements Analysis"],
+}
+ALIAS_RATE = 0.35
+# Partial competence a truly held skill gives towards a different required skill.
+TRUE_TRANSFER = {
+    ("Python", "Data Analysis"): 0.45, ("Python", "REST APIs"): 0.35, ("SQL", "Data Analysis"): 0.5,
+    ("SQL", "Business Analysis"): 0.3, ("Data Analysis", "Business Analysis"): 0.4, ("Docker", "Kubernetes"): 0.35,
+    ("Docker", "CI/CD"): 0.4, ("Kubernetes", "AWS"): 0.3, ("Financial Accounting", "Taxation"): 0.55,
+    ("Taxation", "Financial Accounting"): 0.5, ("Excel", "Data Analysis"): 0.3, ("Data Analysis", "Excel"): 0.4,
+}
+
+
+def apply_skill_aliases(candidate: dict[str, object], rate: float = ALIAS_RATE) -> dict[str, object]:
+    """Copy of the candidate whose listed skills (and CV text) sometimes use an alias of a truly held skill.
+
+    Uses a per-candidate RNG, so the shared generation stream and every v2 dataset stay unchanged."""
+    rng = random.Random(f"alias:{candidate['candidate_id']}")
+    true_skills = list(candidate["skills"])  # type: ignore[arg-type]
+    listed, resume = [], str(candidate["resume_text"])
+    for skill in true_skills:
+        aliases = SKILL_ALIASES.get(skill)
+        if aliases and rng.random() < rate:
+            alias = rng.choice(aliases)
+            listed.append(alias)
+            resume = resume.replace(skill, alias)
+        else:
+            listed.append(skill)
+    return {**candidate, "skills": listed, "resume_text": resume, "latent_true_skills": true_skills}
+
+
+def true_skill_credit(true_skills: list[str], required_skills: list[str]) -> float:
+    """Ground-truth share of the job's required skills the candidate can actually perform."""
+    if not required_skills:
+        return 0.0
+    held = set(true_skills)
+    credits = [1.0 if required in held else max((TRUE_TRANSFER.get((skill, required), 0.0) for skill in held), default=0.0) for required in required_skills]
+    return sum(credits) / len(credits)
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--candidates", type=int, default=500)

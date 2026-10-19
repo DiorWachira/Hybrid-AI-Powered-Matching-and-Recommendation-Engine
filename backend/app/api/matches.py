@@ -10,7 +10,7 @@ from app.api.dependencies import require_roles
 from app.core.rule_filter import CandidateRuleData, JobRuleData, RuleBasedMatcher
 from app.db.models import AuditEvent, Candidate, Employer, JobPosting, MatchResult, User, UserRole
 from app.core.hybrid_matcher import _artifact, calibrated_score, semantic_similarities, semantic_similarity
-from app.core.match_features import growth_score as feature_growth_score, skill_overlap
+from app.core.match_features import CONTRACT_V1, contract_features, skill_credits
 from app.db.postgres import get_db
 from app.schemas import MatchCandidateResponse, MatchEvaluationResponse, StoredMatchResponse
 from app.db.neo4j_db import get_neo4j_driver
@@ -42,7 +42,7 @@ def read_job_matches(job_id: UUID, user: User = Depends(require_roles(UserRole.r
             hard_rule_passed=result.hard_rule_passed, rule_reasons=explanation.get("rule_reasons", []),
             skill_overlap=result.skill_overlap_score or 0.0, semantic_score=result.similarity_score or 0.0,
             growth_score=result.growth_score or 0.0, final_score=result.final_weighted_score or 0.0,
-            matched_skills=explanation.get("matched_skills"), missing_skills=explanation.get("missing_skills"), model_version=result.model_version,
+            matched_skills=explanation.get("matched_skills"), missing_skills=explanation.get("missing_skills"), related_skills=explanation.get("related_skills"), model_version=result.model_version,
             recommended=(result.hard_rule_passed and (result.final_weighted_score or 0.0) >= artifact["decision_threshold"]) if result.model_version == artifact["model_version"] else None,
         ))
     return MatchEvaluationResponse(job_id=job_id, evaluated_at=evaluated_at, candidates=candidates)
@@ -128,10 +128,14 @@ def _score_candidate(candidate: Candidate, job: JobPosting, semantic_score: floa
             final_score=0.0,
         )
 
-    overlap = skill_overlap(candidate.skills or [], job.required_skills or [])
+    overlap, growth_score = contract_features(
+        _artifact()["feature_contract"],
+        candidate_skills=candidate.skills or [], required_skills=job.required_skills or [],
+        years_experience=candidate.years_experience, required_experience_years=job.required_experience_years,
+        certification_count=len(candidate.certifications or []),
+    )
     if semantic_score is None:
         semantic_score = semantic_similarity(candidate.parsed_resume_text or "", job.description)
-    growth_score = feature_growth_score(candidate.years_experience, job.required_experience_years, len(candidate.certifications or []))
     final_score, recommended = calibrated_score(semantic_score, overlap, growth_score)
     return MatchCandidateResponse(
         candidate_id=candidate.candidate_id,
@@ -169,7 +173,8 @@ def evaluate_matches(
         (_score_candidate(candidate, job, scores_by_candidate.get(candidate.candidate_id)) for candidate in candidates),
         key=lambda result: (-result.final_score, str(result.candidate_id)),
     )
-    model_version = _artifact()["model_version"]
+    artifact = _artifact()
+    model_version = artifact["model_version"]
     evaluated_at = datetime.now(UTC)
     candidates_by_id = {candidate.candidate_id: candidate for candidate in candidates}
     required_skills = {skill.casefold() for skill in (job.required_skills or [])}
@@ -178,8 +183,14 @@ def evaluate_matches(
         candidate = candidates_by_id[result.candidate_id]
         matched_skills = sorted({skill for skill in (candidate.skills or []) if skill.casefold() in required_skills})
         missing_skills = sorted({skill for skill in (job.required_skills or []) if skill.casefold() not in {item.casefold() for item in (candidate.skills or [])}})
+        # Under v2 a required skill can earn partial credit through a related listed skill; record which one.
+        related_skills = [] if artifact["feature_contract"] == CONTRACT_V1 else [
+            {"required": required, "via": via, "credit": round(credit, 4)}
+            for required, credit, via in skill_credits(candidate.skills or [], job.required_skills or []) if 0 < credit < 1
+        ]
         result.matched_skills = matched_skills
         result.missing_skills = missing_skills
+        result.related_skills = related_skills
         result.model_version = model_version
         db.add(MatchResult(
             match_id=result.match_id,
@@ -192,7 +203,7 @@ def evaluate_matches(
             skill_overlap_score=result.skill_overlap,
             model_version=model_version,
             final_weighted_score=result.final_score,
-            skill_gap_breakdown={"matched_skills": matched_skills, "missing_skills": missing_skills, "rule_reasons": result.rule_reasons},
+            skill_gap_breakdown={"matched_skills": matched_skills, "missing_skills": missing_skills, "related_skills": related_skills, "rule_reasons": result.rule_reasons},
         ))
     db.add(AuditEvent(actor_user_id=user.user_id, action="matches.evaluated", resource_type="job", resource_id=job.job_id, created_at=evaluated_at, details={"candidates": len(ranked), "eligible": sum(result.hard_rule_passed for result in ranked)}))
     db.commit()
