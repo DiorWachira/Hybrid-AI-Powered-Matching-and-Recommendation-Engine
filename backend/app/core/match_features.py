@@ -49,7 +49,8 @@ def _relations(path: str, mtime_ns: int) -> tuple[dict[str, dict[str, float]], s
             for left, right in ((source, target), (target, source)):
                 graph.setdefault(left, {})
                 graph[left][right] = max(graph[left].get(right, 0.0), weight)
-    return graph, hashlib.sha256(content).hexdigest()
+    # Hash with LF line endings so a Windows (autocrlf) checkout matches the hash pinned by trained artifacts.
+    return graph, hashlib.sha256(content.replace(b"\r\n", b"\n")).hexdigest()
 
 
 def skill_relations() -> tuple[dict[str, dict[str, float]], str]:
