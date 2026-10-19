@@ -98,12 +98,14 @@ def test_non_admin_cannot_access_overview(api_client, role):
 
 
 @pytest.mark.parametrize("role", [UserRole.candidate, UserRole.recruiter])
-def test_all_jobs_oversight_is_admin_only(api_client, role):
+@pytest.mark.parametrize("path", ["/api/admin/jobs", "/api/admin/recruiters", "/api/admin/recruiters/summary"])
+def test_all_jobs_oversight_is_admin_only(api_client, role, path):
     client, database, user = api_client
     user.role = role
-    response = client.get("/api/admin/jobs")
+    response = client.get(path)
     assert response.status_code == 403
     database.execute.assert_not_called()
+    database.scalar.assert_not_called()
 
 
 def test_admin_lists_all_employers_jobs_with_filters_and_applicant_counts(api_client):
@@ -115,8 +117,9 @@ def test_admin_lists_all_employers_jobs_with_filters_and_applicant_counts(api_cl
         location="Nairobi", required_experience_years=2, salary_range_min=50000,
         salary_range_max=100000, requires_work_authorization=True,
         required_skills=["SQL", "Excel"], mandatory_certifications=["CPA"], status=JobStatus.open,
+        employer_id=uuid4(),
     )
-    database.execute.return_value.all.return_value = [(job, "Independent Employer", "owner@example.com", 3)]
+    database.execute.return_value.all.return_value = [(job, "Independent Employer", "owner@example.com", False, 3)]
     response = client.get("/api/admin/jobs", params={"search": "Reporting", "status": "open", "offset": 5, "limit": 6})
     assert response.status_code == 200
     assert response.json() == [{
@@ -124,13 +127,66 @@ def test_admin_lists_all_employers_jobs_with_filters_and_applicant_counts(api_cl
         "title": "Reporting Analyst", "description": job.description, "location": "Nairobi",
         "required_experience_years": 2, "salary_range_max": "100000", "salary_range_min": "50000",
         "requires_work_authorization": True, "required_skills": ["SQL", "Excel"],
-        "mandatory_certifications": ["CPA"], "status": "open", "company_name": "Independent Employer",
-        "recruiter_email": "owner@example.com", "applicant_count": 3,
+        "mandatory_certifications": ["CPA"], "status": "open", "employer_id": str(job.employer_id),
+        "company_name": "Independent Employer", "recruiter_email": "owner@example.com",
+        "recruiter_active": False, "applicant_count": 3,
     }]
     statement = str(database.execute.call_args.args[0].compile(dialect=postgresql.dialect()))
     assert "ILIKE" in statement
     assert "job_postings.status" in statement
     assert "LIMIT" in statement and "OFFSET" in statement
+    assert "EXISTS" not in statement
+
+
+def test_admin_job_list_filters_by_recruiter_and_attention(api_client):
+    client, database, user = api_client
+    user.role = UserRole.admin
+    database.execute.return_value.all.return_value = []
+    employer_id = uuid4()
+    response = client.get("/api/admin/jobs", params={"employer_id": str(employer_id), "attention": "true"})
+    assert response.status_code == 200
+    statement = database.execute.call_args.args[0].compile(dialect=postgresql.dialect())
+    sql = str(statement)
+    assert "job_postings.employer_id = " in sql
+    # Attention = open AND (recruiter suspended OR posted before the cutoff with no applications).
+    assert "users.is_active IS false" in sql
+    assert "NOT (EXISTS" in sql
+    assert employer_id in statement.params.values()
+
+
+def test_admin_lists_recruiters_with_posting_and_hiring_totals(api_client):
+    # Seeded demo accounts use reserved domains such as .local; stored emails must not be re-validated on output.
+    client, database, user = api_client
+    user.role = UserRole.admin
+    employer = SimpleNamespace(employer_id=uuid4(), user_id=uuid4(), company_name="Savannah Analytics", contact_name="Asha Njeri")
+    posted = datetime.now(UTC)
+    database.execute.return_value.all.return_value = [(employer, "seed-recruiter@jobbridge.local", True, False, 4, 3, 9, 1, 2, posted)]
+    response = client.get("/api/admin/recruiters", params={"search": "Savannah", "offset": 5, "limit": 6})
+    assert response.status_code == 200
+    assert response.json() == [{
+        "employer_id": str(employer.employer_id), "user_id": str(employer.user_id),
+        "company_name": "Savannah Analytics", "contact_name": "Asha Njeri", "email": "seed-recruiter@jobbridge.local",
+        "is_active": True, "is_demo": False, "jobs_total": 4, "jobs_open": 3, "applications_total": 9,
+        "hired_total": 1, "stale_open_jobs": 2, "last_posted_at": posted.isoformat().replace("+00:00", "Z"),
+    }]
+    sql = str(database.execute.call_args.args[0].compile(dialect=postgresql.dialect()))
+    assert "ILIKE" in sql
+    assert "FILTER (WHERE" in sql
+    assert "NULLS LAST" in sql
+    assert "LIMIT" in sql and "OFFSET" in sql
+
+
+def test_admin_oversight_summary_reports_attention_counts(api_client):
+    client, database, user = api_client
+    user.role = UserRole.admin
+    database.scalar.side_effect = [5, 4, 12, 3, 40, 2, 1, 2, 3]
+    response = client.get("/api/admin/recruiters/summary")
+    assert response.status_code == 200
+    assert response.json() == {
+        "recruiters_count": 5, "active_recruiters_count": 4, "jobs_open": 12, "jobs_closed": 3,
+        "applications_total": 40, "hired_total": 2, "stale_open_jobs": 1, "suspended_open_jobs": 2,
+        "attention_jobs": 3, "stale_after_days": 14,
+    }
 
 
 def test_admin_cannot_create_jobs_through_recruiter_endpoint(api_client):

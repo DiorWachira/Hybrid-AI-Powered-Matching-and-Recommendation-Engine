@@ -126,9 +126,40 @@ class JobResponse(BaseModel):
 
 
 class AdminJobResponse(JobResponse):
+    employer_id: UUID
     company_name: str
-    recruiter_email: EmailStr
+    recruiter_email: str
+    recruiter_active: bool
     applicant_count: int
+
+
+class AdminRecruiterResponse(BaseModel):
+    employer_id: UUID
+    user_id: UUID
+    company_name: str
+    contact_name: str | None
+    email: str
+    is_active: bool
+    is_demo: bool
+    jobs_total: int
+    jobs_open: int
+    applications_total: int
+    hired_total: int
+    stale_open_jobs: int
+    last_posted_at: datetime | None
+
+
+class AdminOversightSummary(BaseModel):
+    recruiters_count: int
+    active_recruiters_count: int
+    jobs_open: int
+    jobs_closed: int
+    applications_total: int
+    hired_total: int
+    stale_open_jobs: int
+    suspended_open_jobs: int
+    attention_jobs: int
+    stale_after_days: int
 
 
 class JobUpdateRequest(JobCreateRequest):
@@ -290,6 +321,7 @@ class AuditEventResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     event_id: UUID
     actor_user_id: UUID | None
+    actor_email: str | None = None
     action: str
     resource_type: str
     resource_id: UUID | None
