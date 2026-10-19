@@ -93,26 +93,26 @@ ROLE_CATALOG: dict[str, dict[str, object]] = {
             ],
         },
     },
-    "Accountant": {
-        "core_skills": ["Financial Accounting", "Taxation", "Excel"],
-        "adjacent_skills": ["Auditing", "Payroll"],
-        "certifications": ["CPA"],
-        "salary_range": (50000, 150000),
+    "Cybersecurity Analyst": {
+        "core_skills": ["Network Security", "Linux", "SIEM", "Incident Response"],
+        "adjacent_skills": ["Python", "Networking", "Cloud Security"],
+        "certifications": ["CompTIA Security+", "Certified Ethical Hacker"],
+        "salary_range": (80000, 230000),
         "domains": {
-            "tax compliance": [
-                "VAT return filings",
-                "withholding tax schedules",
-                "KRA iTax reconciliations",
+            "security operations": [
+                "SOC alert triage",
+                "threat hunting playbooks",
+                "phishing incident containment",
             ],
-            "management accounts": [
-                "monthly management packs",
-                "cost centre variance notes",
-                "cash flow forecasting",
+            "vulnerability management": [
+                "quarterly penetration test remediation",
+                "patch compliance tracking",
+                "external attack surface reviews",
             ],
-            "external audit support": [
-                "audit sampling schedules",
-                "fixed asset verification",
-                "year-end confirmations",
+            "identity and access": [
+                "privileged access reviews",
+                "single sign-on rollouts",
+                "joiner-mover-leaver audits",
             ],
         },
     },
@@ -271,16 +271,16 @@ def generate_job(rng: random.Random) -> dict[str, object]:
 SKILL_ALIASES = {
     "SQL": ["PostgreSQL", "MySQL"], "CI/CD": ["GitHub Actions", "Jenkins"], "AWS": ["Amazon Web Services"],
     "Kubernetes": ["K8s"], "Git": ["GitHub"], "Linux": ["Ubuntu"], "Excel": ["Microsoft Excel"],
-    "Power BI": ["Power BI DAX"], "Data Analysis": ["Data Analytics"], "Financial Accounting": ["IFRS Reporting"],
-    "Taxation": ["Tax Compliance"], "Business Analysis": ["Requirements Analysis"],
+    "Power BI": ["Power BI DAX"], "Data Analysis": ["Data Analytics"], "SIEM": ["Splunk"],
+    "Network Security": ["Firewall Administration"], "Business Analysis": ["Requirements Analysis"],
 }
 ALIAS_RATE = 0.35
 # Partial competence a truly held skill gives towards a different required skill.
 TRUE_TRANSFER = {
     ("Python", "Data Analysis"): 0.45, ("Python", "REST APIs"): 0.35, ("SQL", "Data Analysis"): 0.5,
     ("SQL", "Business Analysis"): 0.3, ("Data Analysis", "Business Analysis"): 0.4, ("Docker", "Kubernetes"): 0.35,
-    ("Docker", "CI/CD"): 0.4, ("Kubernetes", "AWS"): 0.3, ("Financial Accounting", "Taxation"): 0.55,
-    ("Taxation", "Financial Accounting"): 0.5, ("Excel", "Data Analysis"): 0.3, ("Data Analysis", "Excel"): 0.4,
+    ("Docker", "CI/CD"): 0.4, ("Kubernetes", "AWS"): 0.3, ("Networking", "Network Security"): 0.45,
+    ("Linux", "Incident Response"): 0.3, ("Excel", "Data Analysis"): 0.3, ("Data Analysis", "Excel"): 0.4,
 }
 
 
