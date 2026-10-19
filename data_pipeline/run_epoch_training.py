@@ -8,7 +8,8 @@ from importlib.metadata import version
 from pathlib import Path
 
 from data_pipeline.epoch_artifacts import _atomic_json, get_git_commit
-from data_pipeline.epoch_trainer import TrainingConfig, prepare_synthetic_data, train_epochs, wait_for_local_epoch
+from backend.app.core.match_features import FEATURE_CONTRACT, SUPPORTED_CONTRACTS
+from data_pipeline.epoch_trainer import LABEL_SOURCES, LABEL_V2, TrainingConfig, prepare_synthetic_data, train_epochs, wait_for_local_epoch
 
 
 def main():
@@ -22,6 +23,8 @@ def main():
     parser.add_argument("--batch-size", type=int, default=256)
     parser.add_argument("--learning-rate", type=float, default=0.01)
     parser.add_argument("--ack-timeout", type=float, default=300)
+    parser.add_argument("--feature-contract", choices=SUPPORTED_CONTRACTS, default=FEATURE_CONTRACT)
+    parser.add_argument("--label-source", choices=LABEL_SOURCES, default=LABEL_V2)
     args = parser.parse_args()
     repository = Path(__file__).resolve().parents[1]
     commit = get_git_commit(repository)
@@ -37,7 +40,7 @@ def main():
         if destination.resolve() == repository or repository in destination.resolve().parents:
             parser.error("training outputs must be outside the source checkout")
     config = TrainingConfig(max_epochs=args.max_epochs, batch_size=args.batch_size, learning_rate=args.learning_rate)
-    features, labels, partitions, manifest = prepare_synthetic_data(args.cache_root, code_commit=commit, seed=config.seed)
+    features, labels, partitions, manifest = prepare_synthetic_data(args.cache_root, code_commit=commit, seed=config.seed, feature_contract=args.feature_contract, label_source=args.label_source)
     if manifest["encoder_revision"] == "test-only":
         parser.error("test embeddings cannot be used for the Colab training run")
     environment = {"python": platform.python_version(), "packages": {package: version(package) for package in ("numpy", "scikit-learn", "sentence-transformers", "torch", "huggingface-hub")}}

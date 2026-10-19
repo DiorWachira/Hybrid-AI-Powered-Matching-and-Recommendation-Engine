@@ -16,12 +16,16 @@ from sklearn.linear_model import SGDClassifier
 from sklearn.metrics import f1_score, log_loss, precision_score, recall_score, roc_auc_score
 from sklearn.preprocessing import StandardScaler
 
-from backend.app.core.match_features import FEATURE_CONTRACT, FEATURE_ORDER, growth_score, skill_overlap
+from backend.app.core.match_features import CONTRACT_V1, FEATURE_CONTRACT, FEATURE_ORDER, SUPPORTED_CONTRACTS, contract_features, skill_overlap, skill_relations
 from backend.app.core.text_preprocessing import anonymize_resume_text
 from data_pipeline.epoch_artifacts import EpochArtifactStore, _atomic_json, _canonical_json
-from data_pipeline.generate_synthetic_data import generate_candidate, generate_job
+from data_pipeline.generate_synthetic_data import apply_skill_aliases, generate_candidate, generate_job, true_skill_credit
 
 EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
+LABEL_V2 = "synthetic-fixed-centres-latent-bernoulli-v2"
+# v3: listed skills may be aliases of truly held skills; the label follows true ability, not the wording.
+LABEL_V3 = "synthetic-fixed-centres-latent-bernoulli-v3-skill-aliases"
+LABEL_SOURCES = (LABEL_V2, LABEL_V3)
 
 
 @dataclass(frozen=True)
@@ -64,10 +68,15 @@ def isolated_partitions(candidates: list[dict], jobs: list[dict], seed: int) -> 
     return {"candidate_groups": candidate_groups, "job_groups": job_groups, "seed": seed, "protocol": "role-stratified-disjoint-candidates-60-20-10-10-cold-jobs-20-v1"}
 
 
-def prepare_synthetic_data(cache_root: Path, *, code_commit: str, seed: int = 42, candidate_count: int = 800, job_count: int = 100, encode: Callable | None = None, pinned_encoder_revision: str | None = None) -> tuple:
+def prepare_synthetic_data(cache_root: Path, *, code_commit: str, seed: int = 42, candidate_count: int = 800, job_count: int = 100, encode: Callable | None = None, pinned_encoder_revision: str | None = None, feature_contract: str = FEATURE_CONTRACT, label_source: str = LABEL_V2) -> tuple:
     if encode is not None and pinned_encoder_revision is not None:
         raise ValueError("test encoders cannot claim a pinned model revision")
-    specification = {"seed": seed, "candidates": candidate_count, "jobs": job_count, "code_commit": code_commit, "feature_contract": FEATURE_CONTRACT, "test_encoder": encode is not None, "pinned_encoder_revision": pinned_encoder_revision, "label_source": "synthetic-fixed-centres-latent-bernoulli-v2"}
+    if feature_contract not in SUPPORTED_CONTRACTS or label_source not in LABEL_SOURCES:
+        raise ValueError("unsupported feature contract or label source")
+    specification = {"seed": seed, "candidates": candidate_count, "jobs": job_count, "code_commit": code_commit, "feature_contract": feature_contract, "test_encoder": encode is not None, "pinned_encoder_revision": pinned_encoder_revision, "label_source": label_source}
+    if feature_contract != CONTRACT_V1:
+        # v2 features depend on the relationship file, so it is part of the dataset identity.
+        specification["skill_relations_sha256"] = skill_relations()[1]
     cache_key = hashlib.sha256(_canonical_json(specification)).hexdigest()
     cache = cache_root / cache_key
     manifest_path = cache / "manifest.json"
@@ -81,6 +90,8 @@ def prepare_synthetic_data(cache_root: Path, *, code_commit: str, seed: int = 42
     rng = random.Random(seed)
     candidates = [generate_candidate(rng) for _ in range(candidate_count)]
     jobs = [generate_job(rng) for _ in range(job_count)]
+    if label_source == LABEL_V3:
+        candidates = [apply_skill_aliases(candidate) for candidate in candidates]
     split = isolated_partitions(candidates, jobs, seed)
     raw_hash = hashlib.sha256(_canonical_json({"candidates": candidates, "jobs": jobs})).hexdigest()
     texts = [anonymize_resume_text(item["resume_text"]) for item in candidates] + [item["description"] for item in jobs]
@@ -114,8 +125,9 @@ def prepare_synthetic_data(cache_root: Path, *, code_commit: str, seed: int = 42
                 job_index = job_lookup[job_id]
                 job = jobs[job_index]
                 semantic = float(np.clip(embeddings[candidate_index] @ embeddings[len(candidates) + job_index], 0, 1))
-                overlap = skill_overlap(candidate["skills"], job["required_skills"])
-                growth = growth_score(candidate["years_experience"], job["required_experience_years"], len(candidate["certifications"]))
+                skill_feature, growth = contract_features(feature_contract, candidate_skills=candidate["skills"], required_skills=job["required_skills"], years_experience=candidate["years_experience"], required_experience_years=job["required_experience_years"], certification_count=len(candidate["certifications"]))
+                # The label's skill driver: listed exact overlap (v2 labels) or true ability (v3 labels).
+                overlap = true_skill_credit(candidate["latent_true_skills"], job["required_skills"]) if label_source == LABEL_V3 else skill_overlap(candidate["skills"], job["required_skills"])
                 experience = min(candidate["years_experience"] / max(job["required_experience_years"], 1), 1.5) / 1.5
                 domain = float(candidate["specialisation"] == job["specialisation"])
                 hidden = candidate["latent_competence"] - job["latent_quality_bar"]
@@ -123,7 +135,7 @@ def prepare_synthetic_data(cache_root: Path, *, code_commit: str, seed: int = 42
                 probability = 1 / (1 + np.exp(-logit))
                 partitions[group].append(len(rows))
                 identities.append({"candidate_id": identifier, "job_id": job_id, "split": group})
-                rows.append([semantic, overlap, growth])
+                rows.append([semantic, skill_feature, growth])
                 labels.append(int(label_rng.random() < probability))
     features = np.asarray(rows, dtype=float)
     target = np.asarray(labels, dtype=np.int64)
@@ -216,8 +228,10 @@ def train_epochs(features: np.ndarray, labels: np.ndarray, partitions: dict[str,
     if len(np.unique(labels[train_indices])) != 2 or len(np.unique(labels[validation_indices])) != 2:
         raise ValueError("training and validation must contain both classes")
     data_hash = hashlib.sha256(features.tobytes() + labels.astype(np.int64).tobytes()).hexdigest()
+    specification = manifest.get("specification", {})
+    feature_contract = specification.get("feature_contract", FEATURE_CONTRACT)
     split_manifest = {**manifest, "pair_indices": {name: indices.tolist() for name, indices in partitions.items()}, "feature_data_sha256": data_hash}
-    run_config = {**asdict(config), "feature_order": FEATURE_ORDER, "feature_contract": FEATURE_CONTRACT, "dataset_version": manifest.get("dataset_version", data_hash), "sklearn_version": sklearn.__version__, "numpy_version": np.__version__}
+    run_config = {**asdict(config), "feature_order": FEATURE_ORDER, "feature_contract": feature_contract, "dataset_version": manifest.get("dataset_version", data_hash), "sklearn_version": sklearn.__version__, "numpy_version": np.__version__}
     store = EpochArtifactStore(local_root, run_id, config=run_config, split_manifest=split_manifest, code_commit=code_commit, drive_root=drive_root)
     scaler = StandardScaler().fit(features[train_indices])
     train_features = scaler.transform(features)
@@ -261,9 +275,11 @@ def train_epochs(features: np.ndarray, labels: np.ndarray, partitions: dict[str,
     probabilities = best_model.predict_proba(train_features)[:, 1]
     baseline_scores = {"hybrid": probabilities, "fixed_weights": features @ np.array([0.45, 0.40, 0.15]), "semantic_only": features[:, 0]}
     thresholds = {name: float(max(np.linspace(0.05, 0.95, 91), key=lambda threshold: f1_score(labels[validation_indices], values[validation_indices] >= threshold, zero_division=0))) for name, values in baseline_scores.items()}
-    metrics = {"status": "complete", "max_epochs": config.max_epochs, "selected_epoch": best_epoch, "feature_contract": FEATURE_CONTRACT, "label_warning": "Synthetic labels, not independent hiring outcomes; head metrics precede hard eligibility filtering.", "results": {split: {name: classification_metrics(labels[indices], values[indices], thresholds[name]) for name, values in baseline_scores.items()} for split, indices in partitions.items() if split != "train"}}
-    artifact = {"model_version": run_id, "embedding_model": "sentence-transformers/all-MiniLM-L6-v2", "feature_order": FEATURE_ORDER, "feature_contract": FEATURE_CONTRACT, "scaler_mean": scaler.mean_.tolist(), "scaler_scale": scaler.scale_.tolist(), "logistic_regression": {"coefficients": best_model.coef_[0].tolist(), "intercept": float(best_model.intercept_[0])}, "decision_threshold": thresholds["hybrid"], "promotion_status": "REVIEW_REQUIRED_NOT_PROMOTED"}
+    metrics = {"status": "complete", "max_epochs": config.max_epochs, "selected_epoch": best_epoch, "feature_contract": feature_contract, "label_source": specification.get("label_source"), "label_warning": "Synthetic labels, not independent hiring outcomes; head metrics precede hard eligibility filtering.", "results": {split: {name: classification_metrics(labels[indices], values[indices], thresholds[name]) for name, values in baseline_scores.items()} for split, indices in partitions.items() if split != "train"}}
+    artifact = {"model_version": run_id, "embedding_model": "sentence-transformers/all-MiniLM-L6-v2", "feature_order": FEATURE_ORDER, "feature_contract": feature_contract, "scaler_mean": scaler.mean_.tolist(), "scaler_scale": scaler.scale_.tolist(), "logistic_regression": {"coefficients": best_model.coef_[0].tolist(), "intercept": float(best_model.intercept_[0])}, "decision_threshold": thresholds["hybrid"], "promotion_status": "REVIEW_REQUIRED_NOT_PROMOTED"}
     artifact["encoder_revision"] = manifest.get("encoder_revision")
+    if feature_contract != CONTRACT_V1:
+        artifact["skill_relations_sha256"] = specification["skill_relations_sha256"]
     _atomic_json(store.local_run / "final" / "artifact_candidate.json", artifact)
     _atomic_json(final_path, metrics)
     final_manifest = {"run_id": run_id, "files": {name: hashlib.sha256((store.local_run / "final" / name).read_bytes()).hexdigest() for name in ("artifact_candidate.json", "metrics.json")}}
