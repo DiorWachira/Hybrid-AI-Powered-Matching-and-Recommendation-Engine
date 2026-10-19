@@ -1,6 +1,6 @@
 HYBRID AI-POWERED WORKFORCE PLACEMENT ENGINE
 PROJECT MILESTONE ROADMAP (8 WEEKS)
-Last updated: 2026-10-19 (feature contract v2 compared locally; epoch-19 serving merged)
+Last updated: 2026-10-19 (contract v2 merged to main; v2 Colab run prepared; gold-slice kit)
 
 CURRENT REPOSITORY STATUS (2026-10-19)
 Main integrates Week 1-4 verification (8b6ed07), the Month 2 seeded evaluator and
@@ -39,6 +39,24 @@ FEATURE CONTRACT V2: RELATED SKILLS + EXPERIENCE READINESS (2026-10-19)
 [ ] Next: official pinned Colab run with --feature-contract serving-related-skill-readiness-v2
     --label-source synthetic-fixed-centres-latent-bernoulli-v3-skill-aliases, integrity
     review, then promotion decision. Gold-slice labels remain the independent check.
+[x] Contract v2 merged to main (d944d67) via integrate/match-features-v2: backend 155
+    passed / 5 skipped with Postgres+Neo4j up, frontend build and model-contract check
+    pass. Serving still uses the v1 epoch-19 artifact; v1 scoring is unchanged.
+[~] Official run 2026-10-19-epoch-combiner-v2-r001 pinned to 9621062 is set up in the
+    local notebook (setup/tests, launch, read-only status cells) with the local watcher
+    returning epochs; it starts once the Colab kernel is connected.
+
+GOLD SLICE: HAND-LABELLED INDEPENDENT CHECK (2026-10-19)
+[x] data_pipeline/gold_slice.py: `export` writes a blind labelling sheet (no scores,
+    synthetic labels or latent fields) of 150 IT-role pairs from the held-out warm/cold
+    test pairs of independent seed 20261015, 30 per active-model score band; `evaluate`
+    scores the active and any candidate artifact against the human labels (ROC-AUC with
+    bootstrap 95% CI, F1 at each model's threshold), reports synthetic-vs-human agreement
+    and inter-annotator kappa. It refuses drifted populations. Tests: test_gold_slice.py.
+[x] Sheet generated: data_pipeline/gold_slice/gold-seed20261015-150pairs/ (README has
+    the labelling rubric). Accountant pairs excluded (IT-only platform).
+[ ] Human labelling of the 150 pairs (ideally a second labeller for kappa), then score
+    live v1 and the v2 candidate before the promotion decision.
 
 TRAINING COMPLETION & FEATURE-PARITY GATE UPDATE (2026-10-14)
 [x] Confirmed the 2026-10-09 Colab run 2026-10-09-epoch-combiner-r001 actually
@@ -585,9 +603,9 @@ WEEK 7  Theme, Explainability, Testing and Tuning
 [x] RE-RUN the notebook against the regenerated dataset and record the new
     metrics (done locally via nbclient 2026-09-20 -- see TRAINING RUN
     RESULTS above; the committed artifact is now from this run)
-[ ] Hand-label a small gold slice (100-200 pairs) as an independent check
-    on the new label scheme -- deferred until the re-run confirms the scheme
-    behaves as intended
+[~] Hand-label a small gold slice (100-200 pairs) as an independent check
+    on the new label scheme -- 150-pair blind sheet and scorer ready (see GOLD
+    SLICE above); labels themselves still to be filled in
 Exit criterion: measured precision/recall/F1 recorded against a label that
 has independent ground truth, and matching latency within the stated target.
 Audit: NOT met. Gold slice, feature parity and measured latency remain open.
