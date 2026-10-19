@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 from sqlalchemy import text
 
+from app.core.hybrid_matcher import model_state
 from app.db.neo4j_db import verify_neo4j_connection
 from app.db.postgres import engine
 
@@ -28,4 +29,6 @@ def health_check() -> dict[str, object]:
             "postgres": postgres_status,
             "neo4j": neo4j_status,
         },
+        # Informational only: scoring still works while loading, the first request just waits for it.
+        "matching_model": model_state(),
     }

@@ -32,6 +32,7 @@ def read_job_matches(job_id: UUID, user: User = Depends(require_roles(UserRole.r
     evaluated_at = completed.created_at if completed else db.scalar(select(func.max(MatchResult.created_at)).where(MatchResult.job_id == job_id))
     if evaluated_at is None:
         return MatchEvaluationResponse(job_id=job_id, candidates=[])
+    artifact = _artifact()
     rows = db.execute(select(MatchResult, Candidate.full_name).join(Candidate, Candidate.candidate_id == MatchResult.candidate_id).join(User, User.user_id == Candidate.user_id).where(MatchResult.job_id == job_id, MatchResult.created_at == evaluated_at, User.is_active.is_(True)).order_by(MatchResult.final_weighted_score.desc(), MatchResult.candidate_id)).all()
     candidates = []
     for result, name in rows:
@@ -42,6 +43,7 @@ def read_job_matches(job_id: UUID, user: User = Depends(require_roles(UserRole.r
             skill_overlap=result.skill_overlap_score or 0.0, semantic_score=result.similarity_score or 0.0,
             growth_score=result.growth_score or 0.0, final_score=result.final_weighted_score or 0.0,
             matched_skills=explanation.get("matched_skills"), missing_skills=explanation.get("missing_skills"), model_version=result.model_version,
+            recommended=(result.hard_rule_passed and (result.final_weighted_score or 0.0) >= artifact["decision_threshold"]) if result.model_version == artifact["model_version"] else None,
         ))
     return MatchEvaluationResponse(job_id=job_id, evaluated_at=evaluated_at, candidates=candidates)
 
@@ -130,7 +132,7 @@ def _score_candidate(candidate: Candidate, job: JobPosting, semantic_score: floa
     if semantic_score is None:
         semantic_score = semantic_similarity(candidate.parsed_resume_text or "", job.description)
     growth_score = feature_growth_score(candidate.years_experience, job.required_experience_years, len(candidate.certifications or []))
-    final_score, _ = calibrated_score(semantic_score, overlap, growth_score)
+    final_score, recommended = calibrated_score(semantic_score, overlap, growth_score)
     return MatchCandidateResponse(
         candidate_id=candidate.candidate_id,
         full_name=candidate.full_name,
@@ -140,6 +142,7 @@ def _score_candidate(candidate: Candidate, job: JobPosting, semantic_score: floa
         semantic_score=round(semantic_score, 4),
         growth_score=round(growth_score, 4),
         final_score=final_score,
+        recommended=recommended,
     )
 
 

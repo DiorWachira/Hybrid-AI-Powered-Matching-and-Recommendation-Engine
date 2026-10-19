@@ -1,3 +1,6 @@
+import threading
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
@@ -13,10 +16,19 @@ from app.api.jobs import router as jobs_router
 from app.api.matches import router as matches_router
 from app.api.simulation import router as simulation_router
 from app.config import get_settings
+from app.core.hybrid_matcher import preload_model
 
 settings = get_settings()
 
-app = FastAPI(title=settings.app_name)
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    if settings.preload_matching_model:
+        threading.Thread(target=preload_model, name="matching-model-preload", daemon=True).start()
+    yield
+
+
+app = FastAPI(title=settings.app_name, lifespan=lifespan)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(SlowAPIMiddleware)

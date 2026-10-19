@@ -1,5 +1,9 @@
+import os
 import sys
 from pathlib import Path
+
+# Tests stub or lazily load the encoder; never start a background model load from TestClient startup.
+os.environ.setdefault("PRELOAD_MATCHING_MODEL", "false")
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 if str(BACKEND_ROOT) not in sys.path:
