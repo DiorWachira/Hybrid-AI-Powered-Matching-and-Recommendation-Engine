@@ -1,6 +1,6 @@
 HYBRID AI-POWERED WORKFORCE PLACEMENT ENGINE
 PROJECT MILESTONE ROADMAP (8 WEEKS)
-Last updated: 2026-10-19 (Month 2 evaluation, admin oversight and epoch-19 serving merged)
+Last updated: 2026-10-19 (feature contract v2 compared locally; epoch-19 serving merged)
 
 CURRENT REPOSITORY STATUS (2026-10-19)
 Main integrates Week 1-4 verification (8b6ed07), the Month 2 seeded evaluator and
@@ -14,6 +14,31 @@ hiring-quality validation or public deployment. Git workflow: docs/extras/commit
 Week 1-4 status: local API/DB/graph checks, focused CV upload integration and
 repeatable data-preparation tests pass. Main CI passed at c3fdec3. The merge itself
 contains no file conflicts; its remote CI result remains pending.
+
+FEATURE CONTRACT V2: RELATED SKILLS + EXPERIENCE READINESS (2026-10-19)
+[x] Serving: epoch-19 now preloads at startup, caches its artifact, and For You and
+    shortlists use its 0.44 decision threshold ("recommended"); For You scans all open
+    roles with one batched encode. Merged to main (CI run 39224528057 passed).
+[x] Contract v2 `serving-related-skill-readiness-v2` in the shared feature module:
+    S_graph credits a required skill through the strongest <=2-link path from a listed
+    skill in data_pipeline/ontology/curated_skill_relationships.json (40 IT entries
+    added); S_growth is experience readiness without the v1 no-certification penalty.
+    The artifact names its contract; v2 artifacts pin the relationship file SHA-256 and
+    serving refuses a mismatch. v1 behaviour and the live artifact are unchanged.
+[x] Label v3 (`...latent-bernoulli-v3-skill-aliases`): CVs may name tools (PostgreSQL,
+    GitHub Actions) for truly held skills; labels follow hidden true skills and a
+    generator transfer table that deliberately differs from the ontology weights.
+[x] data_pipeline/compare_feature_contracts.py (local, never promotes). Local trainer
+    reproduces r001 exactly (epoch 19, coefficients 0.745/0.953/0.484). ROC-AUC,
+    warm/cold, training seed 42 and independent seed 20261015:
+      live epoch-19 on v3 labels   0.672/0.713   0.735/0.707
+      v1 retrained on v3 labels    0.706/0.746   0.749/0.752
+      v2 retrained on v3 labels    0.807/0.847   0.864/0.814  (log loss 0.459/0.435)
+      control, v2 labels: v1 0.799/0.825, v2 0.799/0.870 (no regression)
+[~] Gains are conditional on the v3 alias assumption; synthetic labels only.
+[ ] Next: official pinned Colab run with --feature-contract serving-related-skill-readiness-v2
+    --label-source synthetic-fixed-centres-latent-bernoulli-v3-skill-aliases, integrity
+    review, then promotion decision. Gold-slice labels remain the independent check.
 
 TRAINING COMPLETION & FEATURE-PARITY GATE UPDATE (2026-10-14)
 [x] Confirmed the 2026-10-09 Colab run 2026-10-09-epoch-combiner-r001 actually
