@@ -1,4 +1,4 @@
-"""Gold-slice export stays blind and IT-only; evaluation scores against human labels and guards drift."""
+"""Gold-slice export stays blind and IT-only; evaluation scores frozen inputs against human labels."""
 import csv
 import json
 
@@ -15,7 +15,9 @@ def small_population(monkeypatch):
         return vectors / np.linalg.norm(vectors, axis=1, keepdims=True)
 
     def prepare(cache_root, *, pinned_encoder_revision, **options):
-        return epoch_trainer.prepare_synthetic_data(cache_root, candidate_count=200, job_count=100, encode=encoder, **options)
+        features, labels, partitions, manifest = epoch_trainer.prepare_synthetic_data(cache_root, candidate_count=200, job_count=100, encode=encoder, **options)
+        # Stand in for the pinned encoder so the frozen semantic scores match the active model's revision.
+        return features, labels, partitions, {**manifest, "encoder_revision": pinned_encoder_revision}
 
     monkeypatch.setattr(gold_slice, "prepare_synthetic_data", prepare)
 
@@ -59,7 +61,7 @@ def test_evaluate_scores_models_against_human_labels_and_agreement(tmp_path, sma
         synthetic["G001"] = str(1 - int(synthetic["G001"]))
     sheet = _write_labels(folder, synthetic)
     second = _write_labels(folder, {**synthetic, "G002": str(1 - int(synthetic["G002"]))}, "second.csv")
-    report = gold_slice.evaluate(sheet, second_labels=second, cache_root=tmp_path / "cache")
+    report = gold_slice.evaluate(sheet, second_labels=second)
     assert report["labelled_pairs"] == 40 and report["independent_quality_validated"] is False
     [(name, metrics)] = report["models"].items()
     assert name.endswith("[active]") and 0 <= metrics["roc_auc"] <= 1 and metrics["count"] == 40
@@ -67,14 +69,30 @@ def test_evaluate_scores_models_against_human_labels_and_agreement(tmp_path, sma
     assert report["inter_annotator"]["shared_pairs"] == 40 and report["inter_annotator"]["agreement"] == 39 / 40
 
 
-def test_evaluate_rejects_bad_labels_too_few_labels_and_population_drift(tmp_path, small_population):
+def test_evaluate_rejects_bad_labels_too_few_labels_and_a_different_encoder(tmp_path, small_population):
     folder = gold_slice.export(tmp_path / "out", pairs=40, cache_root=tmp_path / "cache")
     with pytest.raises(ValueError, match="at least 20"):
-        gold_slice.evaluate(_write_labels(folder, {"G001": "1"}), cache_root=tmp_path / "cache")
+        gold_slice.evaluate(_write_labels(folder, {"G001": "1"}))
     with pytest.raises(ValueError, match="must be 0, 1 or blank"):
-        gold_slice.evaluate(_write_labels(folder, {"G001": "yes"}), cache_root=tmp_path / "cache")
+        gold_slice.evaluate(_write_labels(folder, {"G001": "yes"}))
     sheet = _write_labels(folder, {f"G{number:03d}": str(number % 2) for number in range(1, 41)})
-    key_path = folder / "answer_key.json"
-    key_path.write_text(json.dumps({**json.loads(key_path.read_text(encoding="utf-8")), "dataset_sha256": "0" * 64}), encoding="utf-8")
-    with pytest.raises(ValueError, match="population differs"):
-        gold_slice.evaluate(sheet, cache_root=tmp_path / "cache")
+    other_encoder = tmp_path / "other.json"
+    other_encoder.write_text(json.dumps({**gold_slice._artifact(), "encoder_revision": "0" * 40}), encoding="utf-8")
+    with pytest.raises(ValueError, match="different encoder revision"):
+        gold_slice.evaluate(sheet, artifacts=[other_encoder])
+
+
+def test_frozen_inputs_reproduce_export_scores_without_regenerating_data(tmp_path, small_population, monkeypatch):
+    folder = gold_slice.export(tmp_path / "out", pairs=40, cache_root=tmp_path / "cache")
+    key = json.loads((folder / "answer_key.json").read_text(encoding="utf-8"))
+    active = gold_slice._artifact()
+    features, *_ = gold_slice._population(tmp_path / "cache", key["seed"], key["label_source"], active)
+    expected = gold_slice._score(active, features, [pair["row"] for pair in key["pairs"]])
+    assert np.array_equal(gold_slice._frozen_scores(active, key["pairs"]), expected)
+
+    def unavailable(*args, **kwargs):
+        raise AssertionError("evaluation must not regenerate the population")
+
+    monkeypatch.setattr(gold_slice, "prepare_synthetic_data", unavailable)
+    report = gold_slice.evaluate(_write_labels(folder, {f"G{number:03d}": str(number % 2) for number in range(1, 41)}))
+    assert report["labelled_pairs"] == 40

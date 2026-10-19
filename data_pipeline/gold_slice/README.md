@@ -21,7 +21,10 @@ An independent check of the matching model against human judgement. Created by
 
     python -m data_pipeline.gold_slice evaluate --labels data_pipeline/gold_slice/gold-seed20261015-150pairs/labelling_sheet.csv --artifact <candidate artifact_candidate.json> [--second-labels <copy.csv>] [--output report.json]
 
-The active model is always included. At least 20 labelled pairs are required.
+The active model is always included. At least 20 labelled pairs are required. The answer key freezes each
+pair's scoring inputs (semantic score, skills, experience) and synthetic label, so evaluation needs neither the
+encoder nor the generator, and labels stay valid if the synthetic generator changes later. A model must use
+the encoder revision recorded in the key.
 
 ## Limits
 
