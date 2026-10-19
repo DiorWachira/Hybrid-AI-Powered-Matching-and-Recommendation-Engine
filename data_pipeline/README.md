@@ -57,6 +57,24 @@ The deployment export excludes `latent_quality_bar`. The quality report records
 seed, row counts, duplicate IDs, missing required fields, non-negative experience
 checks, role counts, and distinct resume-text count.
 
+## Synthetic model evaluation
+
+`evaluate_model.py` scores the active serving artifact on seeded synthetic warm
+and cold holdouts. It uses the shared training/serving feature contract and pins
+generated embeddings to the encoder revision in the active artifact. It does not
+train or tune weights, access the live database, or score user records. The default
+seed is `20261015`; cached embeddings and optional output reports stay under the
+ignored `data_pipeline/training_runs/` directory:
+
+```powershell
+python -m data_pipeline.evaluate_model --seed 20261015 --output data_pipeline/training_runs/evaluation_report.json
+```
+
+The report includes precision, recall, F1, log loss and ROC-AUC where both classes
+are present. These are diagnostics against synthetic latent-generated labels,
+before hard eligibility filtering. They are not independent hiring-quality or
+fairness evidence. Do not use them alone to change or promote model weights.
+
 ## Ontology preparation
 
 A small weighted demo graph is stored in `ontology/curated_skill_relationships.json`.

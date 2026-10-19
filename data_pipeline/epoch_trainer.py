@@ -64,8 +64,10 @@ def isolated_partitions(candidates: list[dict], jobs: list[dict], seed: int) -> 
     return {"candidate_groups": candidate_groups, "job_groups": job_groups, "seed": seed, "protocol": "role-stratified-disjoint-candidates-60-20-10-10-cold-jobs-20-v1"}
 
 
-def prepare_synthetic_data(cache_root: Path, *, code_commit: str, seed: int = 42, candidate_count: int = 800, job_count: int = 100, encode: Callable | None = None) -> tuple:
-    specification = {"seed": seed, "candidates": candidate_count, "jobs": job_count, "code_commit": code_commit, "feature_contract": FEATURE_CONTRACT, "test_encoder": encode is not None, "label_source": "synthetic-fixed-centres-latent-bernoulli-v2"}
+def prepare_synthetic_data(cache_root: Path, *, code_commit: str, seed: int = 42, candidate_count: int = 800, job_count: int = 100, encode: Callable | None = None, pinned_encoder_revision: str | None = None) -> tuple:
+    if encode is not None and pinned_encoder_revision is not None:
+        raise ValueError("test encoders cannot claim a pinned model revision")
+    specification = {"seed": seed, "candidates": candidate_count, "jobs": job_count, "code_commit": code_commit, "feature_contract": FEATURE_CONTRACT, "test_encoder": encode is not None, "pinned_encoder_revision": pinned_encoder_revision, "label_source": "synthetic-fixed-centres-latent-bernoulli-v2"}
     cache_key = hashlib.sha256(_canonical_json(specification)).hexdigest()
     cache = cache_root / cache_key
     manifest_path = cache / "manifest.json"
@@ -82,11 +84,13 @@ def prepare_synthetic_data(cache_root: Path, *, code_commit: str, seed: int = 42
     split = isolated_partitions(candidates, jobs, seed)
     raw_hash = hashlib.sha256(_canonical_json({"candidates": candidates, "jobs": jobs})).hexdigest()
     texts = [anonymize_resume_text(item["resume_text"]) for item in candidates] + [item["description"] for item in jobs]
-    revision = "test-only"
+    revision = "test-only" if encode is not None else pinned_encoder_revision
     if encode is None:
-        from huggingface_hub import model_info
         from sentence_transformers import SentenceTransformer
-        revision = model_info(EMBEDDING_MODEL).sha
+        if revision is None:
+            from huggingface_hub import model_info
+
+            revision = model_info(EMBEDDING_MODEL).sha
         encoder = SentenceTransformer(EMBEDDING_MODEL, revision=revision)
         embeddings = encoder.encode(texts, normalize_embeddings=True, batch_size=64, show_progress_bar=True)
     else:

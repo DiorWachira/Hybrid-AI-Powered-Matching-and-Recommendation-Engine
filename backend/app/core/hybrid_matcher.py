@@ -50,9 +50,16 @@ def _get_model() -> SentenceTransformer:
 
 
 def semantic_similarity(candidate_text: str, job_text: str) -> float:
-    candidate_text = anonymize_resume_text(candidate_text)
-    embeddings = _get_model().encode([candidate_text, job_text], normalize_embeddings=True)
-    return float(max(0.0, min(1.0, embeddings[0] @ embeddings[1])))
+    return semantic_similarities([candidate_text], job_text)[0]
+
+
+def semantic_similarities(candidate_texts: list[str], job_text: str, batch_size: int = 32) -> list[float]:
+    if not candidate_texts:
+        return []
+    texts = [anonymize_resume_text(text) for text in candidate_texts] + [job_text]
+    embeddings = _get_model().encode(texts, normalize_embeddings=True, batch_size=batch_size, show_progress_bar=False)
+    job_embedding = embeddings[-1]
+    return [float(max(0.0, min(1.0, embedding @ job_embedding))) for embedding in embeddings[:-1]]
 
 
 def calibrated_score(semantic: float, graph: float, growth: float) -> tuple[float, bool]:

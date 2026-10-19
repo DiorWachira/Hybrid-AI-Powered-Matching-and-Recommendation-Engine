@@ -1,17 +1,15 @@
 HYBRID AI-POWERED WORKFORCE PLACEMENT ENGINE
 PROJECT MILESTONE ROADMAP (8 WEEKS)
-Last updated: 2026-10-15 (Week 1-4 verification merged)
+Last updated: 2026-10-19 (Month 2 evaluation, admin oversight and epoch-19 serving merged)
 
-CURRENT REPOSITORY STATUS (2026-10-15)
-Week 1-4 verification and the shared serving/training feature-contract validator
-are merged into main in merge commit 8b6ed07. The feature branch
-feat/weeks1-4-verification is published at 5a33db5. Main was at c3fdec3 before
-this merge; CI for the new main merge has not yet been checked. Local verification
-is recorded below. Full clean-machine/browser acceptance, official-source
-provenance and independent fairness/quality remain separate gates. Admin Simulation
-is implemented and API-tested; browser playback has not been verified. The epoch-19
-artifact is approved for prototype testing only, not independent hiring-quality
-validation or public deployment. Git workflow/account guidance: docs/extras/commit.txt.
+CURRENT REPOSITORY STATUS (2026-10-19)
+Main integrates Week 1-4 verification (8b6ed07), the Month 2 seeded evaluator and
+batched semantic scoring (feat/month2-synthetic-evaluation), admin job and recruiter
+oversight (feat/admin-job-oversight, feat/admin-recruiter-oversight) and epoch-19
+serving improvements (feat/epoch19-serving). Full clean-machine/browser acceptance,
+official-source provenance and independent fairness/quality remain separate gates.
+The epoch-19 artifact is approved for prototype testing only, not independent
+hiring-quality validation or public deployment. Git workflow: docs/extras/commit.txt.
 
 Week 1-4 status: local API/DB/graph checks, focused CV upload integration and
 repeatable data-preparation tests pass. Main CI passed at c3fdec3. The merge itself
@@ -455,14 +453,15 @@ MONTH 2 - MODEL TRAINING, INTEGRATION, EVALUATION
 --------------------------------------------------------------------
 WEEK 5  Model Work on Google Colab
 --------------------------------------------------------------------
-[~] Notebook has Colab setup code; latest saved probe says is_colab=False,
-    drive_mounted=False. Dependency reproducibility/remote runtime not certified
-[ ] Run notebook end-to-end on Colab: NOT evidenced and no new training authorized
-[x] Load a pre-trained sentence-transformer (all-MiniLM-L6-v2), tokenise CV
-    and job description text, generate embeddings
-[x] Compute cosine similarity between candidate and job vectors and
-    sanity-check ranking quality on the synthetic set (precision@k,
-    recall@k, NDCG@k against a rule-based weak label)
+[x] Pinned Colab fixed-epoch runner completed run r001: 100 epochs, epoch 19
+    selected by validation loss; both returned bundles passed integrity review
+[~] The legacy notebook itself was not run end-to-end with Run All; the completed
+    Colab execution used the pinned runner and mounted Drive workflow
+[x] Load pinned all-MiniLM-L6-v2 and generate normalized CV/job embeddings
+    in the verified r001 Colab run
+[x] Generate shared-contract semantic, direct-skill and growth features; report
+    held-out metrics against latent-generated synthetic labels, not the old
+    circular rule-based weak label
 [x] Decision recorded: fine-tuning the embedding model itself is deferred;
     only the score-combination logistic regression is trained/tuned, since
     3 features over a few thousand rows does not justify a bigger model
@@ -471,29 +470,29 @@ WEEK 5  Model Work on Google Colab
     the .joblib/.npy/.parquet outputs stay gitignored and regenerable)
 [x] Embedding storage decision: JSONB column now (per the existing
     candidates/job_postings schema); pgvector deferred until proven needed
-Exit criterion: historical LOCAL mechanics demonstrated; Colab execution,
-independent quality and reproducibility not signed off.
+Exit criterion: fixed-epoch Colab execution and bundle reproducibility verified;
+independent quality remains open.
 
-EPOCH WORKFLOW (additional increment, execution on hold) -- SUPERSEDED 2026-10-14: run r001 completed and verified; epoch 19 promoted
-[x] Local artifact-store proof writes fake per-epoch JSON/checkpoints and
-    mirrors temporary folders; tests pass. It does not train a model
-[ ] Actual fixed-epoch trainer with validation loss each epoch, no early stopping
-[ ] Full model/optimizer/RNG state, verified interrupted-run resume and atomic
-    recovery (current helper can replace local files before validating metadata)
-[ ] Real Colab -> Drive -> local reviewed-bundle round-trip with hashes
-[ ] Frozen independent test set used only after validation-based selection
-[ ] Explicit review/promotion of versioned artifacts; never automatic overwrite
+EPOCH WORKFLOW COMPLETION (2026-10-14)
+[x] Local artifact-store tests use fake checkpoint fixtures; the fixed-epoch
+    trainer and real checkpoint round-trip are verified separately below
+[x] Actual fixed-epoch trainer recorded validation loss each epoch without
+    early stopping; numeric checkpoint resume and deterministic epoch shuffling tested
+[x] Real Colab -> Drive -> two local destinations round-trip verified with hashes
+[x] Warm/cold synthetic holdouts evaluated after validation selected epoch 19;
+    they are not independent hiring ground truth
+[x] Returned artifact reviewed and promoted for PROTOTYPE_TESTING_APPROVED only;
+    no automatic promotion or production-quality claim
 
 --------------------------------------------------------------------
 WEEK 6  Hybrid Engine Integration and Graph Linking
 --------------------------------------------------------------------
 [x] backend/app/core/hybrid_matcher.py: load all-MiniLM-L6-v2 lazily and
     apply the committed scaler and logistic-regression calibration artifact
-[~] Selected-match Neo4j skill graph now displayed in-app; wider pathway/history
-    views remain pending. Serving direct overlap does
-    NOT match the historical notebook's weighted-related-skill feature
-[~] Hybrid scoring is rules-first, but serving growth differs too. Feature
-    contract/parity tests are required before reusing historical quality claims
+[~] Selected-match Neo4j skill graph is displayed in-app; wider pathway/history
+    views remain pending
+[x] Training and serving use the shared `serving-direct-skill-growth-v1` feature
+    module; parity validator and regression tests pass. This does not prove quality
 [~] FR-04 first pass: /api/matches/evaluate/{job_id} persists rows to
     match_results using local rule, skill and text scoring
 [x] FR-05 first pass: component scores, rule reasons, stored matched/missing skills,
@@ -518,14 +517,20 @@ WEEK 7  Theme, Explainability, Testing and Tuning
 [~] Security pass: ownership/UUID/config guards tested; Compose ports loopback.
     Throttling, upload guards, session revocation and dependency scans implemented;
     parser isolation, distributed counters and public data/retention policy open
-[ ] data_pipeline/evaluate_model.py reporting precision, recall and F1 --
-    this doubles as the "simulation mode" (seeded run of the hybrid engine
-    over the synthetic dataset, independent of live user traffic)
+[x] `data_pipeline/evaluate_model.py` reports precision, recall, F1, log loss and
+    ROC-AUC on seeded warm/cold synthetic holdouts through the active serving scorer;
+    8 focused evaluator tests and 13 trainer regressions pass. Full run used 800
+    candidates, 100 jobs, seed 20261015, and the artifact-pinned encoder revision.
+    Warm: F1 0.812, ROC-AUC 0.836, log loss 0.501 (400 pairs). Cold: F1 0.857,
+    ROC-AUC 0.846, log loss 0.453 (314 pairs). Report:
+    data_pipeline/training_runs/evaluation-2026-10-15/evaluation_report.json
 [ ] Tune scoring weights and thresholds using the evaluation output
+    Deliberately blocked on independent labelled evidence; synthetic metrics do
+    not justify weight or threshold changes. No weights changed in this run.
 
-    LABEL-VALIDITY CORRECTIONS (blocking any quality claim in the report):
-    HISTORICAL LOCAL implementation, not a verified Colab re-run. Synthetic
-    latents reduce direct circularity but do not create independent gold labels.
+    LABEL-VALIDITY LIMITATION (blocks any real-world quality claim): synthetic
+    latent-generated labels reduce direct circularity but are not independent
+    human hiring outcomes or a fairness audit.
 [x] Replace the circular weak label. generate_synthetic_data.py now emits
     hidden latents (latent_competence, latent_adaptability on candidates;
     latent_quality_bar on jobs) that are never model features, and the
@@ -544,10 +549,10 @@ WEEK 7  Theme, Explainability, Testing and Tuning
     the learned model's threshold is tuned (shared tune_threshold helper;
     the old flat 0.5 cut-off made the fixed-weight baseline a near-constant
     classifier at recall 1.000 / precision 0.629)
-[~] Add a job-disjoint split alongside the candidate-disjoint one. 20% of
-    job postings are held out entirely before splitting, giving a cold-start
-    test excluding training candidates, but NOT all validation candidates;
-    improve split isolation before claiming an untouched cold test
+[x] Isolated warm/cold holdouts: role-stratified candidate groups are disjoint
+    across train/validation/warm/cold; 20% of job IDs are cold-only. Split identity
+    and test-label isolation are covered by trainer regression tests. This remains
+    a synthetic protocol, not independent hiring-quality validation.
 [x] Enrich job/CV text before trusting S_bert. Each role now has three
     specialisations with distinct vocabulary, rendered through four sentence
     templates: 800/800 distinct resumes and 99/100 distinct job posts, and

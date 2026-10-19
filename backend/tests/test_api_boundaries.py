@@ -116,6 +116,42 @@ def test_owner_and_admin_can_evaluate_job(api_client, role):
     database.commit.assert_called_once()
 
 
+def test_job_evaluation_batches_only_hard_rule_eligible_candidates(api_client, monkeypatch):
+    from app.api import matches
+
+    client, database, user = api_client
+    job = SimpleNamespace(
+        job_id=uuid4(), employer_id=uuid4(), status=JobStatus.open,
+        title="Analyst", description="A sufficiently detailed analyst job description",
+        location="Nairobi", required_experience_years=2, salary_range_max=None,
+        requires_work_authorization=False, mandatory_certifications=[], required_skills=["SQL"],
+    )
+    employer = SimpleNamespace(user_id=user.user_id)
+    eligible = SimpleNamespace(
+        candidate_id=uuid4(), full_name="Eligible Candidate", years_experience=3,
+        location="Nairobi", expected_salary=None, certifications=[], skills=["SQL"],
+        parsed_resume_text="Analyst with SQL skills", work_authorized=True,
+    )
+    filtered = SimpleNamespace(
+        candidate_id=uuid4(), full_name="Filtered Candidate", years_experience=0,
+        location="Nairobi", expected_salary=None, certifications=[], skills=["SQL"],
+        parsed_resume_text="Entry-level analyst", work_authorized=True,
+    )
+    database.get.side_effect = lambda model, identifier: job if model is JobPosting else employer
+    database.scalars.return_value = [eligible, filtered]
+    embed = MagicMock(return_value=[0.8])
+    monkeypatch.setattr(matches, "semantic_similarities", embed)
+
+    response = client.post(f"/api/matches/evaluate/{job.job_id}")
+
+    assert response.status_code == 200
+    embed.assert_called_once_with([eligible.parsed_resume_text], job.description)
+    results = {item["candidate_id"]: item for item in response.json()["candidates"]}
+    assert results[str(eligible.candidate_id)]["semantic_score"] == 0.8
+    assert results[str(filtered.candidate_id)]["hard_rule_passed"] is False
+    assert results[str(filtered.candidate_id)]["semantic_score"] == 0
+
+
 @pytest.mark.parametrize("eligible_ids", [[], [1]])
 def test_for_you_excludes_hard_rule_failures(api_client, monkeypatch, eligible_ids):
     client, database, user = api_client
@@ -287,9 +323,12 @@ def test_evaluation_uses_candidate_id_to_break_score_ties(api_client, monkeypatc
     from app.schemas import MatchCandidateResponse
     client, database, user = api_client
     job_id = uuid4()
-    database.get.side_effect = [SimpleNamespace(job_id=job_id, employer_id=uuid4(), required_skills=[]), SimpleNamespace(user_id=user.user_id)]
-    database.scalars.return_value = [SimpleNamespace(candidate_id=UUID(int=index), skills=[]) for index in (2, 1)]
-    monkeypatch.setattr(matches, "_score_candidate", lambda candidate, job: MatchCandidateResponse(candidate_id=candidate.candidate_id, full_name="Test", hard_rule_passed=False, rule_reasons=[], skill_overlap=0, semantic_score=0, growth_score=0, final_score=0))
+    job = SimpleNamespace(job_id=job_id, employer_id=uuid4(), required_skills=[], description="Test role")
+    database.get.side_effect = [job, SimpleNamespace(user_id=user.user_id)]
+    database.scalars.return_value = [SimpleNamespace(candidate_id=UUID(int=index), skills=[], parsed_resume_text="") for index in (2, 1)]
+    monkeypatch.setattr(matches, "_candidate_rule_result", lambda candidate, posting: SimpleNamespace(passed=True))
+    monkeypatch.setattr(matches, "semantic_similarities", lambda texts, description: [0.0] * len(texts))
+    monkeypatch.setattr(matches, "_score_candidate", lambda candidate, posting, semantic_score=None: MatchCandidateResponse(candidate_id=candidate.candidate_id, full_name="Test", hard_rule_passed=False, rule_reasons=[], skill_overlap=0, semantic_score=0, growth_score=0, final_score=0))
     response = client.post(f"/api/matches/evaluate/{job_id}")
     assert response.status_code == 200
     assert [item["candidate_id"] for item in response.json()["candidates"]] == [str(UUID(int=1)), str(UUID(int=2))]
