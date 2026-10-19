@@ -19,7 +19,8 @@ from app.api.dependencies import require_roles
 from app.db.models import AuditEvent, Candidate, CandidateOpportunity, Employer, JobApplication, JobPosting, JobStatus, OpportunityStatus, User, UserRole
 from app.db.postgres import get_db
 from app.schemas import ApplicationResponse, BrowsedOpportunityResponse, CandidateApplicationResponse, CandidateDashboardResponse, CandidateProfileResponse, CandidateProfileUpdate, OpportunityActionRequest, OpportunityResponse
-from app.api.matches import _score_candidate
+from app.api.matches import _candidate_rule_result, _score_candidate
+from app.core.hybrid_matcher import job_similarities
 from app.core.text_preprocessing import anonymize_resume_text
 
 router = APIRouter(prefix="/candidates", tags=["candidates"])
@@ -61,7 +62,11 @@ def _skills_from_text(text: str) -> list[str]:
     return [skill for skill in KNOWN_SKILLS if re.search(rf"(?<![a-z0-9]){re.escape(skill)}(?![a-z0-9])", normalised)]
 
 
-def _opportunity(job: JobPosting, score: float, status_value: OpportunityStatus | None, company_name: str) -> OpportunityResponse:
+# Upper bound on open roles scored per dashboard load; rules run first, so only eligible roles reach the encoder.
+OPEN_JOB_SCAN_LIMIT = 500
+
+
+def _opportunity(job: JobPosting, score: float, status_value: OpportunityStatus | None, company_name: str, recommended: bool = False) -> OpportunityResponse:
     return OpportunityResponse(
         job_id=job.job_id,
         title=job.title,
@@ -73,6 +78,7 @@ def _opportunity(job: JobPosting, score: float, status_value: OpportunityStatus 
         required_skills=job.required_skills or [],
         mandatory_certifications=job.mandatory_certifications or [],
         match_score=round(score, 4),
+        recommended=recommended,
         status=status_value,
     )
 
@@ -146,23 +152,26 @@ def candidate_dashboard(
     candidate = db.scalar(select(Candidate).where(Candidate.user_id == user.user_id))
     if candidate is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Candidate profile not found")
-    jobs = list(db.scalars(select(JobPosting).where(JobPosting.status == JobStatus.open).order_by(JobPosting.posted_at.desc()).limit(50)))
+    jobs = list(db.scalars(select(JobPosting).where(JobPosting.status == JobStatus.open).order_by(JobPosting.posted_at.desc()).limit(OPEN_JOB_SCAN_LIMIT)))
     employer_names = {employer.employer_id: employer.company_name for employer in db.scalars(select(Employer))}
     activity = {item.job_id: item for item in db.scalars(select(CandidateOpportunity).where(CandidateOpportunity.candidate_id == candidate.candidate_id))}
+    eligible_jobs = [job for job in jobs if _candidate_rule_result(candidate, job).passed]
+    similarities = dict(zip((job.job_id for job in eligible_jobs), job_similarities(candidate.parsed_resume_text or "", [job.description for job in eligible_jobs])))
     scored = []
-    eligible = []
+    recommended = []
     for job in jobs:
-        result = _score_candidate(candidate, job)
-        scored.append(_opportunity(job, result.final_score, activity.get(job.job_id).status if job.job_id in activity else None, employer_names.get(job.employer_id, "Workforce employer")))
-        if result.hard_rule_passed:
-            eligible.append(scored[-1])
+        result = _score_candidate(candidate, job, similarities.get(job.job_id))
+        scored.append(_opportunity(job, result.final_score, activity.get(job.job_id).status if job.job_id in activity else None, employer_names.get(job.employer_id, "Workforce employer"), bool(result.recommended)))
+        if result.recommended:
+            recommended.append(scored[-1])
     history = []
     for item in sorted(activity.values(), key=lambda value: value.updated_at, reverse=True):
         if item.job.status == JobStatus.closed or item.status in {OpportunityStatus.saved, OpportunityStatus.applied}:
             history.append(_opportunity(item.job, next((entry.match_score for entry in scored if entry.job_id == item.job_id), 0.0), item.status, employer_names.get(item.job.employer_id, "Workforce employer")))
     return CandidateDashboardResponse(
         available_opportunities=scored[:20],
-        for_you=sorted(eligible, key=lambda value: value.match_score, reverse=True)[:5],
+        # Only roles the candidate is eligible for and the model scores at or above its decision threshold.
+        for_you=sorted(recommended, key=lambda value: value.match_score, reverse=True)[:5],
         history=history[:20],
     )
 

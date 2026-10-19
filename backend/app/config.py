@@ -24,6 +24,9 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 60
 
+    # Load the sentence encoder in the background at startup so the first scoring request is not a cold start.
+    preload_matching_model: bool = True
+
     @field_validator("database_url")
     @classmethod
     def normalize_local_database_host(cls, value: str) -> str:

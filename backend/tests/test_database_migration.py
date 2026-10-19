@@ -312,12 +312,15 @@ def test_authenticated_application_and_match_workflow(migrated_database, monkeyp
         with Session(engine) as database:
             yield database
 
-    def score(candidate, job):
-        return MatchCandidateResponse(candidate_id=candidate.candidate_id, full_name=candidate.full_name, hard_rule_passed=True, rule_reasons=[], skill_overlap=0.8, semantic_score=0.7, growth_score=0.6, final_score=0.75)
+    def score(candidate, job, semantic_score=None):
+        return MatchCandidateResponse(candidate_id=candidate.candidate_id, full_name=candidate.full_name, hard_rule_passed=True, rule_reasons=[], skill_overlap=0.8, semantic_score=0.7, growth_score=0.6, final_score=0.75, recommended=True)
 
     candidate_score = Mock(side_effect=score)
     monkeypatch.setattr(candidates, "_score_candidate", candidate_score)
     monkeypatch.setattr(matches, "_score_candidate", score)
+    # Batched encoder entry points; the scoring stub above ignores their values.
+    monkeypatch.setattr(candidates, "job_similarities", lambda candidate_text, job_texts: [0.7] * len(job_texts))
+    monkeypatch.setattr(matches, "semantic_similarities", lambda candidate_texts, job_text: [0.7] * len(candidate_texts))
     previous = app.dependency_overrides.copy()
     app.dependency_overrides[get_db] = database_dependency
     try:

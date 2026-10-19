@@ -1,6 +1,7 @@
 export type ApiHealth = {
   status: "ok" | "degraded";
   database: { postgres: "ok" | "error"; neo4j: "ok" | "error" };
+  matching_model?: "ready" | "loading" | "not_loaded";
 };
 
 export type UserRole = "candidate" | "recruiter" | "admin";
@@ -71,6 +72,8 @@ export type MatchCandidate = {
   semantic_score: number;
   growth_score: number;
   final_score: number;
+  /** Eligible and at or above the model's decision threshold; null when scored by another model version. */
+  recommended?: boolean | null;
 };
 
 export type MatchEvaluation = {
@@ -126,6 +129,7 @@ export type Opportunity = {
   required_skills: string[];
   mandatory_certifications: string[];
   match_score: number;
+  recommended?: boolean;
   status?: "saved" | "applied" | "viewed";
 };
 

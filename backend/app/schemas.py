@@ -222,6 +222,7 @@ class OpportunityResponse(BaseModel):
     required_skills: list[str]
     mandatory_certifications: list[str]
     match_score: float
+    recommended: bool = False
     status: OpportunityStatus | None
 
 
@@ -253,6 +254,9 @@ class MatchCandidateResponse(BaseModel):
     semantic_score: float
     growth_score: float
     final_score: float
+    # Eligible and at or above the model's validation-tuned decision threshold. None for rows scored by
+    # another model version, whose threshold is unknown.
+    recommended: bool | None = False
 
 
 class MatchEvaluationResponse(BaseModel):

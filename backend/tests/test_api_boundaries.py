@@ -152,26 +152,54 @@ def test_job_evaluation_batches_only_hard_rule_eligible_candidates(api_client, m
     assert results[str(filtered.candidate_id)]["semantic_score"] == 0
 
 
-@pytest.mark.parametrize("eligible_ids", [[], [1]])
-def test_for_you_excludes_hard_rule_failures(api_client, monkeypatch, eligible_ids):
+def test_for_you_only_recommends_eligible_roles_above_model_threshold(api_client, monkeypatch):
     client, database, user = api_client
     user.role = UserRole.candidate
     postings = [JobPosting(
         job_id=uuid4(), employer_id=uuid4(), title=f"Role {index}",
-        description="A sample role", required_experience_years=1,
+        description=f"Sample role {index}", required_experience_years=1,
         status=JobStatus.open,
-    ) for index in range(2)]
-    allowed = {postings[index].job_id for index in eligible_ids}
-    database.scalar.return_value = SimpleNamespace(candidate_id=uuid4())
+    ) for index in range(3)]
+    recommended, eligible_only, filtered = postings
+    database.scalar.return_value = SimpleNamespace(candidate_id=uuid4(), parsed_resume_text="Analyst")
     database.scalars.side_effect = [postings, [], []]
-    monkeypatch.setattr(candidates, "_score_candidate", lambda candidate, job: SimpleNamespace(
-        hard_rule_passed=job.job_id in allowed, final_score=0.0,
-    ))
+    monkeypatch.setattr(candidates, "_candidate_rule_result", lambda candidate, job: SimpleNamespace(passed=job is not filtered))
+    similarities = MagicMock(return_value=[0.9, 0.2])
+    monkeypatch.setattr(candidates, "job_similarities", similarities)
+    seen = {}
+
+    def score(candidate, job, semantic_score=None):
+        seen[job.job_id] = semantic_score
+        return SimpleNamespace(hard_rule_passed=job is not filtered, final_score=0.8 if job is recommended else 0.3 if job is eligible_only else 0.0, recommended=job is recommended)
+
+    monkeypatch.setattr(candidates, "_score_candidate", score)
     response = client.get("/api/candidates/dashboard")
     assert response.status_code == 200
     payload = response.json()
-    assert len(payload["available_opportunities"]) == 2
-    assert {entry["job_id"] for entry in payload["for_you"]} == {str(identifier) for identifier in allowed}
+    assert len(payload["available_opportunities"]) == 3
+    assert [entry["job_id"] for entry in payload["for_you"]] == [str(recommended.job_id)]
+    assert payload["for_you"][0]["recommended"] is True
+    # One encode call covers every eligible role; rule-filtered roles never reach the encoder.
+    similarities.assert_called_once_with("Analyst", ["Sample role 0", "Sample role 1"])
+    assert seen == {recommended.job_id: 0.9, eligible_only.job_id: 0.2, filtered.job_id: None}
+
+
+def test_saved_results_mark_recommendations_only_for_the_active_model(api_client, monkeypatch):
+    from app.api import matches
+    client, database, user = api_client
+    user.role = UserRole.admin
+    job_id = uuid4()
+    database.get.return_value = SimpleNamespace(job_id=job_id, employer_id=uuid4())
+    database.scalar.return_value = SimpleNamespace(created_at=datetime.now(UTC))
+    monkeypatch.setattr(matches, "_artifact", lambda: {"model_version": "active", "decision_threshold": 0.5})
+
+    def row(score, version, passed=True):
+        return (SimpleNamespace(match_id=uuid4(), candidate_id=uuid4(), hard_rule_passed=passed, skill_gap_breakdown={}, skill_overlap_score=0.5, similarity_score=0.5, growth_score=0.5, final_weighted_score=score, model_version=version), "Candidate")
+
+    database.execute.return_value.all.return_value = [row(0.7, "active"), row(0.4, "active"), row(0.9, "older"), row(0.0, "active", passed=False)]
+    response = client.get(f"/api/matches/jobs/{job_id}")
+    assert response.status_code == 200
+    assert [item["recommended"] for item in response.json()["candidates"]] == [True, False, None, False]
 
 
 def test_open_job_listing_filters_query(api_client):
