@@ -463,3 +463,31 @@ def test_evaluation_uses_candidate_id_to_break_score_ties(api_client, monkeypatc
     assert response.status_code == 200
     assert [item["candidate_id"] for item in response.json()["candidates"]] == [str(UUID(int=1)), str(UUID(int=2))]
     assert all(item["model_version"] == "2026-10-09-epoch-combiner-r001" for item in response.json()["candidates"])
+
+def test_v2_evaluation_records_which_related_skill_earned_credit(api_client, monkeypatch):
+    from app.api import matches
+    from app.core.match_features import CONTRACT_V2
+    client, database, user = api_client
+    user.role = UserRole.admin
+    job = SimpleNamespace(
+        job_id=uuid4(), employer_id=uuid4(), status=JobStatus.open, title="Data Engineer",
+        description="Build SQL pipelines", location=None, required_experience_years=2, salary_range_max=None,
+        requires_work_authorization=False, mandatory_certifications=[], required_skills=["SQL", "Python"],
+    )
+    candidate = SimpleNamespace(
+        candidate_id=uuid4(), full_name="Alias Candidate", years_experience=3, location=None, expected_salary=None,
+        certifications=[], skills=["PostgreSQL", "Python"], parsed_resume_text="PostgreSQL and Python", work_authorized=True,
+    )
+    base = matches._artifact()
+    monkeypatch.setattr(matches, "_artifact", lambda: {**base, "feature_contract": CONTRACT_V2})
+    monkeypatch.setattr(matches, "semantic_similarities", lambda texts, job_text: [0.7] * len(texts))
+    database.get.return_value = job
+    database.scalars.return_value = [candidate]
+    response = client.post(f"/api/matches/evaluate/{job.job_id}")
+    assert response.status_code == 200
+    result = response.json()["candidates"][0]
+    assert result["skill_overlap"] == 0.95
+    assert result["related_skills"] == [{"required": "SQL", "via": "PostgreSQL", "credit": 0.9}]
+    assert result["missing_skills"] == ["SQL"]
+    stored = next(call.args[0] for call in database.add.call_args_list if isinstance(call.args[0], MatchResult))
+    assert stored.skill_gap_breakdown["related_skills"] == result["related_skills"]
