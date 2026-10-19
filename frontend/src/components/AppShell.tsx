@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { ArrowUpRight, FlaskConical, LayoutDashboard, LogOut, Menu, Network, ShieldCheck, Target, Users, X } from "lucide-react";
+import { ArrowUpRight, FlaskConical, LayoutDashboard, LogOut, Menu, Network, ShieldCheck, Target, UserRoundSearch, Users, X } from "lucide-react";
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { api, type ApiHealth } from "../lib/api";
 import { clearSession, getSessionRole } from "../lib/session";
@@ -12,8 +12,8 @@ const navigationByRole = {
   ],
   admin: [
     { to: "/admin", label: "Admin overview", icon: ShieldCheck },
+    { to: "/admin/recruiters", label: "Recruiter oversight", icon: UserRoundSearch },
     { to: "/admin/simulation", label: "Simulation", icon: FlaskConical },
-    { to: "/recruiter", label: "Recruiter workspace", icon: LayoutDashboard },
     { to: "/matches", label: "Match analysis", icon: Target },
   ],
 } as const;
@@ -24,10 +24,13 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [mobileNav, setMobileNav] = useState(false);
   const [health, setHealth] = useState<ApiHealth | null>(null);
   const [checking, setChecking] = useState(true);
+  const [accountEmail, setAccountEmail] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
     void api.health().then((value) => { if (active) setHealth(value); }).catch(() => { if (active) setHealth(null); }).finally(() => { if (active) setChecking(false); });
+    const token = localStorage.getItem("jobbridge_token");
+    if (token) void api.currentAccount(token).then((account) => { if (active) setAccountEmail(account.email); }).catch(() => { if (active) setAccountEmail(null); });
     return () => { active = false; };
   }, []);
 
@@ -45,7 +48,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <Link to={homePath} className="brand-lockup"><span className="brand-symbol"><Network size={22} /></span><span>JobBridge<span className="brand-dot">.</span></span></Link>
           <button className="icon-button mobile-only" onClick={() => setMobileNav(false)} aria-label="Close navigation"><X size={20} /></button>
         </div>
-        <div className="workspace-identity"><span className="identity-avatar">{sessionRole === "admin" ? "AD" : sessionRole === "candidate" ? "CA" : "RE"}</span><div><strong>{sessionRole === "admin" ? "Administration" : sessionRole === "candidate" ? "Career workspace" : "Talent workspace"}</strong><span>{sessionRole} account</span></div></div>
+        <div className="workspace-identity"><span className="identity-avatar">{sessionRole === "admin" ? "AD" : sessionRole === "candidate" ? "CA" : "RE"}</span><div><strong>{sessionRole === "admin" ? "Administration" : sessionRole === "candidate" ? "Career workspace" : "Talent workspace"}</strong><span>{sessionRole} account</span>{accountEmail && <span className="identity-email" title={accountEmail}>{accountEmail}</span>}</div></div>
         <p className="eyebrow nav-label">Workspace</p>
         <nav aria-label="Primary workspace" className="workspace-links">
           {visibleNavigation.map(({ to, label, icon: Icon }) => <NavLink key={to} to={to} end onClick={() => setMobileNav(false)} className={({ isActive }) => isActive ? "is-active" : ""}><Icon size={18} /><span>{label}</span><ArrowUpRight className="nav-arrow" size={15} /></NavLink>)}
@@ -54,7 +57,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       </aside>
       <div className="workspace-body">
         <header className="workspace-topbar">
-          <div className="topbar-location"><button className="icon-button mobile-only" aria-label="Open navigation" aria-expanded={mobileNav} aria-controls="workspace-navigation" onClick={() => setMobileNav(true)}><Menu size={20} /></button><span>Workspace</span><span className="breadcrumb-slash">/</span><strong>{location.pathname === "/admin/simulation" ? "Simulation" : sessionRole === "candidate" ? "Discover" : sessionRole === "admin" ? "Overview" : "Recruitment"}</strong></div>
+          <div className="topbar-location"><button className="icon-button mobile-only" aria-label="Open navigation" aria-expanded={mobileNav} aria-controls="workspace-navigation" onClick={() => setMobileNav(true)}><Menu size={20} /></button><span>Workspace</span><span className="breadcrumb-slash">/</span><strong>{location.pathname === "/admin/simulation" ? "Simulation" : location.pathname === "/admin/recruiters" ? "Recruiter oversight" : sessionRole === "candidate" ? "Discover" : sessionRole === "admin" ? "Overview" : "Recruitment"}</strong></div>
           <div className="topbar-actions"><span className="role-tag">{sessionRole}</span><button className="icon-button" title="Sign out" aria-label="Sign out" onClick={() => { clearSession(); navigate("/auth", { replace: true }); }}><LogOut size={18} /></button></div>
         </header>
         <div id="workspace-content">{children}</div>

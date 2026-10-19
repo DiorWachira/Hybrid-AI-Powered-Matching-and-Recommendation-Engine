@@ -5,18 +5,36 @@ from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from app.core.rate_limit import limiter
-from sqlalchemy import func, select
-from sqlalchemy.orm import Session
+from sqlalchemy import String, and_, cast, exists, func, or_, select
+from sqlalchemy.orm import Session, aliased
 
 from app.api.dependencies import require_roles
-from app.db.models import AuditEvent, Candidate, Employer, GraphSyncEvent, JobApplication, JobPosting, MatchResult, User, UserRole
+from app.db.models import AuditEvent, Candidate, Employer, GraphSyncEvent, JobApplication, JobPosting, JobStatus, MatchResult, User, UserRole
 from app.db.postgres import get_db
-from app.schemas import AccountStatusUpdate, AdminOverviewResponse, AdminUserResponse, AuditEventResponse, JobResponse, JobStatusUpdate, OntologyRelationRequest, OntologySkillRequest, ResetAuthorization
+from app.schemas import AccountStatusUpdate, AdminJobResponse, AdminOversightSummary, AdminOverviewResponse, AdminRecruiterResponse, AdminUserResponse, AuditEventResponse, JobResponse, JobStatusUpdate, OntologyRelationRequest, OntologySkillRequest, ResetAuthorization
 from app.db.neo4j_db import get_neo4j_driver
 from neo4j.exceptions import Neo4jError, ServiceUnavailable, SessionExpired
 from app.utils.security import verify_password
 
 router = APIRouter(prefix="/admin", tags=["administration"])
+
+# An open posting with no applicants after this many days is flagged for review.
+STALE_AFTER_DAYS = 14
+
+
+def _stale_cutoff() -> datetime:
+    return datetime.now(UTC) - timedelta(days=STALE_AFTER_DAYS)
+
+
+def _is_stale(cutoff: datetime):
+    # Aliased so the subquery still has its own FROM when the outer query already joins applications.
+    application = aliased(JobApplication)
+    return and_(JobPosting.status == JobStatus.open, JobPosting.posted_at < cutoff, ~exists().where(application.job_id == JobPosting.job_id))
+
+
+def _needs_attention(cutoff: datetime):
+    # Expects the recruiter's User row to be joined: a suspended recruiter's open roles stay visible to candidates.
+    return and_(JobPosting.status == JobStatus.open, or_(User.is_active.is_(False), _is_stale(cutoff)))
 
 
 @router.get("/ontology")
@@ -131,6 +149,141 @@ def moderate_job(job_id: UUID, payload: JobStatusUpdate, user: User = Depends(re
     return job
 
 
+@router.get("/jobs", response_model=list[AdminJobResponse])
+def list_all_jobs(
+    search: str = Query(default="", max_length=120),
+    status_filter: JobStatus | None = Query(default=None, alias="status"),
+    employer_id: UUID | None = None,
+    attention: bool = False,
+    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=25, ge=1, le=100),
+    user: User = Depends(require_roles(UserRole.admin)),
+    db: Session = Depends(get_db),
+):
+    statement = (
+        select(JobPosting, Employer.company_name, User.email, User.is_active, func.count(JobApplication.application_id))
+        .join(Employer, Employer.employer_id == JobPosting.employer_id)
+        .join(User, User.user_id == Employer.user_id)
+        .outerjoin(JobApplication, JobApplication.job_id == JobPosting.job_id)
+    )
+    if search.strip():
+        term = search.strip()
+        statement = statement.where(
+            or_(
+                JobPosting.title.icontains(term, autoescape=True),
+                Employer.company_name.icontains(term, autoescape=True),
+                User.email.icontains(term, autoescape=True),
+                cast(JobPosting.required_skills, String).icontains(term, autoescape=True),
+            )
+        )
+    if status_filter is not None:
+        statement = statement.where(JobPosting.status == status_filter)
+    if employer_id is not None:
+        statement = statement.where(JobPosting.employer_id == employer_id)
+    if attention:
+        statement = statement.where(_needs_attention(_stale_cutoff()))
+    statement = (
+        statement.group_by(JobPosting.job_id, Employer.company_name, User.email, User.is_active)
+        .order_by(JobPosting.posted_at.desc(), JobPosting.job_id)
+        .offset(offset)
+        .limit(limit)
+    )
+    rows = db.execute(statement).all()
+    return [
+        AdminJobResponse(
+            **JobResponse.model_validate(job).model_dump(),
+            employer_id=job.employer_id,
+            company_name=company_name,
+            recruiter_email=recruiter_email,
+            recruiter_active=recruiter_active,
+            applicant_count=applicant_count,
+        )
+        for job, company_name, recruiter_email, recruiter_active, applicant_count in rows
+    ]
+
+
+@router.get("/recruiters/summary", response_model=AdminOversightSummary)
+def read_oversight_summary(user: User = Depends(require_roles(UserRole.admin)), db: Session = Depends(get_db)):
+    cutoff = _stale_cutoff()
+    owned_jobs = select(func.count(JobPosting.job_id)).join(Employer, Employer.employer_id == JobPosting.employer_id).join(User, User.user_id == Employer.user_id)
+    return AdminOversightSummary(
+        recruiters_count=db.scalar(select(func.count()).select_from(Employer)) or 0,
+        active_recruiters_count=db.scalar(select(func.count()).select_from(Employer).join(User, User.user_id == Employer.user_id).where(User.is_active.is_(True))) or 0,
+        jobs_open=db.scalar(select(func.count()).select_from(JobPosting).where(JobPosting.status == JobStatus.open)) or 0,
+        jobs_closed=db.scalar(select(func.count()).select_from(JobPosting).where(JobPosting.status == JobStatus.closed)) or 0,
+        applications_total=db.scalar(select(func.count()).select_from(JobApplication)) or 0,
+        hired_total=db.scalar(select(func.count()).select_from(JobApplication).where(JobApplication.status == "hired")) or 0,
+        stale_open_jobs=db.scalar(owned_jobs.where(_is_stale(cutoff))) or 0,
+        suspended_open_jobs=db.scalar(owned_jobs.where(JobPosting.status == JobStatus.open, User.is_active.is_(False))) or 0,
+        attention_jobs=db.scalar(owned_jobs.where(_needs_attention(cutoff))) or 0,
+        stale_after_days=STALE_AFTER_DAYS,
+    )
+
+
+@router.get("/recruiters", response_model=list[AdminRecruiterResponse])
+def list_recruiters(
+    search: str = Query(default="", max_length=120),
+    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=25, ge=1, le=100),
+    user: User = Depends(require_roles(UserRole.admin)),
+    db: Session = Depends(get_db),
+):
+    cutoff = _stale_cutoff()
+    # Applications are aggregated per job first so the per-employer job counts are not multiplied by applicants.
+    applications = (
+        select(
+            JobApplication.job_id,
+            func.count(JobApplication.application_id).label("applications"),
+            func.count(JobApplication.application_id).filter(JobApplication.status == "hired").label("hired"),
+        )
+        .group_by(JobApplication.job_id)
+        .subquery()
+    )
+    jobs = (
+        select(
+            JobPosting.employer_id,
+            func.count(JobPosting.job_id).label("jobs_total"),
+            func.count(JobPosting.job_id).filter(JobPosting.status == JobStatus.open).label("jobs_open"),
+            func.coalesce(func.sum(applications.c.applications), 0).label("applications_total"),
+            func.coalesce(func.sum(applications.c.hired), 0).label("hired_total"),
+            func.count(JobPosting.job_id).filter(JobPosting.status == JobStatus.open, JobPosting.posted_at < cutoff, applications.c.job_id.is_(None)).label("stale_open_jobs"),
+            func.max(JobPosting.posted_at).label("last_posted_at"),
+        )
+        .outerjoin(applications, applications.c.job_id == JobPosting.job_id)
+        .group_by(JobPosting.employer_id)
+        .subquery()
+    )
+    statement = (
+        select(
+            Employer, User.email, User.is_active, User.is_demo,
+            func.coalesce(jobs.c.jobs_total, 0), func.coalesce(jobs.c.jobs_open, 0),
+            func.coalesce(jobs.c.applications_total, 0), func.coalesce(jobs.c.hired_total, 0),
+            func.coalesce(jobs.c.stale_open_jobs, 0), jobs.c.last_posted_at,
+        )
+        .join(User, User.user_id == Employer.user_id)
+        .outerjoin(jobs, jobs.c.employer_id == Employer.employer_id)
+    )
+    if search.strip():
+        term = search.strip()
+        statement = statement.where(
+            or_(
+                Employer.company_name.icontains(term, autoescape=True),
+                Employer.contact_name.icontains(term, autoescape=True),
+                User.email.icontains(term, autoescape=True),
+            )
+        )
+    statement = statement.order_by(jobs.c.last_posted_at.desc().nulls_last(), Employer.company_name, Employer.employer_id).offset(offset).limit(limit)
+    return [
+        AdminRecruiterResponse(
+            employer_id=employer.employer_id, user_id=employer.user_id, company_name=employer.company_name,
+            contact_name=employer.contact_name, email=email, is_active=is_active, is_demo=is_demo,
+            jobs_total=jobs_total, jobs_open=jobs_open, applications_total=applications_total,
+            hired_total=hired_total, stale_open_jobs=stale_open_jobs, last_posted_at=last_posted_at,
+        )
+        for employer, email, is_active, is_demo, jobs_total, jobs_open, applications_total, hired_total, stale_open_jobs, last_posted_at in db.execute(statement).all()
+    ]
+
+
 @router.get("/overview", response_model=AdminOverviewResponse)
 def read_admin_overview(
     user: User = Depends(require_roles(UserRole.admin)),
@@ -149,5 +302,8 @@ def read_admin_overview(
         suspended_users_count=db.scalar(select(func.count()).select_from(User).where(User.is_active.is_(False))) or 0,
         recent_users=[_user_response(item, db) for item in recent_users],
         recent_jobs=[JobResponse.model_validate(item) for item in recent_jobs],
-        recent_activity=[AuditEventResponse.model_validate(item) for item in db.scalars(select(AuditEvent).order_by(AuditEvent.created_at.desc()).limit(30))],
+        recent_activity=[
+            AuditEventResponse.model_validate(event).model_copy(update={"actor_email": actor_email})
+            for event, actor_email in db.execute(select(AuditEvent, User.email).outerjoin(User, User.user_id == AuditEvent.actor_user_id).order_by(AuditEvent.created_at.desc()).limit(30)).all()
+        ],
     )

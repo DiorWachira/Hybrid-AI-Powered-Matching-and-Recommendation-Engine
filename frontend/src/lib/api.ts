@@ -35,6 +35,19 @@ export type JobPosting = {
   required_skills: string[] | null; mandatory_certifications: string[] | null;
   status: "open" | "closed"; posted_at: string | null;
 };
+export type AdminJob = JobPosting & { employer_id: string; company_name: string; recruiter_email: string; recruiter_active: boolean; applicant_count: number };
+export type AdminJobFilters = { search: string; status: "" | "open" | "closed"; employerId?: string | null; attention?: boolean };
+export type AdminRecruiter = {
+  employer_id: string; user_id: string; company_name: string; contact_name: string | null; email: string;
+  is_active: boolean; is_demo: boolean; jobs_total: number; jobs_open: number; applications_total: number;
+  hired_total: number; stale_open_jobs: number; last_posted_at: string | null;
+};
+export type OversightSummary = {
+  recruiters_count: number; active_recruiters_count: number; jobs_open: number; jobs_closed: number;
+  applications_total: number; hired_total: number; stale_open_jobs: number; suspended_open_jobs: number;
+  attention_jobs: number; stale_after_days: number;
+};
+export type CurrentAccount = { user_id: string; email: string; role: UserRole };
 export type ApplicationStatus = "submitted" | "reviewing" | "shortlisted" | "rejected" | "hired" | "withdrawn";
 export type RecruiterStatus = "reviewing" | "shortlisted" | "rejected" | "hired";
 export type Application = { application_id: string; candidate_id: string; job_id: string; status: ApplicationStatus; created_at: string; updated_at: string };
@@ -114,7 +127,7 @@ export type AdminOverview = {
   pending_graph_events: number;
   suspended_users_count: number;
   recent_users: AdminUser[];
-  recent_activity: Array<{ event_id: string; actor_user_id: string | null; action: string; resource_type: string; resource_id: string | null; details: Record<string, unknown> | null; created_at: string }>;
+  recent_activity: Array<{ event_id: string; actor_user_id: string | null; actor_email?: string | null; action: string; resource_type: string; resource_id: string | null; details: Record<string, unknown> | null; created_at: string }>;
   recent_jobs: Array<{ job_id: string; title: string; status: string; location?: string; required_experience_years: number; salary_range_max?: number; required_skills?: string[]; mandatory_certifications?: string[]; description: string }>;
 };
 
@@ -254,6 +267,19 @@ export const api = {
     request<AdminOverview>("/admin/overview", {
       headers: { Authorization: `Bearer ${token}` },
     }),
+  adminJobs: (token: string, filters: AdminJobFilters, offset: number, limit = 11) => {
+    const params = new URLSearchParams({ search: filters.search, offset: String(offset), limit: String(limit) });
+    if (filters.status) params.set("status", filters.status);
+    if (filters.employerId) params.set("employer_id", filters.employerId);
+    if (filters.attention) params.set("attention", "true");
+    return request<AdminJob[]>(`/admin/jobs?${params}`, { headers: { Authorization: `Bearer ${token}` } });
+  },
+  adminRecruiters: (token: string, search: string, offset: number, limit = 6) =>
+    request<AdminRecruiter[]>(`/admin/recruiters?${new URLSearchParams({ search, offset: String(offset), limit: String(limit) })}`, { headers: { Authorization: `Bearer ${token}` } }),
+  oversightSummary: (token: string) =>
+    request<OversightSummary>("/admin/recruiters/summary", { headers: { Authorization: `Bearer ${token}` } }),
+  currentAccount: (token: string) =>
+    request<CurrentAccount>("/auth/me", { headers: { Authorization: `Bearer ${token}` } }),
   adminUsers: (token: string, search: string, offset: number) =>
     request<AdminUser[]>(`/admin/users?${new URLSearchParams({ search, offset: String(offset) })}`, {
       headers: { Authorization: `Bearer ${token}` },

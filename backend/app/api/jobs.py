@@ -20,7 +20,7 @@ def list_my_jobs(offset: int = Query(default=0, ge=0), limit: int = Query(defaul
 @router.post("/create", response_model=JobResponse, status_code=status.HTTP_201_CREATED)
 def create_job(
     payload: JobCreateRequest,
-    user: User = Depends(require_roles(UserRole.recruiter, UserRole.admin)),
+    user: User = Depends(require_roles(UserRole.recruiter)),
     db: Session = Depends(get_db),
 ) -> JobPosting:
     employer = db.scalar(select(Employer).where(Employer.user_id == user.user_id))
