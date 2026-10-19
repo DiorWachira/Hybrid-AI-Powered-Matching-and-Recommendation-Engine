@@ -1,4 +1,5 @@
 """Feature contract v2 (related skills + experience readiness), its serving guard and its training data."""
+import hashlib
 import json
 import random
 
@@ -58,6 +59,14 @@ def test_curated_relationship_file_is_loaded_undirected_and_hashed():
     graph, digest = match_features.skill_relations()
     assert graph["postgresql"]["sql"] == graph["sql"]["postgresql"] == 0.9
     assert len(digest) == 64
+
+
+def test_relationship_hash_ignores_crlf_checkouts(tmp_path):
+    content = match_features.SKILL_RELATIONS_PATH.read_bytes().replace(b"\r\n", b"\n")
+    (tmp_path / "lf.json").write_bytes(content)
+    (tmp_path / "crlf.json").write_bytes(content.replace(b"\n", b"\r\n"))
+    digests = {match_features._relations(str(tmp_path / name), 0)[1] for name in ("lf.json", "crlf.json")}
+    assert digests == {hashlib.sha256(content).hexdigest()}
 
 
 def _write_artifact(tmp_path, **changes):
