@@ -5,6 +5,16 @@ and graph-based skill explanations for workforce placement.
 
 ## Current Increment
 
+Two-step verification (2026-10-22): sign-in supports authenticator-app codes (TOTP,
+RFC 6238), which work for every account because no email delivery is involved.
+Administrators must enrol on their first sign-in (`MFA_REQUIRED_ROLES`); candidates and
+recruiters can opt in under **Security**. Each enrolment issues ten single-use recovery
+codes, stored hashed; TOTP secrets are Fernet-encrypted (`MFA_ENCRYPTION_KEY`). Codes
+cannot be replayed, and five wrong codes lock the second step for 15 minutes.
+Administrators can reset a user's two-step verification from the dashboard; an
+administrator who loses their phone is reset on the server with
+`python backend/reset_mfa.py <email>`. Migration `20261022_0008` adds the columns.
+
 Public entry (2026-10-04): `/` now opens the JobBridge landing page with candidate
 and recruiter signup paths, About, approach, FAQs and project feedback links.
 `/privacy` and `/terms` describe prototype data handling and use limits. Existing
@@ -26,6 +36,7 @@ Implemented on the feature branch, with verification gaps documented in
 - FastAPI authentication, candidate profiles/resume parsing, jobs and match APIs
 - React candidate/recruiter workspaces and admin monitoring/moderation/ontology controls
 - Admin-assisted single-use password recovery, session revocation and request throttling
+- Authenticator-app two-step verification (required for administrators) with recovery codes
 - PostgreSQL/Alembic persistence and Neo4j projection/ontology tooling
 - Synthetic data preparation and historical model artifacts
 - Rule, data-tool and API-boundary tests plus backend CI configuration

@@ -126,7 +126,9 @@ choice is still needed; no domain purchase is authorized.
    checkpoints. There is no authorized deployment commit yet.
 5. Configure a root `.env` privately, readable only by the backend service user.
    Set `ENVIRONMENT=production`, an independently generated `JWT_SECRET` of at
-   least 32 characters, and `CORS_ORIGINS=["https://your-hostname"]`. Use unique
+   least 32 characters, an independently generated `MFA_ENCRYPTION_KEY` (Fernet key;
+   see `.env.example`), and `CORS_ORIGINS=["https://your-hostname"]`. Back up the MFA
+   key with the database: losing it voids every enrolment. Use unique
    DB/Neo4j credentials with matching connection URLs. Settings guards cover JWT
    and browser origins, NOT all deployment safety requirements.
 6. Start only PostgreSQL/Neo4j from Compose; do not launch public DB viewers.
