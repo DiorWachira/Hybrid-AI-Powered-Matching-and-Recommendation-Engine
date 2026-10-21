@@ -140,7 +140,8 @@ choice is still needed; no domain purchase is authorized.
    `127.0.0.1:8000`. Verify model download/cache permissions. No training is needed.
 9. Configure Caddy/DNS/HTTPS and complete the acceptance checks below. Add abuse
    throttling and upload resource controls before unrestricted exposure. Avoid
-   deploying shared seed passwords; create independent synthetic demo accounts.
+   deploying shared seed passwords; create independent synthetic demo accounts, or
+   set a unique `SEED_PASSWORD` before running the seed scripts on the host.
 
 ## Acceptance Checklist
 

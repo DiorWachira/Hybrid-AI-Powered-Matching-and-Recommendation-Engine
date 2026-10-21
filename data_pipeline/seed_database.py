@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import sys
 import uuid
@@ -25,7 +26,8 @@ from app.utils.security import hash_password  # noqa: E402
 from app.core.text_preprocessing import anonymize_resume_text  # noqa: E402
 
 DATASET = ROOT / "data_pipeline" / "dataset"
-SEED_PASSWORD = "SeedDataOnly123!"
+# Set SEED_PASSWORD on any shared or public host; the default is published in this repository.
+SEED_PASSWORD = os.environ.get("SEED_PASSWORD") or "SeedDataOnly123!"
 
 
 def load_json(path: Path) -> list[dict[str, object]]:
