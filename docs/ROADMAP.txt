@@ -2,14 +2,46 @@ HYBRID AI-POWERED WORKFORCE PLACEMENT ENGINE
 PROJECT MILESTONE ROADMAP (8 WEEKS)
 Last updated: 2026-10-21 (v2 epoch 4 promoted; gold slice merged; Neo4j seed IT-only)
 
-CURRENT REPOSITORY STATUS (2026-10-19)
-Main integrates Week 1-4 verification (8b6ed07), the Month 2 seeded evaluator and
-batched semantic scoring (feat/month2-synthetic-evaluation), admin job and recruiter
-oversight (feat/admin-job-oversight, feat/admin-recruiter-oversight) and epoch-19
-serving improvements (feat/epoch19-serving). Full clean-machine/browser acceptance,
-official-source provenance and independent fairness/quality remain separate gates.
-The epoch-19 artifact is approved for prototype testing only, not independent
-hiring-quality validation or public deployment. Git workflow: docs/extras/commit.txt.
+CURRENT REPOSITORY STATUS (2026-10-21)
+Main integrates Week 1-4 verification, the Month 2 seeded evaluator and batched
+semantic scoring, admin job and recruiter oversight, epoch-19 serving improvements,
+feature contract v2 and its promoted epoch-4 model, the gold-slice kit and IT-only
+seed data. Full clean-machine/browser acceptance, official-source provenance and
+independent fairness/quality remain separate gates. The v2 epoch-4 artifact is
+approved for prototype testing only, not independent hiring-quality validation or
+public deployment. Git workflow: docs/extras/commit.txt.
+
+OPEN ITEMS TRIAGE (2026-10-21; every remaining [ ]/[~] below falls into one group)
+Closed in this review:
+[x] Stale entries reconciled: Simulate button/demo simulation exists (SimulationPage,
+    API-tested); data_pipeline/evaluate_model.py exists; the 2026-10-02 "model
+    validation NOT PASSED" was superseded by the 2026-10-14 shared-contract parity
+    gate; merge 8b6ed07's pending CI is superseded by green main CI (run 39576098475).
+[x] Repository cleanup check: no secrets, .env, logs or credentials are tracked;
+    .gitignore covers local outputs; no unused Python imports or unused TypeScript
+    locals (tsc --noUnusedLocals --noUnusedParameters clean).
+[x] FR-02: a valid text PDF is now extracted and its skills detected (unit test in
+    test_password_security.py); browser upload of a real PDF remains in the browser group.
+[x] Seed scripts read SEED_PASSWORD from the environment so a shared/public demo need
+    not use the password published in this repository (.env.example, DEPLOYMENT.md).
+Needs Docker + running app (Claude can do with the user's go-ahead):
+[ ] NFR-02 latency: measure match evaluation and For You against 2-5 s (next task).
+[ ] Clean-machine path: fresh clone -> .env -> compose up -> migrations -> seed -> run.
+[ ] Final sanity run with the demo dataset (seed_database.py + seed_oversight_demo.py).
+Needs a browser walkthrough (Claude in Chrome or the user):
+[ ] Real CV (PDF and DOCX) upload through the UI to stored text and graph skills.
+[ ] Simulation playback, auth/session lifecycle, recruiter/candidate/admin flows.
+[ ] Keyboard, screen-reader, contrast and 320/390/1440px checks on current pages.
+Needs the user:
+[ ] Label the 150 gold-slice pairs (plus a second labeller if possible), then run
+    gold_slice evaluate; only then consider threshold/weight tuning.
+[ ] Demo assets: decide demo accounts and the scripted walkthrough; tag a release.
+[ ] Oracle Always Free deployment: account login, capacity, DNS/TLS (DEPLOYMENT.md).
+[ ] Official ESCO/CDACC source verification and permitted real job data.
+Accepted limitations (documented, not planned work for this prototype):
+[~] Synthetic labels are not hiring outcomes; redaction is not proof of anonymity;
+    parser isolation and distributed rate-limit counters are deferred; graph sync
+    stays manual at the user's request; wider pathway/history graph views deferred.
 
 Week 1-4 status: local API/DB/graph checks, focused CV upload integration and
 repeatable data-preparation tests pass. Main CI passed at c3fdec3. The merge itself
@@ -107,8 +139,8 @@ WEEK 1-4 VERIFICATION UPDATE (2026-10-10)
     byte-identical exports from a fixed seed and exclude training-only latent fields
 [x] Compose startup grace updated; existing PostgreSQL/Neo4j both became healthy
     without volume deletion. Neo4j still needed about 232 seconds on this machine
-[~] The verification changes have focused local evidence; CI for merge 8b6ed07
-    has not yet run or been inspected
+[x] The verification changes have focused local evidence; merge 8b6ed07's own CI
+    was never inspected, but main CI has passed on every later merge (2026-10-21 review)
 [~] Full clean-machine launch/seed/browser walkthrough and current UI acceptance
     remain pending. API TestClient coverage is not browser upload evidence
 [~] Official ESCO/CDACC source verification, permitted real-job inputs and
@@ -187,8 +219,10 @@ NON-TRAINING WEEKLY PROGRESS (2026-10-04; current status)
 [~] Performance: one cold cached-model evaluation 63.034s; saved read 0.091s.
     Not a representative benchmark; the 2-5s inference target remains open
 [x] Graph-sync task remains DISABLED at user request; manual sync only
-[ ] Next: demo-only simulation, fuller application/profile controls, broader
+[~] Next: demo-only simulation, fuller application/profile controls, broader
     workflow/accessibility checks, latency improvements and clean setup
+    [2026-10-21: simulation and profile/application controls done; the rest is in
+    OPEN ITEMS TRIAGE at the top]
 [ ] Model parity/independent quality, official datasets and public deployment open
     Epoch training is explicitly ON HOLD; no training files or weights changed
      [SUPERSEDED 2026-10-14: run completed all 100 epochs; epoch 19 promoted for prototype testing; parity verified on shared contract. Independent quality/deployment still open.]
@@ -208,8 +242,9 @@ ADMIN RELEASE-READINESS UPDATE (2026-10-02; supersedes older items below)
     byte limits and upload signature/archive-expansion limits added
 [x] Patched affected Python packages; installed-environment pip-audit and frontend
     production npm audit report no known vulnerabilities at this check
-[~] Model validation RUN, NOT PASSED: valid artifact structure but different graph,
+[x] Model validation RUN, NOT PASSED: valid artifact structure but different graph,
     growth and empty-required-skills semantics. No training or weight replacement
+    [SUPERSEDED 2026-10-14: shared feature contract; validate_model_contract exits 0]
 [ ] Public deployment: fresh Oracle login, verified free capacity/storage, TLS,
     host-specific verification and model-quality gate remain unresolved
 Current operations/limits: docs/WORKFLOW.md and docs/DEPLOYMENT.md.
@@ -239,7 +274,7 @@ An [x] is NOT production approval. Week exit criteria require separate evidence.
 Audit details: docs/IMPLEMENTATION_AUDIT.md. Workflow: docs/WORKFLOW.md.
 Sprint 1: local runtime and main CI verified; full setup/browser sign-off pending.
 Public demo: Oracle Always Free-only proposed; no public endpoint deployed.
-No new training, main-branch merge/push, or native PostgreSQL changes authorized.
+Training runs, model promotion, merges to main and native PostgreSQL changes each need explicit user approval.
 Note: academic documentation tasks (Chapter 5, UML write-ups, report) are
 owned by the student and are deliberately excluded from this roadmap.
 
@@ -256,7 +291,7 @@ CLIENT ALIGNMENT NOTES (2026-09-20)
    docs/extras/marketplace_features.txt for the captured requirements.
  - "Simulate but also be a web app": resolved as a seeded demo/evaluation
     mode using the same hybrid engine over synthetic data. The planned
-    data_pipeline/evaluate_model.py is not implemented yet.
+    data_pipeline/evaluate_model.py now exists (see Week 7).
  - Mobile is out of scope entirely.
  - Dataset strategy decided -- see docs/DATASET_STRATEGY.md for the full
    rationale (synthetic Kenyan candidates, real BrighterMonday job posts,
@@ -347,7 +382,8 @@ HISTORICAL AUDIT SNAPSHOT (2026-10-01; superseded by dated updates above)
     against Postgres + Neo4j; current remote green run not inspected
 [x] Audit checks: 30 DB-independent tests, frontend build, Compose config pass
 [~] UI redesign builds; selected browser fixture checks are not live E2E proof
-[ ] Adding a Simulate button that will sim jobs being posted and candidates applying for the opportunities to save on time
+[x] Adding a Simulate button that will sim jobs being posted and candidates applying for the opportunities to save on time
+    (SimulationPage + /api/admin/simulation, API-tested; browser playback pending)
 [~] Selected-match skill/application graph added; broader candidate application-history
     graph views remain pending
 
@@ -450,8 +486,8 @@ WEEK 3  Frontend Shell and Resume Parsing
     local scoring and persists match results with skill-gap explanations
 [x] DOCX upload extracts text/skills, preserves profile fields and enqueues graph
     updates; authenticated API-to-PostgreSQL-to-Neo4j integration verified
-[~] FR-02 PDF/DOCX acceptance: DOCX integration and invalid-signature checks pass;
-    valid PDF end-to-end and current browser upload acceptance remain pending
+[~] FR-02 PDF/DOCX acceptance: DOCX integration, invalid-signature and valid-PDF
+    extraction checks pass; browser upload acceptance remains pending
 [x] Basic section text extraction and known-skill detection from uploaded files
 [x] Resume/profile writes enqueue graph changes transactionally; manual worker retries
 [~] Upload baseline: 10 MB and extension allow-list; no original file storage.
@@ -467,7 +503,8 @@ The real-CV browser exit criterion is not yet reverified; no personal CV was use
 WEEK 4  Dataset Preparation and Anti-Bias Pipeline
 [x] data_pipeline/generate_synthetic_data.py: synthetic Kenyan candidate
     profiles for Data Analyst, DevOps Engineer, Software Engineer,
-    Accountant and Business Analyst roles, with a matching job generator
+    Cybersecurity Analyst (replaced Accountant 2026-10-19) and Business Analyst
+    roles, with a matching job generator
     (started early to unblock the Week 5/6 training notebook)
 [x] data_pipeline/import_brightermonday_jobs.py normalizes a permitted local
     BrighterMonday/Apify JSON export; it does not scrape or require a paid API
@@ -540,8 +577,9 @@ WEEK 6  Hybrid Engine Integration and Graph Linking
     apply the committed scaler and logistic-regression calibration artifact
 [~] Selected-match Neo4j skill graph is displayed in-app; wider pathway/history
     views remain pending
-[x] Training and serving use the shared `serving-direct-skill-growth-v1` feature
-    module; parity validator and regression tests pass. This does not prove quality
+[x] Training and serving use the shared feature module (live contract
+    `serving-related-skill-readiness-v2` since 2026-10-21); parity validator and
+    regression tests pass. This does not prove quality
 [~] FR-04 first pass: /api/matches/evaluate/{job_id} persists rows to
     match_results using local rule, skill and text scoring
 [x] FR-05 first pass: component scores, rule reasons, stored matched/missing skills,
@@ -619,8 +657,8 @@ Audit: NOT met. Gold slice, feature parity and measured latency remain open.
 --------------------------------------------------------------------
 WEEK 8  Hardening, Cleanup and Demonstration
 --------------------------------------------------------------------
-[ ] Repository cleanup: remove dead code, confirm directory structure,
-    verify .gitignore, ensure no secrets are tracked
+[x] Repository cleanup: remove dead code, confirm directory structure,
+    verify .gitignore, ensure no secrets are tracked (2026-10-21 review)
 [ ] Verify a clean-machine setup path (clone, .env, compose up,
     migrations, seed, run) end to end
 [ ] Fix outstanding bugs from Week 7 testing
