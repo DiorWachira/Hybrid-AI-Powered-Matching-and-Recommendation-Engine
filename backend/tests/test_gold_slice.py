@@ -96,3 +96,15 @@ def test_frozen_inputs_reproduce_export_scores_without_regenerating_data(tmp_pat
     monkeypatch.setattr(gold_slice, "prepare_synthetic_data", unavailable)
     report = gold_slice.evaluate(_write_labels(folder, {f"G{number:03d}": str(number % 2) for number in range(1, 41)}))
     assert report["labelled_pairs"] == 40
+
+
+def test_evaluate_reads_a_copy_saved_outside_the_slice_folder(tmp_path, small_population):
+    folder = gold_slice.export(tmp_path / "out", pairs=40, cache_root=tmp_path / "cache")
+    sheet = _write_labels(folder, {f"G{number:03d}": str(number % 2) for number in range(1, 41)})
+    copy = tmp_path / "elsewhere" / "my_labels.csv"
+    copy.parent.mkdir()
+    copy.write_bytes(sheet.read_bytes())
+    with pytest.raises(FileNotFoundError):
+        gold_slice.evaluate(copy)
+    assert gold_slice.evaluate(copy, answer_key=folder / "answer_key.json")["labelled_pairs"] == 40
+

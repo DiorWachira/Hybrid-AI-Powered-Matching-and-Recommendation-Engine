@@ -144,8 +144,9 @@ def _frozen_scores(artifact: dict, pairs: list[dict]) -> np.ndarray:
     return np.asarray(scores, dtype=float)
 
 
-def evaluate(labels_path: Path, *, artifacts: list[Path] | None = None, second_labels: Path | None = None) -> dict:
-    key = json.loads((labels_path.parent / "answer_key.json").read_text(encoding="utf-8"))
+def evaluate(labels_path: Path, *, artifacts: list[Path] | None = None, second_labels: Path | None = None, answer_key: Path | None = None) -> dict:
+    # A filled-in copy may live outside the slice folder; the key then has to be named explicitly.
+    key = json.loads((answer_key or labels_path.parent / "answer_key.json").read_text(encoding="utf-8"))
     human_labels = _read_labels(labels_path)
     pairs = [pair for pair in key["pairs"] if pair["pair_id"] in human_labels]
     if len(pairs) < 20:
@@ -157,7 +158,7 @@ def evaluate(labels_path: Path, *, artifacts: list[Path] | None = None, second_l
               "independent_quality_validated": False,
               "limitations": ["Profiles and jobs are synthetic even though the labels are human; this checks the model against human judgement, not hiring outcomes.",
                               "One labeller's judgement is not ground truth; report inter-annotator agreement before relying on these numbers.",
-                              "Pairs were sampled using the active model's score bands, so metrics are over a score-stratified, not natural, mix."]}
+                              f"Pairs were sampled using {key.get('sampled_with_model', 'the then-active model')}'s score bands, so metrics are over a score-stratified, not natural, mix."]}
     for path in [None, *(artifacts or [])]:
         artifact = _load_artifact(path) if path else _artifact()
         if artifact["encoder_revision"] != key["encoder_revision"]:
@@ -189,6 +190,7 @@ def main() -> None:
     evaluating.add_argument("--labels", type=Path, required=True)
     evaluating.add_argument("--artifact", type=Path, action="append", help="candidate artifact to score alongside the active one; repeatable")
     evaluating.add_argument("--second-labels", type=Path, help="a second labeller's copy of the same sheet")
+    evaluating.add_argument("--answer-key", type=Path, help="answer_key.json for the slice; defaults to the one beside --labels")
     evaluating.add_argument("--output", type=Path)
     args = parser.parse_args()
     if args.command == "export":
@@ -197,7 +199,7 @@ def main() -> None:
         folder = export(args.output_root, pairs=args.pairs, seed=args.seed, label_source=args.label_source, cache_root=args.cache_root)
         print(json.dumps({"sheet": str(folder / "labelling_sheet.csv"), "answer_key": str(folder / "answer_key.json"), "promotion_performed": False}, indent=2))
         return
-    report = evaluate(args.labels, artifacts=args.artifact, second_labels=args.second_labels)
+    report = evaluate(args.labels, artifacts=args.artifact, second_labels=args.second_labels, answer_key=args.answer_key)
     serialized = json.dumps(report, indent=2)
     if args.output:
         args.output.write_text(serialized + "\n", encoding="utf-8")
