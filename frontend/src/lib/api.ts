@@ -47,7 +47,11 @@ export type OversightSummary = {
   applications_total: number; hired_total: number; stale_open_jobs: number; suspended_open_jobs: number;
   attention_jobs: number; stale_after_days: number;
 };
-export type CurrentAccount = { user_id: string; email: string; role: UserRole };
+export type CurrentAccount = { user_id: string; email: string; role: UserRole; mfa_enabled: boolean; mfa_required: boolean; mfa_recovery_codes_remaining: number };
+export type Session = { access_token: string; role: UserRole };
+/** A session, or a short-lived token for the second step when the account uses or must set up two-step verification. */
+export type LoginResult = { status: "authenticated"; access_token: string; role: UserRole } | { status: "mfa_required" | "mfa_setup_required"; challenge_token: string; role: UserRole };
+export type MfaSetup = { secret: string; otpauth_uri: string; qr_svg: string };
 export type ApplicationStatus = "submitted" | "reviewing" | "shortlisted" | "rejected" | "hired" | "withdrawn";
 export type RecruiterStatus = "reviewing" | "shortlisted" | "rejected" | "hired";
 export type Application = { application_id: string; candidate_id: string; job_id: string; status: ApplicationStatus; created_at: string; updated_at: string };
@@ -113,6 +117,7 @@ export type AdminUser = {
   is_active: boolean;
   is_demo: boolean;
   created_at: string;
+  mfa_enabled: boolean;
 };
 
 export type OntologySkill = { name: string; category: string | null; source: string | null };
@@ -202,6 +207,9 @@ export const api = {
     issuePasswordReset: (token: string, userId: string, password: string) => request<{ token: string; expires_at: string }>(`/admin/users/${userId}/password-reset`, {
       method: "POST", headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify({ password }),
     }),
+    resetAccountMfa: (token: string, userId: string, password: string) => request<{ status: string }>(`/admin/users/${userId}/mfa-reset`, {
+      method: "POST", headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify({ password }),
+    }),
   health: () => request<ApiHealth>("/health"),
   register: (payload: RegisterInput) =>
     request<{ access_token: string; role: UserRole }>("/auth/register", {
@@ -209,10 +217,16 @@ export const api = {
       body: JSON.stringify(payload),
     }),
   login: (email: string, password: string) =>
-    request<{ access_token: string; role: UserRole }>("/auth/login", {
+    request<LoginResult>("/auth/login", {
       method: "POST",
       body: JSON.stringify({ email, password }),
     }),
+  verifyMfa: (challengeToken: string, code: string) => request<Session>("/auth/mfa/verify", { method: "POST", body: JSON.stringify({ challenge_token: challengeToken, code }) }),
+  // `token` is a session, or the enrolment token from a login that must set up two-step verification first.
+  startMfaSetup: (token: string, password?: string) => request<MfaSetup>("/auth/mfa/setup", { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify(password ? { password } : {}) }),
+  enableMfa: (token: string, code: string) => request<Session & { recovery_codes: string[] }>("/auth/mfa/enable", { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify({ code }) }),
+  disableMfa: (token: string, password: string, code: string) => request<Session>("/auth/mfa/disable", { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify({ password, code }) }),
+  regenerateRecoveryCodes: (token: string, password: string, code: string) => request<{ recovery_codes: string[] }>("/auth/mfa/recovery-codes", { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify({ password, code }) }),
   createJob: (job: JobInput, token: string) =>
     request<JobPosting>("/jobs/create", {
       method: "POST",

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { Activity, AlertTriangle, ArrowRight, BriefcaseBusiness, Copy, Database, KeyRound, RefreshCw, Search, ShieldCheck, UserCheck, UserRoundSearch, UserX, Users, X } from "lucide-react";
+import { Activity, AlertTriangle, ArrowRight, BriefcaseBusiness, Copy, Database, KeyRound, RefreshCw, Search, ShieldCheck, ShieldOff, UserCheck, UserRoundSearch, UserX, Users, X } from "lucide-react";
 import { api, type AdminOverview, type AdminUser, type ApiHealth, type OversightSummary } from "../lib/api";
 import { OntologyEditor } from "../components/OntologyEditor";
 import { ADMIN_PAGE_SIZE, ListPagination } from "../components/ListPagination";
@@ -32,20 +32,29 @@ export function AdminPage() {
   const [activityOffset, setActivityOffset] = useState(0);
   const [busy, setBusy] = useState<string | null>(null);
   const [resetUser, setResetUser] = useState<AdminUser | null>(null);
+  const [resetKind, setResetKind] = useState<"password" | "mfa">("password");
+  const [mfaResetDone, setMfaResetDone] = useState(false);
   const [confirmationPassword, setConfirmationPassword] = useState("");
   const [resetLink, setResetLink] = useState("");
   const [resetError, setResetError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const resetDialog = useRef<HTMLDialogElement>(null);
   useEffect(() => { if (resetUser) resetDialog.current?.showModal(); else resetDialog.current?.close(); }, [resetUser]);
-  const closeReset = () => { setResetUser(null); setConfirmationPassword(""); setResetLink(""); setResetError(null); setCopied(false); };
-  const openReset = (account: AdminUser) => { setConfirmationPassword(""); setResetLink(""); setResetError(null); setCopied(false); setResetUser(account); };
+  const closeReset = () => { setResetUser(null); setConfirmationPassword(""); setResetLink(""); setResetError(null); setCopied(false); setMfaResetDone(false); };
+  const openReset = (account: AdminUser, kind: "password" | "mfa" = "password") => { setConfirmationPassword(""); setResetLink(""); setResetError(null); setCopied(false); setMfaResetDone(false); setResetKind(kind); setResetUser(account); };
   const issueReset = async (event: React.FormEvent) => {
     event.preventDefault(); if (!resetUser) return;
     setBusy(resetUser.user_id); setResetError(null);
     try {
-      const result = await api.issuePasswordReset(localStorage.getItem("jobbridge_token") ?? "", resetUser.user_id, confirmationPassword);
-      setResetLink(`${location.origin}/auth#reset=${encodeURIComponent(result.token)}`);
+      const token = localStorage.getItem("jobbridge_token") ?? "";
+      if (resetKind === "mfa") {
+        await api.resetAccountMfa(token, resetUser.user_id, confirmationPassword);
+        setMfaResetDone(true);
+        setAccounts((items) => items.map((item) => item.user_id === resetUser.user_id ? { ...item, mfa_enabled: false } : item));
+      } else {
+        const result = await api.issuePasswordReset(token, resetUser.user_id, confirmationPassword);
+        setResetLink(`${location.origin}/auth#reset=${encodeURIComponent(result.token)}`);
+      }
     } catch (reason) { setResetError(reason instanceof Error ? reason.message : "Reset could not be issued."); }
     finally { setConfirmationPassword(""); setBusy(null); }
   };
@@ -101,25 +110,27 @@ export function AdminPage() {
       <div className="admin-oversight-links">{oversight && oversight.attention_jobs > 0 && <Link className="secondary-button" to="/admin/recruiters?attention=1"><AlertTriangle size={16} />Review flagged roles</Link>}<Link className="primary-button" to="/admin/recruiters">Open oversight<ArrowRight size={16} /></Link></div>
     </section>
     <dialog className="admin-dialog" ref={resetDialog} onCancel={(event) => { if (busy !== null) event.preventDefault(); else closeReset(); }} aria-labelledby="reset-title">
-      <div className="page-heading"><h2 id="reset-title">Password recovery</h2><button className="icon-button" aria-label="Close password recovery" title="Close" onClick={closeReset} disabled={busy !== null}><X size={18} /></button></div>
+      <div className="page-heading"><h2 id="reset-title">{resetKind === "mfa" ? "Reset two-step verification" : "Password recovery"}</h2><button className="icon-button" aria-label={resetKind === "mfa" ? "Close two-step verification reset" : "Close password recovery"} title="Close" onClick={closeReset} disabled={busy !== null}><X size={18} /></button></div>
       <p>{resetUser?.display_name}</p>
       <p className="recovery-email">{resetUser?.email}</p>
       {resetError && <p className="notice error" role="alert">{resetError}</p>}
-      {resetLink ? <div><label className="studio-field">Reset link (expires in 15 minutes)<input value={resetLink} readOnly autoComplete="off" /></label><button className="secondary-button" onClick={() => { void navigator.clipboard.writeText(resetLink).then(() => setCopied(true)).catch(() => setResetError("Could not copy the link. Select the field to copy it.")); }}><Copy size={16} />{copied ? "Copied" : "Copy reset link"}</button></div> : <form onSubmit={issueReset}><label className="studio-field">Your administrator password<input type="password" autoComplete="current-password" value={confirmationPassword} onChange={(event) => setConfirmationPassword(event.target.value)} required /></label><button className="primary-button" disabled={busy !== null}><KeyRound size={16} />Issue reset link</button></form>}
+      {resetKind === "mfa" ? (mfaResetDone ? <p className="notice" role="status">Two-step verification is off for this account and its sessions were signed out. They can sign in with their password and set it up again.</p> : <form onSubmit={issueReset}><p>This removes their authenticator and recovery codes. Do this only after confirming who is asking, for example when they lost their phone.</p><label className="studio-field">Your administrator password<input type="password" autoComplete="current-password" value={confirmationPassword} onChange={(event) => setConfirmationPassword(event.target.value)} required /></label><button className="primary-button" disabled={busy !== null}><ShieldOff size={16} />Reset two-step verification</button></form>)
+        : resetLink ? <div><label className="studio-field">Reset link (expires in 15 minutes)<input value={resetLink} readOnly autoComplete="off" /></label><button className="secondary-button" onClick={() => { void navigator.clipboard.writeText(resetLink).then(() => setCopied(true)).catch(() => setResetError("Could not copy the link. Select the field to copy it.")); }}><Copy size={16} />{copied ? "Copied" : "Copy reset link"}</button></div> : <form onSubmit={issueReset}><label className="studio-field">Your administrator password<input type="password" autoComplete="current-password" value={confirmationPassword} onChange={(event) => setConfirmationPassword(event.target.value)} required /></label><button className="primary-button" disabled={busy !== null}><KeyRound size={16} />Issue reset link</button></form>}
     </dialog>
     <section className="data-section" aria-labelledby="accounts-heading"><h2 id="accounts-heading" className="section-heading"><Users size={18} />Accounts and recovery</h2>
       <form className="admin-search" role="search" aria-label="Account search" onSubmit={(event) => { event.preventDefault(); setOffset(0); setQuery(search.trim()); setRefresh((value) => value + 1); }}><label className="studio-field">Name, company or email<input value={search} onChange={(event) => setSearch(event.target.value)} maxLength={120} type="search" /></label><button className="secondary-button" type="submit" disabled={accountsLoading}><Search size={16} />Search</button></form>
       {accountsError && <p className="notice error" role="alert">{accountsError}</p>}
-      <div className="data-table-wrap" aria-busy={accountsLoading}><table className="data-table"><thead><tr><th scope="col">Name</th><th scope="col">Email</th><th scope="col">Role</th><th scope="col">Data</th><th scope="col">Status</th><th scope="col"><span className="sr-only">Actions</span></th></tr></thead><tbody>
+      <div className="data-table-wrap" aria-busy={accountsLoading}><table className="data-table"><thead><tr><th scope="col">Name</th><th scope="col">Email</th><th scope="col">Role</th><th scope="col">Data</th><th scope="col">2-step</th><th scope="col">Status</th><th scope="col"><span className="sr-only">Actions</span></th></tr></thead><tbody>
         {accounts.slice(0, ADMIN_PAGE_SIZE).map((account) => <tr key={account.user_id}>
-          <td><strong>{account.display_name}</strong>{account.company_name && <div>{account.company_name}</div>}</td><td>{account.email}</td><td>{account.role}</td><td>{account.is_demo ? "Fictional demo" : "Registered"}</td>
+          <td><strong>{account.display_name}</strong>{account.company_name && <div>{account.company_name}</div>}</td><td>{account.email}</td><td>{account.role}</td><td>{account.is_demo ? "Fictional demo" : "Registered"}</td><td>{account.mfa_enabled ? "On" : "Off"}</td>
           <td><span className={`admin-job-status ${account.is_active ? "open" : "closed"}`}>{account.is_active ? "Active" : "Suspended"}</span></td>
           <td>{account.role === "admin" ? <span className="admin-row-note">Managed outside the dashboard</span> : <div className="admin-row-actions">
             {account.is_active && <button className="text-button" disabled={busy !== null} onClick={() => openReset(account)} aria-label={`Reset password for ${account.email}`}><KeyRound size={15} />Reset password</button>}
+            {account.mfa_enabled && <button className="text-button" disabled={busy !== null} onClick={() => openReset(account, "mfa")} aria-label={`Reset two-step verification for ${account.email}`}><ShieldOff size={15} />Reset 2-step</button>}
             <button className="text-button" disabled={busy !== null || accountsLoading} onClick={() => void changeAccount(account)} aria-label={`${account.is_active ? "Suspend" : "Reactivate"} ${account.email}`}>{account.is_active ? <><UserX size={15} />Suspend</> : <><UserCheck size={15} />Reactivate</>}</button>
           </div>}</td>
         </tr>)}
-        {!accounts.length && <tr><td colSpan={6}>{accountsLoading ? "Loading accounts..." : accountsError ? "Accounts unavailable" : "No accounts found"}</td></tr>}
+        {!accounts.length && <tr><td colSpan={7}>{accountsLoading ? "Loading accounts..." : accountsError ? "Accounts unavailable" : "No accounts found"}</td></tr>}
       </tbody></table></div>
       <ListPagination label="accounts" offset={offset} hasNext={accounts.length > ADMIN_PAGE_SIZE} disabled={accountsLoading || busy !== null} onChange={setOffset} />
     </section>

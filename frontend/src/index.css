@@ -647,3 +647,20 @@ button, a { transition: background-color .18s, color .18s, border-color .18s; }
   @keyframes status-ping { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.45; transform: scale(0.82); } }
   .animate-status { animation: status-ping 2s ease-in-out infinite; }
 }
+
+/* Two-step verification */
+.mfa-enrol, .mfa-recovery, .mfa-form, .security-form { display: grid; gap: 16px; min-width: 0; }
+.mfa-steps { display: grid; gap: 6px; padding-left: 18px; list-style: decimal; color: var(--muted); font-size: 13px; }
+.mfa-qr { width: 200px; height: 200px; padding: 6px; background: #fff; border-radius: 8px; }
+.mfa-secret { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; font-size: 12px; color: var(--muted); }
+.mfa-secret code, .recovery-codes code { font-family: var(--font-mono); color: var(--ink); letter-spacing: 0.06em; overflow-wrap: anywhere; }
+.mfa-code-input { font-family: var(--font-mono); font-size: 18px; letter-spacing: 0.2em; }
+.recovery-codes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 14px; border: 1px solid var(--line); border-radius: 6px; background: #121713; }
+.recovery-codes li { font-size: 14px; }
+.mfa-confirm { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--ink); }
+.mfa-confirm input { width: 16px; height: 16px; accent-color: var(--accent); }
+.inline-icon { display: inline; vertical-align: -2px; margin-right: 4px; }
+.security-card { max-width: 640px; padding: 24px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); }
+.security-status { display: flex; align-items: baseline; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; font-size: 13px; color: var(--muted); }
+.security-note { display: block; width: 100%; font-size: 12px; color: var(--muted); }
+@media (max-width: 420px) { .recovery-codes { grid-template-columns: 1fr; } .security-card { padding: 16px; } }
