@@ -144,20 +144,20 @@ def seed_neo4j_ontology() -> dict[str, int]:
                     ("Python", "Programming"),
                     ("SQL", "Data"),
                     ("Data Analysis", "Data"),
-                    ("Financial Accounting", "Accounting"),
-                    ("Taxation", "Accounting"),
+                    ("Network Security", "Security"),
+                    ("Incident Response", "Security"),
                     ("Project Management", "Management"),
                     ("Business Analysis", "Business"),
                 ],
                 "Certification": [
-                    ("CPA", "Certification"),
+                    ("CompTIA Security+", "Certification"),
                     ("AWS Certified Cloud Practitioner", "Certification"),
                     ("Google Data Analytics", "Certification"),
                 ],
                 "JobRole": [
                     ("Software Engineer", "Role"),
                     ("Data Analyst", "Role"),
-                    ("Accountant", "Role"),
+                    ("Cybersecurity Analyst", "Role"),
                 ],
                 "Industry": [
                     ("Technology", "Industry"),
@@ -182,12 +182,12 @@ def seed_neo4j_ontology() -> dict[str, int]:
             relationship_statements = [
                 "MATCH (s:Skill {name: 'Python'}), (t:Skill {name: 'Data Analysis'}) MERGE (s)-[r:RELATED_TO]->(t) ON CREATE SET r.weight = 0.8",
                 "MATCH (s:Skill {name: 'SQL'}), (t:Skill {name: 'Data Analysis'}) MERGE (s)-[r:RELATED_TO]->(t) ON CREATE SET r.weight = 0.7",
-                "MATCH (s:Skill {name: 'Financial Accounting'}), (t:Skill {name: 'Taxation'}) MERGE (s)-[r:RELATED_TO]->(t) ON CREATE SET r.weight = 0.9",
+                "MATCH (s:Skill {name: 'Network Security'}), (t:Skill {name: 'Incident Response'}) MERGE (s)-[r:RELATED_TO]->(t) ON CREATE SET r.weight = 0.8",
                 "MATCH (s:JobRole {title: 'Software Engineer'}), (t:Skill {name: 'Python'}) MERGE (s)-[r:SKILL_REQUIRED]->(t) ON CREATE SET r.weight = 0.9",
                 "MATCH (s:JobRole {title: 'Software Engineer'}), (t:Skill {name: 'SQL'}) MERGE (s)-[r:SKILL_REQUIRED]->(t) ON CREATE SET r.weight = 0.6",
                 "MATCH (s:JobRole {title: 'Data Analyst'}), (t:Skill {name: 'Data Analysis'}) MERGE (s)-[r:SKILL_REQUIRED]->(t) ON CREATE SET r.weight = 0.9",
-                "MATCH (s:JobRole {title: 'Accountant'}), (t:Skill {name: 'Financial Accounting'}) MERGE (s)-[r:SKILL_REQUIRED]->(t) ON CREATE SET r.weight = 0.9",
-                "MATCH (s:JobRole {title: 'Accountant'}), (t:Certification {name: 'CPA'}) MERGE (s)-[:REQUIRES_CERT]->(t)",
+                "MATCH (s:JobRole {title: 'Cybersecurity Analyst'}), (t:Skill {name: 'Network Security'}) MERGE (s)-[r:SKILL_REQUIRED]->(t) ON CREATE SET r.weight = 0.9",
+                "MATCH (s:JobRole {title: 'Cybersecurity Analyst'}), (t:Certification {name: 'CompTIA Security+'}) MERGE (s)-[:REQUIRES_CERT]->(t)",
                 "MATCH (s:JobRole {title: 'Software Engineer'}), (t:Certification {name: 'AWS Certified Cloud Practitioner'}) MERGE (s)-[:REQUIRES_CERT]->(t)",
             ]
             for statement in relationship_statements:
