@@ -34,9 +34,19 @@ def test_production_rejects_unsafe_origins(origins):
         Settings(_env_file=None, environment="production", jwt_secret="test-only-" * 8, cors_origins=origins)
 
 
+TEST_FERNET_KEY = "Gd2nWQ0lT9n6m3yQ0ZtWm9P3o4qG2rV3y1bB2cC3dD4="
+
+
 def test_explicit_production_settings_are_accepted():
-    settings = Settings(_env_file=None, environment="production", jwt_secret="test-only-" * 8, cors_origins=["https://jobs.example.org"])
+    settings = Settings(_env_file=None, environment="production", jwt_secret="test-only-" * 8, cors_origins=["https://jobs.example.org"], mfa_encryption_key=TEST_FERNET_KEY)
     assert settings.environment == "production"
+    assert settings.mfa_required_roles == ["admin"]
+
+
+@pytest.mark.parametrize("key", ["", "not-a-fernet-key"])
+def test_production_requires_valid_mfa_encryption_key(key):
+    with pytest.raises(ValidationError, match="MFA_ENCRYPTION_KEY"):
+        Settings(_env_file=None, environment="production", jwt_secret="test-only-" * 8, cors_origins=["https://jobs.example.org"], mfa_encryption_key=key)
 
 
 def test_dotenv_path_is_repository_root():

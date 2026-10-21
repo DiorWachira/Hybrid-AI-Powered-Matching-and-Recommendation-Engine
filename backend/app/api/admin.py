@@ -14,6 +14,7 @@ from app.db.postgres import get_db
 from app.schemas import AccountStatusUpdate, AdminJobResponse, AdminOversightSummary, AdminOverviewResponse, AdminRecruiterResponse, AdminUserResponse, AuditEventResponse, JobResponse, JobStatusUpdate, OntologyRelationRequest, OntologySkillRequest, ResetAuthorization
 from app.db.neo4j_db import get_neo4j_driver
 from neo4j.exceptions import Neo4jError, ServiceUnavailable, SessionExpired
+from app.utils.mfa import clear_mfa
 from app.utils.security import verify_password
 
 router = APIRouter(prefix="/admin", tags=["administration"])
@@ -106,10 +107,29 @@ def issue_password_reset(request: Request, user_id: UUID, payload: ResetAuthoriz
     return {"token": token, "expires_at": account.password_reset_expires_at}
 
 
+@router.post("/users/{user_id}/mfa-reset")
+@limiter.limit("5/minute")
+def reset_account_mfa(request: Request, user_id: UUID, payload: ResetAuthorization, user: User = Depends(require_roles(UserRole.admin)), db: Session = Depends(get_db)):
+    if not verify_password(payload.password, user.password_hash):
+        raise HTTPException(status_code=401, detail="Administrator password is incorrect")
+    account = db.scalar(select(User).where(User.user_id == user_id).with_for_update())
+    if account is None:
+        raise HTTPException(status_code=404, detail="Account not found")
+    if account.role == UserRole.admin:
+        raise HTTPException(status_code=409, detail="Administrator two-step verification is reset from the server with reset_mfa.py")
+    if account.mfa_secret_encrypted is None:
+        raise HTTPException(status_code=409, detail="This account does not use two-step verification")
+    clear_mfa(db, account)
+    account.auth_version += 1
+    db.add(AuditEvent(actor_user_id=user.user_id, action="account.mfa_reset", resource_type="user", resource_id=user_id))
+    db.commit()
+    return {"status": "reset"}
+
+
 def _user_response(user: User, db: Session) -> AdminUserResponse:
     candidate = db.scalar(select(Candidate).where(Candidate.user_id == user.user_id)) if user.role == UserRole.candidate else None
     employer = db.scalar(select(Employer).where(Employer.user_id == user.user_id)) if user.role == UserRole.recruiter else None
-    return AdminUserResponse(user_id=user.user_id, email=user.email, role=user.role, display_name=candidate.full_name if candidate else (employer.contact_name or employer.company_name) if employer else "Administrator", company_name=employer.company_name if employer else None, is_active=user.is_active, is_demo=user.is_demo, created_at=user.created_at)
+    return AdminUserResponse(user_id=user.user_id, email=user.email, role=user.role, display_name=candidate.full_name if candidate else (employer.contact_name or employer.company_name) if employer else "Administrator", company_name=employer.company_name if employer else None, is_active=user.is_active, is_demo=user.is_demo, created_at=user.created_at, mfa_enabled=user.mfa_enabled_at is not None)
 
 
 @router.get("/users", response_model=list[AdminUserResponse])

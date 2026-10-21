@@ -25,7 +25,7 @@ from app.schemas import MatchCandidateResponse
 from app.utils.security import create_access_token, hash_password
 from app.db.base import Base
 from app.db.graph_sync import ensure_graph_schema, sync_graph_events
-from app.db.models import Candidate, Employer, JobApplication, JobPosting, MatchResult, User, UserRole
+from app.db.models import Candidate, Employer, JobApplication, JobPosting, MatchResult, MfaRecoveryCode, User, UserRole
 from app.db.neo4j_db import get_neo4j_driver
 
 pytestmark = pytest.mark.skipif(os.getenv("RUN_DATABASE_MIGRATION_TESTS") != "1", reason="requires local disposable PostgreSQL database privileges and Neo4j")
@@ -453,6 +453,67 @@ def test_authenticated_application_and_match_workflow(migrated_database, monkeyp
                 database.execute(text("UPDATE users SET password_reset_expires_at = CURRENT_TIMESTAMP - interval '1 minute' WHERE user_id = :id"), {"id": candidate_id})
                 database.commit()
             assert client.post("/api/auth/reset-password", json={"token": second.json()["token"], "new_password": "UpdatedPassword123!"}).status_code == 400
+    finally:
+        app.dependency_overrides.clear()
+        app.dependency_overrides.update(previous)
+
+
+def test_admin_mfa_enrolment_recovery_and_reset_against_postgres(migrated_database):
+    import pyotp
+    from sqlalchemy import select
+    from app.utils import mfa
+
+    engine, configuration = migrated_database
+    password = "AdminPassword123!"
+
+    def database_dependency():
+        with Session(engine) as database:
+            yield database
+
+    with Session(engine) as database:
+        admin = User(email="admin@jobbridge.example.org", password_hash=hash_password(password), role=UserRole.admin)
+        database.add(admin)
+        database.commit()
+        admin_id = admin.user_id
+    previous = app.dependency_overrides.copy()
+    app.dependency_overrides[get_db] = database_dependency
+    try:
+        with TestClient(app) as client:
+            credentials = {"email": "admin@jobbridge.example.org", "password": password}
+            first = client.post("/api/auth/login", json=credentials).json()
+            assert first["status"] == "mfa_setup_required" and first["access_token"] is None
+            enrolment = {"Authorization": f"Bearer {first['challenge_token']}"}
+            secret = client.post("/api/auth/mfa/setup", json={}, headers=enrolment).json()["secret"]
+            enabled = client.post("/api/auth/mfa/enable", json={"code": pyotp.TOTP(secret).now()}, headers=enrolment)
+            assert enabled.status_code == 200
+            recovery_codes = enabled.json()["recovery_codes"]
+            # The enrolment token stops working once the session version moves on.
+            assert client.post("/api/auth/mfa/setup", json={}, headers=enrolment).status_code == 401
+            session = {"Authorization": f"Bearer {enabled.json()['access_token']}"}
+            profile = client.get("/api/auth/me", headers=session).json()
+            assert profile["mfa_enabled"] and profile["mfa_required"] and profile["mfa_recovery_codes_remaining"] == 10
+
+            with Session(engine) as database:
+                stored = database.get(User, admin_id)
+                assert secret not in stored.mfa_secret_encrypted and mfa.decrypt_secret(stored.mfa_secret_encrypted) == secret
+                hashes = set(database.scalars(select(MfaRecoveryCode.code_hash).where(MfaRecoveryCode.user_id == admin_id)))
+                assert hashes == {mfa.hash_recovery_code(code) for code in recovery_codes}
+
+            challenge = client.post("/api/auth/login", json=credentials).json()
+            assert challenge["status"] == "mfa_required"
+            assert client.post("/api/auth/mfa/verify", json={"challenge_token": challenge["challenge_token"], "code": recovery_codes[0].upper()}).status_code == 200
+            assert client.post("/api/auth/mfa/verify", json={"challenge_token": challenge["challenge_token"], "code": recovery_codes[0]}).status_code == 401
+            assert client.get("/api/auth/me", headers=session).json()["mfa_recovery_codes_remaining"] == 9
+            assert client.post("/api/auth/mfa/disable", json={"password": password, "code": recovery_codes[1]}, headers=session).status_code == 403
+
+            with Session(engine) as database:
+                stored = database.get(User, admin_id)
+                mfa.clear_mfa(database, stored)
+                stored.auth_version += 1
+                database.commit()
+                assert database.scalar(select(MfaRecoveryCode).where(MfaRecoveryCode.user_id == admin_id)) is None
+            assert client.get("/api/auth/me", headers=session).status_code == 401
+            assert client.post("/api/auth/login", json=credentials).json()["status"] == "mfa_setup_required"
     finally:
         app.dependency_overrides.clear()
         app.dependency_overrides.update(previous)

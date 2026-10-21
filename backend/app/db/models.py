@@ -6,7 +6,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Optional
 
-from sqlalchemy import Boolean, CheckConstraint, Computed, DateTime, Enum, Float, ForeignKey, Index, Integer, Numeric, String, Text, UniqueConstraint, text
+from sqlalchemy import BigInteger, Boolean, CheckConstraint, Computed, DateTime, Enum, Float, ForeignKey, Index, Integer, Numeric, String, Text, UniqueConstraint, text
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -44,11 +44,30 @@ class User(Base):
     auth_version: Mapped[int] = mapped_column(Integer, default=0, server_default=text("0"), nullable=False)
     password_reset_hash: Mapped[Optional[str]] = mapped_column(String(64), unique=True)
     password_reset_expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    # Fernet-encrypted TOTP secret; set but unconfirmed while enrolment is pending.
+    mfa_secret_encrypted: Mapped[Optional[str]] = mapped_column(Text)
+    mfa_enabled_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    # Last accepted 30-second time step, so a code cannot be replayed inside its window.
+    mfa_last_used_step: Mapped[Optional[int]] = mapped_column(BigInteger)
+    mfa_failed_attempts: Mapped[int] = mapped_column(Integer, default=0, server_default=text("0"), nullable=False)
+    mfa_locked_until: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     role: Mapped[UserRole] = mapped_column(Enum(UserRole, name="user_role"), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("CURRENT_TIMESTAMP"))
 
     candidate_profile = relationship("Candidate", back_populates="user", uselist=False)
     employer_profile = relationship("Employer", back_populates="user", uselist=False)
+
+
+class MfaRecoveryCode(Base):
+    __tablename__ = "mfa_recovery_codes"
+
+    code_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False, index=True)
+    code_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    used_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("CURRENT_TIMESTAMP"))
 
 
 class Candidate(Base):

@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Literal, Self
 from urllib.parse import urlsplit
 
+from cryptography.fernet import Fernet
 from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy.engine import make_url
@@ -23,6 +24,13 @@ class Settings(BaseSettings):
     jwt_secret: str = "replace-this-development-secret-before-production"
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 60
+
+    # Authenticator-app (TOTP) second factor. Roles listed here must enrol before they can sign in.
+    mfa_required_roles: list[Literal["candidate", "recruiter", "admin"]] = Field(default_factory=lambda: ["admin"])
+    # Fernet key that encrypts stored TOTP secrets; development derives one from JWT_SECRET when unset.
+    mfa_encryption_key: str = ""
+    mfa_issuer: str = "JobBridge"
+    mfa_challenge_minutes: int = 5
 
     # Load the sentence encoder in the background at startup so the first scoring request is not a cold start.
     preload_matching_model: bool = True
@@ -52,6 +60,12 @@ class Settings(BaseSettings):
                 parsed = urlsplit(origin)
                 if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password or parsed.path or parsed.query or parsed.fragment:
                     raise ValueError("CORS_ORIGINS must contain HTTPS origins without paths or credentials")
+            if not self.mfa_encryption_key:
+                raise ValueError("Shared deployments require an MFA_ENCRYPTION_KEY (a Fernet key)")
+            try:
+                Fernet(self.mfa_encryption_key)
+            except ValueError:
+                raise ValueError("MFA_ENCRYPTION_KEY must be a valid Fernet key") from None
         return self
 
 
