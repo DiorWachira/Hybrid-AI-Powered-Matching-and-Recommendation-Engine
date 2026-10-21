@@ -40,11 +40,11 @@ def test_encoder_loads_artifact_revision_and_refreshes_on_change(monkeypatch):
 def test_active_prototype_artifact_has_reviewed_model_identity():
     from app.core.hybrid_matcher import _artifact, calibrated_score
     artifact = _artifact()
-    assert artifact["model_version"] == "2026-10-09-epoch-combiner-r001"
+    assert artifact["model_version"] == "2026-10-19-epoch-combiner-v2-r001"
     assert artifact["promotion_status"] == "PROTOTYPE_TESTING_APPROVED"
-    assert artifact["selected_epoch"] == 19
+    assert artifact["selected_epoch"] == 4
     assert artifact["encoder_revision"] == "1110a243fdf4706b3f48f1d95db1a4f5529b4d41"
-    assert artifact["decision_threshold"] == pytest.approx(0.44)
+    assert artifact["decision_threshold"] == pytest.approx(0.46)
     assert calibrated_score(1.0, 1.0, 1.0)[0] > calibrated_score(0.0, 0.0, 0.0)[0]
 
 def test_artifact_is_cached_until_the_file_changes(tmp_path, monkeypatch):

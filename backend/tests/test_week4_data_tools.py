@@ -14,7 +14,7 @@ if str(REPO_ROOT) not in sys.path:
 
 from app.core.text_preprocessing import anonymize_resume_text
 from data_pipeline.import_brightermonday_jobs import normalize_job
-from data_pipeline.generate_synthetic_data import generate_candidate
+from data_pipeline.generate_synthetic_data import ROLE_CATALOG, SKILL_ALIASES, TRUE_TRANSFER, generate_candidate, generate_job
 from data_pipeline.load_esco_ontology import load_relationships, load_skills
 from data_pipeline.prepare_week4 import clean_candidate_for_export, clean_job_for_export
 from data_pipeline.prepare_week4 import prepare
@@ -136,3 +136,13 @@ def test_preparation_rejects_empty_dataset_before_writing(tmp_path):
     with pytest.raises(ValueError, match="positive"):
         prepare(0, 8, 42, True, True, None, tmp_path / "invalid")
     assert not (tmp_path / "invalid").exists()
+
+
+def test_synthetic_population_covers_it_roles_only():
+    # The platform lists formal IT roles only; training data must not teach the model other sectors.
+    assert set(ROLE_CATALOG) == {"Data Analyst", "DevOps Engineer", "Software Engineer", "Cybersecurity Analyst", "Business Analyst"}
+    rng = random.Random(7)
+    assert {generate_job(rng)["title"] for _ in range(200)} == set(ROLE_CATALOG)
+    assert {generate_candidate(rng)["target_role"] for _ in range(200)} == set(ROLE_CATALOG)
+    known = {skill for role in ROLE_CATALOG.values() for skill in role["core_skills"] + role["adjacent_skills"]}
+    assert set(SKILL_ALIASES) <= known and {skill for pair in TRUE_TRANSFER for skill in pair} <= known

@@ -61,7 +61,7 @@ def test_simulation_uses_rules_and_model_without_live_database_writes(api_client
     assert response.status_code == 200
     result = response.json()
     assert result["sandbox"] is True
-    assert result["model_version"] == "2026-10-09-epoch-combiner-r001"
+    assert result["model_version"] == "2026-10-19-epoch-combiner-v2-r001"
     assert len(result["candidates"]) == 6
     assert len(result["jobs"]) == 2
     assert len(result["matches"]) == 6
@@ -462,7 +462,7 @@ def test_evaluation_uses_candidate_id_to_break_score_ties(api_client, monkeypatc
     response = client.post(f"/api/matches/evaluate/{job_id}")
     assert response.status_code == 200
     assert [item["candidate_id"] for item in response.json()["candidates"]] == [str(UUID(int=1)), str(UUID(int=2))]
-    assert all(item["model_version"] == "2026-10-09-epoch-combiner-r001" for item in response.json()["candidates"])
+    assert all(item["model_version"] == "2026-10-19-epoch-combiner-v2-r001" for item in response.json()["candidates"])
 
 def test_v2_evaluation_records_which_related_skill_earned_credit(api_client, monkeypatch):
     from app.api import matches

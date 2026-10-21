@@ -32,9 +32,9 @@ Implemented on the feature branch, with verification gaps documented in
 
 Automatic graph sync is disabled at the user's request to stop repeated terminals.
 Run the one-shot worker manually. See [docs/WORKFLOW.md](docs/WORKFLOW.md) for
-status checks and operational limits. The 2026-10-09 Colab run completed all 100
-epochs and was integrity-verified; epoch 19 was promoted for prototype testing
-(`PROTOTYPE_TESTING_APPROVED`). `data_pipeline/validate_model_contract.py` now
+status checks and operational limits. The live model is the 2026-10-19 feature
+contract v2 run (related-skill readiness), epoch 4, promoted for prototype testing
+(`PROTOTYPE_TESTING_APPROVED`); it replaced the 2026-10-09 v1 epoch-19 model. `data_pipeline/validate_model_contract.py` now
 verifies training/serving feature parity against the shared feature module and
 exits 0; independent non-synthetic quality evaluation and public deployment are
 not done.
