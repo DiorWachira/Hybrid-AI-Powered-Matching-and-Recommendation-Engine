@@ -1,3 +1,5 @@
+from unittest.mock import MagicMock
+
 from fastapi.testclient import TestClient
 from uuid import uuid4
 
@@ -45,3 +47,17 @@ def test_ontology_import_is_repeatable_and_counts_standard_mappings():
         finally:
             with driver.session(database="neo4j") as graph:
                 graph.run("MATCH (node) WHERE node.name IN $names DETACH DELETE node", names=names).consume()
+
+
+def test_neo4j_seed_lists_it_roles_only(monkeypatch) -> None:
+    # The platform lists formal IT roles only; the seeded ontology must match the synthetic generator.
+    from app.db import neo4j_db
+
+    driver = MagicMock()
+    session = driver.session.return_value.__enter__.return_value
+    session.run.return_value.single.return_value = MagicMock(__getitem__=lambda self, key: 0)
+    monkeypatch.setattr(neo4j_db, "get_neo4j_driver", lambda: driver)
+    neo4j_db.seed_neo4j_ontology()
+    roles = {call.args[1]["name"] for call in session.run.call_args_list if "MERGE (j:JobRole" in call.args[0]}
+    assert roles == {"Software Engineer", "Data Analyst", "Cybersecurity Analyst"}
+    assert not any("Accountant" in call.args[0] for call in session.run.call_args_list)
