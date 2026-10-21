@@ -1,8 +1,8 @@
 {
-  "decision_threshold": 0.43999999999999995,
+  "decision_threshold": 0.4599999999999999,
   "embedding_model": "sentence-transformers/all-MiniLM-L6-v2",
   "encoder_revision": "1110a243fdf4706b3f48f1d95db1a4f5529b4d41",
-  "feature_contract": "serving-direct-skill-growth-v1",
+  "feature_contract": "serving-related-skill-readiness-v2",
   "feature_order": [
     "S_bert",
     "S_graph",
@@ -10,26 +10,27 @@
   ],
   "logistic_regression": {
     "coefficients": [
-      0.7448612392003338,
-      0.9525298174161484,
-      0.48442019877353487
+      0.7082764943398288,
+      0.6822683197436659,
+      0.9415553261948322
     ],
-    "intercept": 1.202187690910195
+    "intercept": 1.4628540203560627
   },
-  "model_version": "2026-10-09-epoch-combiner-r001",
+  "model_version": "2026-10-19-epoch-combiner-v2-r001",
   "promotion_status": "PROTOTYPE_TESTING_APPROVED",
-  "training_commit": "77f05fad66434ce3d5e89418f3a71a8d12e19e47",
-  "source_artifact_sha256": "185471dc6e0affdbdc6073b647b9573db0b427663e13c4eb1910f62d5ed892e5",
-  "selected_epoch": 19,
-  "evaluation_note": "Synthetic held-out scoring-head results; not independent hiring-quality certification.",
+  "training_commit": "9621062b77863b4e73402b4813019fabe8afb15e",
+  "source_artifact_sha256": "47cb91950d07587e4787b632ce75d425cb88bdaf6b8d016a2ca7cd67d8d496ae",
+  "selected_epoch": 4,
+  "evaluation_note": "Synthetic held-out scoring-head results (v3 alias labels); not independent hiring-quality certification.",
   "scaler_mean": [
-    0.6220521211749103,
-    0.7961425576519916,
-    0.5999109014675054
+    0.6215445290696446,
+    0.8925819706498979,
+    0.7837443013543646
   ],
   "scaler_scale": [
-    0.11477535967216847,
-    0.2276046899519517,
-    0.23167071523500132
-  ]
+    0.1141949264115322,
+    0.1222141731240649,
+    0.32469005783489024
+  ],
+  "skill_relations_sha256": "689264faefb0a11b253e3505276b6cea382fb09862723853856974ecc9c2f9ef"
 }

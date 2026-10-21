@@ -1,6 +1,6 @@
 HYBRID AI-POWERED WORKFORCE PLACEMENT ENGINE
 PROJECT MILESTONE ROADMAP (8 WEEKS)
-Last updated: 2026-10-19 (feature contract v2 compared locally; epoch-19 serving merged)
+Last updated: 2026-10-21 (feature contract v2 epoch 4 promoted for prototype testing)
 
 CURRENT REPOSITORY STATUS (2026-10-19)
 Main integrates Week 1-4 verification (8b6ed07), the Month 2 seeded evaluator and
@@ -36,9 +36,16 @@ FEATURE CONTRACT V2: RELATED SKILLS + EXPERIENCE READINESS (2026-10-19)
       v2 retrained on v3 labels    0.807/0.847   0.864/0.814  (log loss 0.459/0.435)
       control, v2 labels: v1 0.799/0.825, v2 0.799/0.870 (no regression)
 [~] Gains are conditional on the v3 alias assumption; synthetic labels only.
-[ ] Next: official pinned Colab run with --feature-contract serving-related-skill-readiness-v2
-    --label-source synthetic-fixed-centres-latent-bernoulli-v3-skill-aliases, integrity
-    review, then promotion decision. Gold-slice labels remain the independent check.
+[x] Official pinned Colab run 2026-10-19-epoch-combiner-v2-r001 (commit 9621062): 100
+    epochs, integrity verified, selected epoch 4, threshold 0.46 - identical to the local
+    comparison. Hybrid ROC-AUC warm/cold 0.807/0.847 vs fixed-weight 0.803/0.853; hybrid
+    wins F1 and log loss on every split.
+[x] Skill relations hashed with LF endings (Windows checkouts load v2) and the synthetic
+    generator kept to IT roles (Accountant -> Cybersecurity Analyst).
+[x] 2026-10-21: v2 epoch 4 promoted for prototype testing, replacing v1 epoch 19.
+    Artifact matches the verified bundle (SHA-256 47cb9195...); contract gate exits 0.
+[ ] Next: gold-slice labels, then `evaluate --artifact` on the promoted v2 model as the
+    independent check.
 
 TRAINING COMPLETION & FEATURE-PARITY GATE UPDATE (2026-10-14)
 [x] Confirmed the 2026-10-09 Colab run 2026-10-09-epoch-combiner-r001 actually
