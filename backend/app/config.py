@@ -32,6 +32,11 @@ class Settings(BaseSettings):
     mfa_issuer: str = "JobBridge"
     mfa_challenge_minutes: int = 5
 
+    # "Sign in with Google": off while the OAuth client ID is empty. Only existing, non-admin accounts whose
+    # email is listed may use it; everyone else signs in with their password.
+    google_client_id: str = ""
+    google_signin_emails: list[str] = Field(default_factory=list)
+
     # Load the sentence encoder in the background at startup so the first scoring request is not a cold start.
     preload_matching_model: bool = True
 

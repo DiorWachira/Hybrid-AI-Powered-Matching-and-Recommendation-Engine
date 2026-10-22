@@ -9,11 +9,12 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import get_current_user, get_enrolling_user
+from app.config import get_settings
 from app.db.models import AuditEvent, Candidate, Employer, User, UserRole
 from app.db.postgres import get_db
-from app.schemas import (LoginRequest, LoginResponse, MfaCodeRequest, MfaConfirmRequest, MfaEnableResponse, MfaSetupRequest, MfaSetupResponse,
+from app.schemas import (GoogleLoginRequest, GoogleSignInOptions, LoginRequest, LoginResponse, MfaCodeRequest, MfaConfirmRequest, MfaEnableResponse, MfaSetupRequest, MfaSetupResponse,
                          MfaVerifyRequest, PasswordResetRequest, ProfileResponse, RecoveryCodesResponse, RegisterRequest, TokenResponse)
-from app.utils import mfa
+from app.utils import google_identity, mfa
 from app.utils.security import (MFA_CHALLENGE_TOKEN, MFA_ENROLLMENT_TOKEN, create_access_token, create_mfa_token, decode_access_token,
                                 hash_password, verify_password)
 
@@ -53,15 +54,45 @@ def login(request: Request, payload: LoginRequest, db: Session = Depends(get_db)
     user = db.scalar(select(User).where(User.email == str(payload.email).lower()))
     if user is None or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
+    return _first_factor_passed(db, user)
+
+
+def _first_factor_passed(db: Session, user: User, details: dict | None = None) -> LoginResponse:
+    """Finish a sign-in whose first factor (password or Google) succeeded; two-step verification still applies."""
     if not user.is_active:
         raise HTTPException(status_code=403, detail="Account suspended; contact the administrator")
     if user.mfa_enabled_at is not None:
         return LoginResponse(status="mfa_required", role=user.role, challenge_token=create_mfa_token(user.user_id, user.role.value, user.auth_version, MFA_CHALLENGE_TOKEN))
     if mfa.is_required(user):
         return LoginResponse(status="mfa_setup_required", role=user.role, challenge_token=create_mfa_token(user.user_id, user.role.value, user.auth_version, MFA_ENROLLMENT_TOKEN))
-    db.add(AuditEvent(actor_user_id=user.user_id, action="account.login", resource_type="user", resource_id=user.user_id))
+    db.add(AuditEvent(actor_user_id=user.user_id, action="account.login", resource_type="user", resource_id=user.user_id, details=details))
     db.commit()
     return LoginResponse(status="authenticated", role=user.role, access_token=create_access_token(user.user_id, user.role.value, user.auth_version))
+
+
+@router.get("/google", response_model=GoogleSignInOptions)
+def google_sign_in_options() -> GoogleSignInOptions:
+    """The OAuth client ID the sign-in page needs to show the Google button, or null when it is switched off."""
+    return GoogleSignInOptions(client_id=get_settings().google_client_id or None)
+
+
+@router.post("/google", response_model=LoginResponse)
+@limiter.limit("10/minute")
+def google_login(request: Request, payload: GoogleLoginRequest, db: Session = Depends(get_db)) -> LoginResponse:
+    settings = get_settings()
+    if not settings.google_client_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Google sign-in is not enabled")
+    try:
+        email = google_identity.verified_email(payload.credential, settings.google_client_id)
+    except google_identity.GoogleUnavailable:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Google sign-in is temporarily unavailable; use your password") from None
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Google sign-in could not be verified") from None
+    user = db.scalar(select(User).where(User.email == email))
+    # One message for every refusal, so the endpoint does not reveal which emails have accounts.
+    if email not in {item.strip().lower() for item in settings.google_signin_emails} or user is None or user.role == UserRole.admin:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="This Google account cannot sign in here; use your email and password")
+    return _first_factor_passed(db, user, {"method": "google"})
 
 
 def _locked(until: datetime) -> HTTPException:

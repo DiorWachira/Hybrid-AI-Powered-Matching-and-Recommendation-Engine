@@ -198,6 +198,10 @@ button, a { transition: background-color .18s, color .18s, border-color .18s; }
 .auth-content > p { color: #bfccb7; font-size: 13px; line-height: 1.7; }
 .auth-form { display: grid; gap: 18px; margin-top: 28px; }
 .auth-form input { background: #162219e8; }
+.google-signin { display: grid; gap: 14px; margin-top: 18px; }
+.google-signin[hidden] { display: none; }
+.google-signin-divider { display: flex; align-items: center; gap: 12px; color: #becbb7; font-size: 12px; text-transform: uppercase; letter-spacing: .08em; }
+.google-signin-divider::before, .google-signin-divider::after { content: ""; flex: 1; border-top: 1px solid var(--line); }
 .auth-switch { margin-top: 24px; font-size: 12px; color: #becbb7; }
 .auth-switch button { color: var(--accent); margin-left: 8px; text-decoration: underline; text-underline-offset: 4px; }
 .password-field { position: relative; }

@@ -15,6 +15,12 @@ Administrators can reset a user's two-step verification from the dashboard; an
 administrator who loses their phone is reset on the server with
 `python backend/reset_mfa.py <email>`. Migration `20261022_0008` adds the columns.
 
+Sign in with Google (2026-10-22): optional, off until `GOOGLE_CLIENT_ID` is set. The
+server verifies Google's signed ID token (signature, audience, issuer, expiry and a
+Google-verified email) and accepts it only for existing, active, non-admin accounts listed
+in `GOOGLE_SIGNIN_EMAILS`; two-step verification still applies. Everyone else, and every
+administrator, signs in with their password. Google does not create accounts.
+
 Public entry (2026-10-04): `/` now opens the JobBridge landing page with candidate
 and recruiter signup paths, About, approach, FAQs and project feedback links.
 `/privacy` and `/terms` describe prototype data handling and use limits. Existing
