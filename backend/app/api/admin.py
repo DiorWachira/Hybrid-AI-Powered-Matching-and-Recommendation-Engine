@@ -2,16 +2,17 @@ from uuid import UUID
 import hashlib
 import secrets
 from datetime import UTC, datetime, timedelta
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from app.core.rate_limit import limiter
-from sqlalchemy import String, and_, cast, exists, func, or_, select
+from sqlalchemy import Date, String, and_, cast, exists, func, or_, select
 from sqlalchemy.orm import Session, aliased
 
 from app.api.dependencies import require_roles
 from app.db.models import AuditEvent, Candidate, Employer, GraphSyncEvent, JobApplication, JobPosting, JobStatus, MatchResult, User, UserRole
 from app.db.postgres import get_db
-from app.schemas import AccountStatusUpdate, AdminJobResponse, AdminOversightSummary, AdminOverviewResponse, AdminRecruiterResponse, AdminUserResponse, AuditEventResponse, JobResponse, JobStatusUpdate, OntologyRelationRequest, OntologySkillRequest, ResetAuthorization
+from app.schemas import AccountStatusUpdate, AdminJobResponse, AdminOversightSummary, AdminOverviewResponse, AdminRecruiterResponse, AdminUserResponse, AuditEventResponse, DailyActivity, JobResponse, JobStatusUpdate, OntologyRelationRequest, OntologySkillRequest, ResetAuthorization
 from app.db.neo4j_db import get_neo4j_driver
 from neo4j.exceptions import Neo4jError, ServiceUnavailable, SessionExpired
 from app.utils.mfa import clear_mfa
@@ -21,6 +22,10 @@ router = APIRouter(prefix="/admin", tags=["administration"])
 
 # An open posting with no applicants after this many days is flagged for review.
 STALE_AFTER_DAYS = 14
+# Days of audit history summarised in the overview trend.
+TREND_DAYS = 14
+# Audit actions are named "<category>.<event>"; the log can be filtered by category.
+AuditCategory = Literal["account", "application", "job", "matches", "ontology", "opportunity", "profile", "resume"]
 
 
 def _stale_cutoff() -> datetime:
@@ -133,8 +138,19 @@ def _user_response(user: User, db: Session) -> AdminUserResponse:
 
 
 @router.get("/users", response_model=list[AdminUserResponse])
-def list_users(search: str = Query(default="", max_length=120), offset: int = Query(default=0, ge=0), user: User = Depends(require_roles(UserRole.admin)), db: Session = Depends(get_db)):
+def list_users(
+    search: str = Query(default="", max_length=120),
+    offset: int = Query(default=0, ge=0),
+    role: UserRole | None = None,
+    status: Literal["active", "suspended"] | None = None,
+    user: User = Depends(require_roles(UserRole.admin)),
+    db: Session = Depends(get_db),
+):
     statement = select(User).outerjoin(Candidate, Candidate.user_id == User.user_id).outerjoin(Employer, Employer.user_id == User.user_id)
+    if role is not None:
+        statement = statement.where(User.role == role)
+    if status is not None:
+        statement = statement.where(User.is_active.is_(status == "active"))
     if search.strip():
         term = search.strip()
         statement = statement.where(User.email.icontains(term, autoescape=True) | Candidate.full_name.icontains(term, autoescape=True) | Employer.contact_name.icontains(term, autoescape=True) | Employer.company_name.icontains(term, autoescape=True))
@@ -322,8 +338,48 @@ def read_admin_overview(
         suspended_users_count=db.scalar(select(func.count()).select_from(User).where(User.is_active.is_(False))) or 0,
         recent_users=[_user_response(item, db) for item in recent_users],
         recent_jobs=[JobResponse.model_validate(item) for item in recent_jobs],
-        recent_activity=[
-            AuditEventResponse.model_validate(event).model_copy(update={"actor_email": actor_email})
-            for event, actor_email in db.execute(select(AuditEvent, User.email).outerjoin(User, User.user_id == AuditEvent.actor_user_id).order_by(AuditEvent.created_at.desc()).limit(30)).all()
-        ],
+        recent_activity=_audit_events(db, select(AuditEvent, User.email).outerjoin(User, User.user_id == AuditEvent.actor_user_id).order_by(AuditEvent.created_at.desc()).limit(30)),
+        mfa_enabled_count=db.scalar(select(func.count()).select_from(User).where(User.mfa_enabled_at.is_not(None))) or 0,
+        application_status_counts=dict(db.execute(select(JobApplication.status, func.count()).group_by(JobApplication.status)).all()),
+        daily_activity=_daily_activity(db),
     )
+
+def _audit_events(db: Session, statement) -> list[AuditEventResponse]:
+    return [AuditEventResponse.model_validate(event).model_copy(update={"actor_email": actor_email}) for event, actor_email in db.execute(statement).all()]
+
+
+def _daily_activity(db: Session) -> list[DailyActivity]:
+    today = datetime.now(UTC).date()
+    first_day = today - timedelta(days=TREND_DAYS - 1)
+    day = cast(AuditEvent.created_at, Date)
+    rows = db.execute(
+        select(
+            day,
+            func.count(),
+            func.count().filter(AuditEvent.action == "account.registered"),
+            func.count().filter(AuditEvent.action == "application.submitted"),
+            func.count().filter(AuditEvent.action == "application.status_changed", AuditEvent.details["status"].astext == "hired"),
+        )
+        .where(AuditEvent.created_at >= datetime.combine(first_day, datetime.min.time(), UTC))
+        .group_by(day)
+    ).all()
+    counts = {row[0]: row[1:] for row in rows}
+    # Days without events are reported as zeros so the trend has no gaps.
+    return [
+        DailyActivity(day=current, **dict(zip(("events", "signups", "applications", "hires"), counts.get(current, (0, 0, 0, 0)))))
+        for current in (first_day + timedelta(days=offset) for offset in range(TREND_DAYS))
+    ]
+
+
+@router.get("/activity", response_model=list[AuditEventResponse])
+def read_audit_log(
+    category: AuditCategory | None = None,
+    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=25, ge=1, le=100),
+    user: User = Depends(require_roles(UserRole.admin)),
+    db: Session = Depends(get_db),
+):
+    statement = select(AuditEvent, User.email).outerjoin(User, User.user_id == AuditEvent.actor_user_id)
+    if category is not None:
+        statement = statement.where(AuditEvent.action.startswith(f"{category}.", autoescape=True))
+    return _audit_events(db, statement.order_by(AuditEvent.created_at.desc(), AuditEvent.event_id).offset(offset).limit(limit))

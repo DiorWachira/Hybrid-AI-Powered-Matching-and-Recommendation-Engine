@@ -538,3 +538,60 @@ def test_v2_evaluation_records_which_related_skill_earned_credit(api_client, mon
     assert result["missing_skills"] == ["SQL"]
     stored = next(call.args[0] for call in database.add.call_args_list if isinstance(call.args[0], MatchResult))
     assert stored.skill_gap_breakdown["related_skills"] == result["related_skills"]
+
+
+def test_audit_log_filters_by_category_and_validates_input(api_client):
+    client, database, user = api_client
+    user.role = UserRole.admin
+    event_id = uuid4()
+    created = datetime(2026, 10, 20, 9, 30, tzinfo=UTC)
+    event = SimpleNamespace(event_id=event_id, actor_user_id=None, action="account.suspended", resource_type="user", resource_id=None, details=None, created_at=created)
+    database.execute.return_value.all.return_value = [(event, "admin@example.org")]
+    response = client.get("/api/admin/activity?category=account&limit=10&offset=20")
+    assert response.status_code == 200
+    assert response.json()[0]["action"] == "account.suspended"
+    assert response.json()[0]["actor_email"] == "admin@example.org"
+    sql = str(database.execute.call_args.args[0].compile(dialect=postgresql.dialect()))
+    assert "LIKE" in sql and "LIMIT" in sql and "OFFSET" in sql
+    assert client.get("/api/admin/activity?category=unknown").status_code == 422
+    assert client.get("/api/admin/activity?limit=101").status_code == 422
+
+
+def test_audit_log_is_admin_only(api_client):
+    client, database, user = api_client
+    user.role = UserRole.recruiter
+    assert client.get("/api/admin/activity").status_code == 403
+    database.execute.assert_not_called()
+
+
+def test_admin_user_list_filters_role_and_status(api_client):
+    client, database, user = api_client
+    user.role = UserRole.admin
+    database.scalars.return_value = []
+    assert client.get("/api/admin/users?role=recruiter&status=suspended").status_code == 200
+    sql = str(database.scalars.call_args.args[0].compile(dialect=postgresql.dialect(), compile_kwargs={"literal_binds": True}))
+    assert "users.role = 'recruiter'" in sql
+    assert "users.is_active IS false" in sql
+    assert client.get("/api/admin/users?status=deleted").status_code == 422
+
+
+def test_recruiter_pipeline_counts_applications_per_stage(api_client):
+    client, database, user = api_client
+    first_job, second_job = uuid4(), uuid4()
+    status_rows = MagicMock(); status_rows.all.return_value = [(JobStatus.open, 2), (JobStatus.closed, 1)]
+    application_rows = MagicMock(); application_rows.all.return_value = [(first_job, "submitted", 3), (first_job, "hired", 1), (second_job, "submitted", 2)]
+    database.execute.side_effect = [status_rows, application_rows]
+    response = client.get("/api/jobs/mine/pipeline")
+    assert response.status_code == 200
+    assert response.json() == {
+        "jobs_open": 2, "jobs_closed": 1, "applications_by_status": {"submitted": 5, "hired": 1},
+        "jobs": {str(first_job): {"submitted": 3, "hired": 1}, str(second_job): {"submitted": 2}},
+    }
+
+
+@pytest.mark.parametrize("role", [UserRole.candidate, UserRole.admin])
+def test_recruiter_pipeline_is_recruiter_only(api_client, role):
+    client, database, user = api_client
+    user.role = role
+    assert client.get("/api/jobs/mine/pipeline").status_code == 403
+    database.execute.assert_not_called()

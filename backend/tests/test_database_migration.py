@@ -398,6 +398,10 @@ def test_authenticated_application_and_match_workflow(migrated_database, monkeyp
             for application_status in ("interviewed", "hired"):
                 assert client.patch(f"/api/jobs/{job_id}/applications/{application_id}", json={"status": application_status}, headers=recruiter_headers).status_code == 200
                 assert client.get("/api/candidates/me/applications", headers=candidate_headers).json()[0]["status"] == application_status
+            pipeline = client.get("/api/jobs/mine/pipeline", headers=recruiter_headers).json()
+            assert pipeline["jobs_open"] == 1 and pipeline["applications_by_status"] == {"hired": 1}
+            assert pipeline["jobs"] == {job_id: {"hired": 1}}
+            assert client.get("/api/jobs/mine/pipeline", headers=other_headers).json()["applications_by_status"] == {}
             employment = client.get("/api/candidates/me/employment", headers=candidate_headers).json()
             assert [(role["job_title"], role["company_name"]) for role in employment] == [("Senior Analyst", "Test Employer")]
             assert client.get("/api/candidates/me/employment", headers=recruiter_headers).status_code == 403
@@ -450,6 +454,13 @@ def test_authenticated_application_and_match_workflow(migrated_database, monkeyp
             assert overview.status_code == 200
             actions = {event["action"] for event in overview.json()["recent_activity"]}
             assert {"account.suspended", "account.reactivated", "application.submitted", "matches.evaluated"} <= actions
+            assert overview.json()["application_status_counts"] == {"hired": 1}
+            trend = overview.json()["daily_activity"]
+            assert len(trend) == 14 and trend[-1]["signups"] >= 3 and trend[-1]["hires"] == 1
+            account_log = client.get("/api/admin/activity", params={"category": "account"}, headers=admin_headers).json()
+            assert account_log and all(event["action"].startswith("account.") for event in account_log)
+            suspended_filter = client.get("/api/admin/users", params={"role": "candidate", "status": "active"}, headers=admin_headers).json()
+            assert [account["role"] for account in suspended_filter] == ["candidate"]
             users_response = client.get("/api/admin/users", params={"search": "candidate@example.org"}, headers=admin_headers)
             assert users_response.status_code == 200
             assert len(users_response.json()) == 1

@@ -1,13 +1,13 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import require_roles
 from app.db.models import AuditEvent, Candidate, Employer, JobApplication, JobPosting, JobStatus, User, UserRole
 from app.db.postgres import get_db
-from app.schemas import ApplicantResponse, ApplicationResponse, ApplicationStatusUpdate, JobCreateRequest, JobResponse, JobStatusUpdate, JobUpdateRequest
+from app.schemas import ApplicantResponse, ApplicationResponse, ApplicationStatusUpdate, JobCreateRequest, JobResponse, JobStatusUpdate, JobUpdateRequest, RecruiterPipelineSummary
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
 
@@ -15,6 +15,18 @@ router = APIRouter(prefix="/jobs", tags=["jobs"])
 @router.get("/mine", response_model=list[JobResponse])
 def list_my_jobs(offset: int = Query(default=0, ge=0), limit: int = Query(default=25, ge=1, le=100), user: User = Depends(require_roles(UserRole.recruiter, UserRole.admin)), db: Session = Depends(get_db)):
     return list(db.scalars(select(JobPosting).join(Employer, JobPosting.employer_id == Employer.employer_id).where(Employer.user_id == user.user_id).order_by(JobPosting.posted_at.desc(), JobPosting.job_id).offset(offset).limit(limit)))
+
+
+@router.get("/mine/pipeline", response_model=RecruiterPipelineSummary)
+def my_pipeline(user: User = Depends(require_roles(UserRole.recruiter)), db: Session = Depends(get_db)):
+    owned = select(JobPosting.job_id, JobPosting.status).join(Employer, JobPosting.employer_id == Employer.employer_id).where(Employer.user_id == user.user_id).subquery()
+    statuses = dict(db.execute(select(owned.c.status, func.count()).group_by(owned.c.status)).all())
+    jobs: dict[UUID, dict[str, int]] = {}
+    totals: dict[str, int] = {}
+    for job_id, application_status, count in db.execute(select(JobApplication.job_id, JobApplication.status, func.count()).join(owned, owned.c.job_id == JobApplication.job_id).group_by(JobApplication.job_id, JobApplication.status)).all():
+        jobs.setdefault(job_id, {})[application_status] = count
+        totals[application_status] = totals.get(application_status, 0) + count
+    return RecruiterPipelineSummary(jobs_open=statuses.get(JobStatus.open, 0), jobs_closed=statuses.get(JobStatus.closed, 0), applications_by_status=totals, jobs=jobs)
 
 
 @router.post("/create", response_model=JobResponse, status_code=status.HTTP_201_CREATED)

@@ -1,5 +1,5 @@
 from decimal import Decimal
-from datetime import datetime
+from datetime import date, datetime
 from typing import Literal
 from uuid import UUID
 
@@ -389,6 +389,14 @@ class AuditEventResponse(BaseModel):
     created_at: datetime
 
 
+class DailyActivity(BaseModel):
+    day: date
+    events: int
+    signups: int
+    applications: int
+    hires: int
+
+
 class AdminOverviewResponse(BaseModel):
     users_count: int
     candidates_count: int
@@ -401,3 +409,15 @@ class AdminOverviewResponse(BaseModel):
     recent_users: list[AdminUserResponse]
     recent_jobs: list[JobResponse]
     recent_activity: list[AuditEventResponse]
+    mfa_enabled_count: int = 0
+    # Applications grouped by pipeline stage, e.g. {"submitted": 4, "hired": 1}.
+    application_status_counts: dict[str, int] = Field(default_factory=dict)
+    daily_activity: list[DailyActivity] = Field(default_factory=list)
+
+
+class RecruiterPipelineSummary(BaseModel):
+    jobs_open: int
+    jobs_closed: int
+    # Applications per stage across all of the recruiter's postings, and per posting.
+    applications_by_status: dict[str, int]
+    jobs: dict[UUID, dict[str, int]]
