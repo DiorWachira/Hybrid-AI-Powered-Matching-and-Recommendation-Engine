@@ -368,6 +368,14 @@ def test_authenticated_application_and_match_workflow(migrated_database, monkeyp
             assert applications[0]["job_status"] == "open"
             candidate_score.assert_not_called()
             application_id = applications[0]["application_id"]
+            # Withdrawing frees the job card, and registering interest again resubmits the same application.
+            withdrawn = client.post(f"/api/candidates/me/applications/{application_id}/withdraw", headers=candidate_headers)
+            assert withdrawn.status_code == 200 and withdrawn.json()["status"] == "withdrawn"
+            assert client.get("/api/candidates/opportunities?activity=applied", headers=candidate_headers).json() == []
+            assert client.post(f"/api/candidates/opportunities/{job_id}", json={"status": "applied"}, headers=candidate_headers).status_code == 200
+            applications = client.get("/api/candidates/me/applications", headers=candidate_headers).json()
+            assert [(item["application_id"], item["status"]) for item in applications] == [(application_id, "submitted")]
+            candidate_score.reset_mock()
             assert client.get(f"/api/jobs/{job_id}/applications", headers=other_headers).status_code == 403
             applicant_list = client.get(f"/api/jobs/{job_id}/applications", headers=recruiter_headers)
             assert applicant_list.status_code == 200
@@ -383,9 +391,19 @@ def test_authenticated_application_and_match_workflow(migrated_database, monkeyp
             tracked = client.get("/api/candidates/me/applications", headers=candidate_headers).json()[0]
             assert tracked["status"] == "reviewing"
             assert tracked["updated_at"] == updated.json()["updated_at"]
-            for application_status in ("shortlisted", "hired"):
+            assert client.patch(f"/api/jobs/{job_id}/applications/{application_id}", json={"status": "shortlisted"}, headers=recruiter_headers).status_code == 200
+            # Hiring must wait for a confirmed interview.
+            assert client.patch(f"/api/jobs/{job_id}/applications/{application_id}", json={"status": "hired"}, headers=recruiter_headers).status_code == 409
+            assert client.get("/api/candidates/me/employment", headers=candidate_headers).json() == []
+            for application_status in ("interviewed", "hired"):
                 assert client.patch(f"/api/jobs/{job_id}/applications/{application_id}", json={"status": application_status}, headers=recruiter_headers).status_code == 200
                 assert client.get("/api/candidates/me/applications", headers=candidate_headers).json()[0]["status"] == application_status
+            employment = client.get("/api/candidates/me/employment", headers=candidate_headers).json()
+            assert [(role["job_title"], role["company_name"]) for role in employment] == [("Senior Analyst", "Test Employer")]
+            assert client.get("/api/candidates/me/employment", headers=recruiter_headers).status_code == 403
+            # A decided outcome cannot be withdrawn, and only the candidate may withdraw.
+            assert client.post(f"/api/candidates/me/applications/{application_id}/withdraw", headers=candidate_headers).status_code == 409
+            assert client.post(f"/api/candidates/me/applications/{application_id}/withdraw", headers=recruiter_headers).status_code == 403
             assert client.patch(f"/api/jobs/{job_id}/applications/{application_id}", json={"status": "reviewing"}, headers=recruiter_headers).status_code == 409
             candidate_score.assert_not_called()
             evaluated = client.post(f"/api/matches/evaluate/{job_id}", headers=recruiter_headers)

@@ -209,7 +209,7 @@ class JobUpdateRequest(JobCreateRequest):
 
 
 class ApplicationStatusUpdate(BaseModel):
-    status: Literal["reviewing", "shortlisted", "rejected", "hired"]
+    status: Literal["reviewing", "shortlisted", "interviewed", "rejected", "hired"]
 
 
 class ApplicationResponse(BaseModel):

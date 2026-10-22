@@ -99,7 +99,9 @@ def update_application(job_id: UUID, application_id: UUID, payload: ApplicationS
     transitions = {
         "submitted": {"reviewing", "shortlisted", "rejected"},
         "reviewing": {"shortlisted", "rejected"},
-        "shortlisted": {"hired", "rejected"},
+        # A hire must follow a confirmed interview.
+        "shortlisted": {"interviewed", "rejected"},
+        "interviewed": {"hired", "rejected"},
     }
     if payload.status != application.status and payload.status not in transitions.get(application.status, set()):
         raise HTTPException(status_code=409, detail="Application status transition not allowed")

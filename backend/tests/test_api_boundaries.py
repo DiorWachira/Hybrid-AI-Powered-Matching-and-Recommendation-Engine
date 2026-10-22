@@ -380,6 +380,53 @@ def test_terminal_application_status_cannot_be_reopened(api_client):
     database.commit.assert_not_called()
 
 
+@pytest.mark.parametrize("current,target,allowed", [
+    ("shortlisted", "hired", False),
+    ("submitted", "interviewed", False),
+    ("shortlisted", "interviewed", True),
+    ("interviewed", "hired", True),
+    ("interviewed", "rejected", True),
+])
+def test_hire_requires_confirmed_interview(api_client, current, target, allowed):
+    client, database, user = api_client
+    database.get.side_effect = lambda model, identifier: SimpleNamespace(employer_id=uuid4()) if model is JobPosting else SimpleNamespace(user_id=user.user_id)
+    application = SimpleNamespace(application_id=uuid4(), candidate_id=uuid4(), job_id=uuid4(), status=current, created_at=datetime.now(UTC), updated_at=datetime.now(UTC))
+    database.scalar.return_value = application
+    response = client.patch(f"/api/jobs/{application.job_id}/applications/{application.application_id}", json={"status": target})
+    assert response.status_code == (200 if allowed else 409)
+    assert database.commit.called is allowed
+
+
+@pytest.mark.parametrize("current,allowed", [
+    ("submitted", True),
+    ("shortlisted", True),
+    ("interviewed", True),
+    ("hired", False),
+    ("rejected", False),
+    ("withdrawn", False),
+])
+def test_candidate_can_withdraw_only_open_applications(api_client, current, allowed):
+    client, database, user = api_client
+    user.role = UserRole.candidate
+    application = SimpleNamespace(application_id=uuid4(), candidate_id=uuid4(), job_id=uuid4(), status=current, created_at=datetime.now(UTC), updated_at=datetime.now(UTC))
+    database.scalar.return_value = application
+    response = client.post(f"/api/candidates/me/applications/{application.application_id}/withdraw")
+    assert response.status_code == (200 if allowed else 409)
+    assert database.commit.called is allowed
+    if allowed:
+        assert response.json()["status"] == "withdrawn"
+
+
+def test_withdraw_hides_other_candidates_applications(api_client):
+    client, database, user = api_client
+    user.role = UserRole.candidate
+    database.scalar.return_value = None
+    assert client.post(f"/api/candidates/me/applications/{uuid4()}/withdraw").status_code == 404
+    user.role = UserRole.recruiter
+    assert client.post(f"/api/candidates/me/applications/{uuid4()}/withdraw").status_code == 403
+    database.commit.assert_not_called()
+
+
 def test_candidate_cannot_list_recruiter_postings(api_client):
     client, database, user = api_client
     user.role = UserRole.candidate

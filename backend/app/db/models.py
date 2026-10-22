@@ -199,7 +199,7 @@ class JobApplication(Base):
     __tablename__ = "job_applications"
     __table_args__ = (
         UniqueConstraint("candidate_id", "job_id", name="uq_application_candidate_job"),
-        CheckConstraint("status IN ('submitted', 'reviewing', 'shortlisted', 'rejected', 'hired', 'withdrawn')", name="ck_application_status"),
+        CheckConstraint("status IN ('submitted', 'reviewing', 'shortlisted', 'interviewed', 'rejected', 'hired', 'withdrawn')", name="ck_application_status"),
         Index("ix_application_job_status", "job_id", "status"),
     )
 
