@@ -85,6 +85,14 @@ class TokenResponse(BaseModel):
     role: UserRole
 
 
+class GoogleLoginRequest(BaseModel):
+    credential: str = Field(min_length=1, max_length=4096)
+
+
+class GoogleSignInOptions(BaseModel):
+    client_id: str | None
+
+
 class LoginResponse(BaseModel):
     """A session, or the token for the second step when the account uses or must set up MFA."""
     status: Literal["authenticated", "mfa_required", "mfa_setup_required"]
