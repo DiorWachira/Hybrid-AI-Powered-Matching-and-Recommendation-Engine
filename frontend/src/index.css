@@ -226,6 +226,14 @@ button, a { transition: background-color .18s, color .18s, border-color .18s; }
 .workflow-actions { display: flex; align-items: end; flex-wrap: wrap; gap: 10px; }
 .workflow-status { min-width: 160px; max-width: 100%; }
 .workflow-status-label { color: var(--accent); text-transform: capitalize; font-size: 14px; }
+.workflow-status-label.hired { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border: 1px solid #596b47; border-radius: 999px; }
+.employment-badge { display: inline-flex; align-items: center; gap: 8px; margin-top: 12px; padding: 7px 13px; border: 1px solid #596b47; border-radius: 999px; background: #273124; color: #d8e6bc; font-size: 13px; }
+.employment-badge strong { color: var(--accent); }
+.hire-decision { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; padding: 16px 18px; margin-bottom: 20px; border: 1px solid #596b47; border-radius: 6px; background: #273124; color: #d8e6bc; }
+.hire-decision > svg { color: var(--accent); flex-shrink: 0; }
+.hire-decision h3 { margin: 0 0 4px; font-size: 15px; }
+.hire-decision p { margin: 0; font-size: 13px; }
+.hire-decision .workflow-actions { margin-left: auto; }
 .simulation-banner { display: flex; align-items: center; flex-wrap: wrap; gap: 20px; padding: 18px 0; border-block: 1px solid var(--line); margin-bottom: 24px; }
 .simulation-banner img { width: 96px; height: 70px; object-fit: cover; border-radius: 4px; }
 .simulation-banner > div { display: grid; gap: 5px; flex: 1 1 180px; }
@@ -297,7 +305,7 @@ button, a { transition: background-color .18s, color .18s, border-color .18s; }
 .admin-jobs-page .data-table { min-width: 680px; }
 .admin-job-employer { margin-top: 5px; color: var(--muted); font-size: 11px; }
 .admin-job-status, .admin-application-status { display: inline-block; padding: 4px 7px; border: 1px solid var(--line); border-radius: 4px; color: var(--muted); text-transform: capitalize; font-size: 10px; }
-.admin-job-status.open, .admin-application-status.shortlisted, .admin-application-status.hired { color: var(--accent); border-color: #596b47; }
+.admin-job-status.open, .admin-application-status.shortlisted, .admin-application-status.interviewed, .admin-application-status.hired { color: var(--accent); border-color: #596b47; }
 .admin-job-status.closed, .admin-application-status.rejected, .admin-application-status.withdrawn { color: #e9a69a; border-color: #70483d; }
 .admin-job-detail { border-top: 1px solid var(--line); padding-top: 28px; }
 .admin-job-detail-heading, .admin-applicant-heading { display: flex; justify-content: space-between; align-items: end; flex-wrap: wrap; gap: 18px; }

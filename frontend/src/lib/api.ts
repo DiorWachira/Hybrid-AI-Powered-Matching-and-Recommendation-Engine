@@ -52,8 +52,8 @@ export type Session = { access_token: string; role: UserRole };
 /** A session, or a short-lived token for the second step when the account uses or must set up two-step verification. */
 export type LoginResult = { status: "authenticated"; access_token: string; role: UserRole } | { status: "mfa_required" | "mfa_setup_required"; challenge_token: string; role: UserRole };
 export type MfaSetup = { secret: string; otpauth_uri: string; qr_svg: string };
-export type ApplicationStatus = "submitted" | "reviewing" | "shortlisted" | "rejected" | "hired" | "withdrawn";
-export type RecruiterStatus = "reviewing" | "shortlisted" | "rejected" | "hired";
+export type ApplicationStatus = "submitted" | "reviewing" | "shortlisted" | "interviewed" | "rejected" | "hired" | "withdrawn";
+export type RecruiterStatus = "reviewing" | "shortlisted" | "interviewed" | "rejected" | "hired";
 export type Application = { application_id: string; candidate_id: string; job_id: string; status: ApplicationStatus; created_at: string; updated_at: string };
 export type Applicant = Application & { candidate_name: string; candidate_location: string | null; years_experience: number; skills: string[]; certifications: string[] };
 export type CandidateApplication = Application & { job_title: string; company_name: string; job_location: string | null; job_status: "open" | "closed" };
@@ -238,6 +238,8 @@ export const api = {
   changeOwnJobStatus: (jobId: string, status: "open" | "closed", token: string) => request<JobPosting>(`/jobs/${jobId}/status`, { method: "PATCH", headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify({ status }) }),
   jobApplications: (jobId: string, token: string, offset = 0, limit = 6) => request<Applicant[]>(`/jobs/${jobId}/applications?${new URLSearchParams({ offset: String(offset), limit: String(limit) })}`, { headers: { Authorization: `Bearer ${token}` } }),
   changeApplicationStatus: (jobId: string, applicationId: string, status: RecruiterStatus, token: string) => request<Application>(`/jobs/${jobId}/applications/${applicationId}`, { method: "PATCH", headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify({ status }) }),
+  withdrawApplication: (applicationId: string, token: string) => request<Application>(`/candidates/me/applications/${applicationId}/withdraw`, { method: "POST", headers: { Authorization: `Bearer ${token}` } }),
+  myEmployment: (token: string) => request<CandidateApplication[]>("/candidates/me/employment", { headers: { Authorization: `Bearer ${token}` } }),
   myApplications: (token: string, offset = 0, limit = 6) => request<CandidateApplication[]>(`/candidates/me/applications?${new URLSearchParams({ offset: String(offset), limit: String(limit) })}`, { headers: { Authorization: `Bearer ${token}` } }),
   getCandidateProfile: (token: string) =>
     request<CandidateProfileInput>("/candidates/me", {

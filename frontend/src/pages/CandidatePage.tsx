@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { useSearchParams } from "react-router-dom";
-import { ArrowUpRight, Bookmark, BriefcaseBusiness, Check, CircleAlert, Clock3, FileText, MapPin, RefreshCw, RotateCcw, Search, SlidersHorizontal, Sparkles, UploadCloud, UserRound } from "lucide-react";
-import { api, type BrowsedOpportunity, type CandidateDashboard, type Opportunity } from "../lib/api";
+import { ArrowUpRight, BadgeCheck, Bookmark, BriefcaseBusiness, Check, CircleAlert, Clock3, FileText, MapPin, RefreshCw, RotateCcw, Search, SlidersHorizontal, Sparkles, UploadCloud, UserRound } from "lucide-react";
+import { api, type BrowsedOpportunity, type CandidateApplication, type CandidateDashboard, type Opportunity } from "../lib/api";
 import { CandidateApplications } from "../components/CandidateApplications";
 import { CandidateProfile } from "../components/CandidateProfile";
 import { ADMIN_PAGE_SIZE as PAGE_SIZE, ListPagination } from "../components/ListPagination";
@@ -38,6 +38,15 @@ export function CandidatePage() {
   const [loading, setLoading] = useState(true);
   const [reload, setReload] = useState(0);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [employment, setEmployment] = useState<CandidateApplication[]>([]);
+
+  useEffect(() => {
+    let active = true;
+    const token = localStorage.getItem("jobbridge_token");
+    // The badge is a courtesy; a failed lookup simply leaves it hidden.
+    if (token) void api.myEmployment(token).then((roles) => { if (active) setEmployment(roles); }).catch(() => undefined);
+    return () => { active = false; };
+  }, [reload]);
 
   useEffect(() => {
     if (!needsDashboard || loadedRevision.current === reload) return;
@@ -108,7 +117,7 @@ export function CandidatePage() {
 
   return (
     <main className="studio-page">
-      <div className="page-heading"><div><p className="eyebrow">Your next chapter</p><h1>Opportunity, with direction.</h1><p>A closer look at the roles that could come next.</p></div><button className="secondary-button" onClick={() => setTab("resume")}><UploadCloud size={16} />Update resume</button></div>
+      <div className="page-heading"><div><p className="eyebrow">Your next chapter</p><h1>Opportunity, with direction.</h1><p>A closer look at the roles that could come next.</p>{employment.length > 0 && <p className="employment-badge" role="status"><BadgeCheck size={16} aria-hidden="true" /><span><strong>Employed</strong> / {employment[0].job_title} at {employment[0].company_name}{employment.length > 1 ? ` and ${employment.length - 1} more` : ""}</span></p>}</div><button className="secondary-button" onClick={() => setTab("resume")}><UploadCloud size={16} />Update resume</button></div>
       <section className="opportunity-banner" aria-label="Career workspace">
         <img src="/media/workspace.jpg" alt="A sunlit shared workspace with desks and greenery" />
         <div><span className="eyebrow">JobBridge / Discover</span><h2>Find your place.<br />Build what comes next.</h2><p>Your skills. A new perspective on opportunity.</p></div>
