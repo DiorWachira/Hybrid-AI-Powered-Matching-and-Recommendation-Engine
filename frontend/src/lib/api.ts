@@ -221,6 +221,8 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ email, password }),
     }),
+  googleSignInOptions: () => request<{ client_id: string | null }>("/auth/google"),
+  googleLogin: (credential: string) => request<LoginResult>("/auth/google", { method: "POST", body: JSON.stringify({ credential }) }),
   verifyMfa: (challengeToken: string, code: string) => request<Session>("/auth/mfa/verify", { method: "POST", body: JSON.stringify({ challenge_token: challengeToken, code }) }),
   // `token` is a session, or the enrolment token from a login that must set up two-step verification first.
   startMfaSetup: (token: string, password?: string) => request<MfaSetup>("/auth/mfa/setup", { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify(password ? { password } : {}) }),

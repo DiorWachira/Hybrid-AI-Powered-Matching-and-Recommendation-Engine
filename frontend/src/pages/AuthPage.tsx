@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { ArrowLeft, ArrowRight, BriefcaseBusiness, Eye, EyeOff, KeyRound, Network, ShieldCheck, UserRound } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
-import { api, type MfaSetup, type Session, type UserRole } from "../lib/api";
+import { api, type LoginResult, type MfaSetup, type Session, type UserRole } from "../lib/api";
 import { clearSession } from "../lib/session";
+import { GoogleSignIn } from "../components/GoogleSignIn";
 import { MfaEnrollment, OneTimeCodeField, RecoveryCodes } from "../components/TwoStep";
 
 export function AuthPage() {
@@ -80,11 +81,24 @@ export function AuthPage() {
         startSession(await api.register({ email, password, role, full_name: fullName, ...(role === "recruiter" ? { company_name: companyName } : {}), location }));
         return;
       }
-      const result = await api.login(email, password);
-      if (result.status === "authenticated") { startSession(result); return; }
-      setChallengeToken(result.challenge_token); setPassword(""); setCode(""); setUseRecovery(false);
-      setStep(result.status === "mfa_required" ? "mfa" : "enroll");
+      continueSignIn(await api.login(email, password));
     } catch (error) { setNotice(error instanceof Error ? error.message : "Could not sign in. Please try again."); }
+    finally { setBusy(false); }
+  };
+  // Shared by password and Google sign-in: either opens the session or moves on to two-step verification.
+  const continueSignIn = (result: LoginResult) => {
+    if (result.status === "authenticated") { startSession(result); return; }
+    setChallengeToken(result.challenge_token); setPassword(""); setCode(""); setUseRecovery(false);
+    setStep(result.status === "mfa_required" ? "mfa" : "enroll");
+  };
+  const googleSignIn = async (credential: string) => {
+    if (busy) return;
+    setNotice(null); setBusy(true);
+    try {
+      // The token's email labels saved recovery codes if enrolment follows; the server verifies the token itself.
+      try { setEmail(JSON.parse(atob(credential.split(".")[1].replace(/-/g, "+").replace(/_/g, "/"))).email ?? ""); } catch { /* label only */ }
+      continueSignIn(await api.googleLogin(credential));
+    } catch (error) { setNotice(error instanceof Error ? error.message : "Could not sign in with Google."); }
     finally { setBusy(false); }
   };
 
@@ -120,6 +134,7 @@ export function AuthPage() {
         {notice && <p className="notice error" role="alert">{notice}</p>}
         <button className="primary-button" disabled={busy}>{busy ? "Please wait..." : isResetting ? "Update password" : isRegistering ? "Create account" : "Sign in"}<ArrowRight size={17} /></button>
       </form>
+      {mode === "login" && <GoogleSignIn disabled={busy} onCredential={(credential) => void googleSignIn(credential)} />}
       <div className="auth-switch">{mode === "login" ? "New to JobBridge?" : "Already part of JobBridge?"}<button disabled={busy} onClick={() => { setMode(mode === "login" ? "register" : "login"); setNotice(null); setPassword(""); }}>{mode === "login" ? "Create an account" : "Sign in"}</button>{mode === "login" && <button disabled={busy} onClick={() => { setMode("reset"); setNotice(null); setPassword(""); }}>Reset password</button>}</div></>}
     </div>
     <div className="auth-caption">Room for your next idea.<span>JobBridge / Intelligent workforce placement</span></div>
