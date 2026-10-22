@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { useSearchParams } from "react-router-dom";
 import { ArrowUpRight, BadgeCheck, Bookmark, BriefcaseBusiness, Check, CircleAlert, Clock3, FileText, MapPin, RefreshCw, RotateCcw, Search, SlidersHorizontal, Sparkles, UploadCloud, UserRound } from "lucide-react";
-import { api, type BrowsedOpportunity, type CandidateApplication, type CandidateDashboard, type Opportunity } from "../lib/api";
+import { api, type BrowsedOpportunity, type CandidateApplication, type CandidateDashboard, type CandidateProfileInput, type Opportunity } from "../lib/api";
 import { CandidateApplications } from "../components/CandidateApplications";
 import { CandidateProfile } from "../components/CandidateProfile";
 import { ADMIN_PAGE_SIZE as PAGE_SIZE, ListPagination } from "../components/ListPagination";
@@ -16,6 +16,19 @@ const tabs = [
 ] as const;
 type Tab = typeof tabs[number]["id"];
 const percentage = (score: number) => Math.round(Math.max(0, Math.min(1, score)) * 100);
+
+// Each step improves how well the matcher can judge the candidate.
+function profileSteps(profile: CandidateProfileInput): Array<{ label: string; done: boolean; tab: Tab }> {
+  return [
+    { label: "Upload your resume", done: Boolean(profile.parsed_resume_text?.trim()), tab: "resume" },
+    { label: "List at least 5 skills", done: profile.skills.length >= 5, tab: "profile" },
+    { label: "Add your years of experience", done: profile.years_experience > 0, tab: "profile" },
+    { label: "Add your location", done: Boolean(profile.location?.trim()), tab: "profile" },
+    { label: "Add a certification", done: profile.certifications.length > 0, tab: "profile" },
+    { label: "Set your expected salary", done: profile.expected_salary != null && profile.expected_salary !== "", tab: "profile" },
+    { label: "State your work authorization", done: profile.work_authorized != null, tab: "profile" },
+  ];
+}
 
 export function CandidatePage() {
   const input = useRef<HTMLInputElement>(null);
@@ -39,6 +52,15 @@ export function CandidatePage() {
   const [reload, setReload] = useState(0);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [employment, setEmployment] = useState<CandidateApplication[]>([]);
+  const [profile, setProfile] = useState<CandidateProfileInput | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    const token = localStorage.getItem("jobbridge_token");
+    // Profile strength is a hint; without it the tile simply links to the profile.
+    if (token) void api.getCandidateProfile(token).then((data) => { if (active) setProfile(data); }).catch(() => undefined);
+    return () => { active = false; };
+  }, [reload]);
 
   useEffect(() => {
     let active = true;
@@ -114,6 +136,9 @@ export function CandidatePage() {
   const visible = [...filtered].sort((first, second) => sort === "salary" ? Number(second.salary_range_max ?? 0) - Number(first.salary_range_max ?? 0) : sort === "title" ? first.title.localeCompare(second.title) : second.match_score - first.match_score);
   const saved = dashboard?.history.filter((job) => job.status === "saved").length;
   const applied = dashboard?.history.filter((job) => job.status === "applied").length;
+  const steps = profile ? profileSteps(profile) : [];
+  const nextStep = steps.find((step) => !step.done);
+  const strength = steps.length ? Math.round(steps.filter((step) => step.done).length / steps.length * 100) : null;
 
   return (
     <main className="studio-page">
@@ -122,7 +147,12 @@ export function CandidatePage() {
         <img src="/media/workspace.jpg" alt="A sunlit shared workspace with desks and greenery" />
         <div><span className="eyebrow">JobBridge / Discover</span><h2>Find your place.<br />Build what comes next.</h2><p>Your skills. A new perspective on opportunity.</p></div>
       </section>
-      {needsDashboard && <div className="dashboard-stats"><div><span>Open roles in your feed</span><strong>{loading ? "..." : dashboard?.available_opportunities.length ?? "—"}</strong></div><div><span>Saved opportunities</span><strong>{loading ? "..." : saved ?? "—"}</strong></div><div><span>Interest registered</span><strong>{loading ? "..." : applied ?? "—"}</strong></div></div>}
+      {needsDashboard && <div className="dashboard-stats is-actionable">
+        <button type="button" onClick={() => setTab("all")}><span>Open roles</span><strong>{loading ? "..." : dashboard?.available_opportunities.length ?? "—"}</strong><small>Browse all<ArrowUpRight size={12} /></small></button>
+        <button type="button" onClick={() => setTab("history")}><span>Saved opportunities</span><strong>{loading ? "..." : saved ?? "—"}</strong><small>My activity<ArrowUpRight size={12} /></small></button>
+        <button type="button" onClick={() => setTab("applications")}><span>Interest registered</span><strong>{loading ? "..." : applied ?? "—"}</strong><small>Track applications<ArrowUpRight size={12} /></small></button>
+        <button type="button" className="profile-strength" onClick={() => setTab(nextStep?.tab ?? "profile")}><span>Profile strength</span><strong>{strength == null ? "—" : `${strength}%`}</strong><span className="meter" aria-hidden="true"><i style={{ width: `${strength ?? 0}%` }} /></span><small>{nextStep ? <>Next: {nextStep.label.toLowerCase()}<ArrowUpRight size={12} /></> : strength === 100 ? "Complete" : "Open profile"}</small></button>
+      </div>}
       <div className="tab-bar" role="tablist" aria-label="Candidate views">
         {tabs.map(({ id, label, icon: Icon }, index) => <button key={id} role="tab" id={`tab-${id}`} tabIndex={tab === id ? 0 : -1} aria-selected={tab === id} aria-controls="candidate-panel" onClick={() => { setTab(id); setQuery(""); }} onKeyDown={(event) => {
           const nextIndex = event.key === "ArrowRight" ? (index + 1) % tabs.length : event.key === "ArrowLeft" ? (index + tabs.length - 1) % tabs.length : event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1 : null;

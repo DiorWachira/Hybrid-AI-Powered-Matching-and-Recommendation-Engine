@@ -124,6 +124,13 @@ export type OntologySkill = { name: string; category: string | null; source: str
 export type OntologyRelation = { source_skill: string; target_skill: string; weight: number; source: string | null };
 export type OntologyData = { skills: OntologySkill[]; relationships: OntologyRelation[] };
 
+export type AuditEvent = { event_id: string; actor_user_id: string | null; actor_email?: string | null; action: string; resource_type: string; resource_id: string | null; details: Record<string, unknown> | null; created_at: string };
+export type AuditCategory = "account" | "application" | "job" | "matches" | "ontology" | "opportunity" | "profile" | "resume";
+export type DailyActivity = { day: string; events: number; signups: number; applications: number; hires: number };
+export type AdminUserFilters = { search: string; role?: UserRole | ""; status?: "active" | "suspended" | "" };
+/** Application counts per stage across a recruiter's postings, and per posting id. */
+export type RecruiterPipeline = { jobs_open: number; jobs_closed: number; applications_by_status: Partial<Record<ApplicationStatus, number>>; jobs: Record<string, Partial<Record<ApplicationStatus, number>>> };
+
 export type AdminOverview = {
   users_count: number;
   candidates_count: number;
@@ -134,7 +141,10 @@ export type AdminOverview = {
   pending_graph_events: number;
   suspended_users_count: number;
   recent_users: AdminUser[];
-  recent_activity: Array<{ event_id: string; actor_user_id: string | null; actor_email?: string | null; action: string; resource_type: string; resource_id: string | null; details: Record<string, unknown> | null; created_at: string }>;
+  recent_activity: AuditEvent[];
+  mfa_enabled_count: number;
+  application_status_counts: Partial<Record<ApplicationStatus, number>>;
+  daily_activity: DailyActivity[];
   recent_jobs: Array<{ job_id: string; title: string; status: string; location?: string; required_experience_years: number; salary_range_max?: number; required_skills?: string[]; mandatory_certifications?: string[]; description: string }>;
 };
 
@@ -300,10 +310,18 @@ export const api = {
     request<OversightSummary>("/admin/recruiters/summary", { headers: { Authorization: `Bearer ${token}` } }),
   currentAccount: (token: string) =>
     request<CurrentAccount>("/auth/me", { headers: { Authorization: `Bearer ${token}` } }),
-  adminUsers: (token: string, search: string, offset: number) =>
-    request<AdminUser[]>(`/admin/users?${new URLSearchParams({ search, offset: String(offset) })}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    }),
+  adminUsers: (token: string, filters: AdminUserFilters, offset: number) => {
+    const params = new URLSearchParams({ search: filters.search, offset: String(offset) });
+    if (filters.role) params.set("role", filters.role);
+    if (filters.status) params.set("status", filters.status);
+    return request<AdminUser[]>(`/admin/users?${params}`, { headers: { Authorization: `Bearer ${token}` } });
+  },
+  auditLog: (token: string, category: AuditCategory | "", offset: number, limit: number) => {
+    const params = new URLSearchParams({ offset: String(offset), limit: String(limit) });
+    if (category) params.set("category", category);
+    return request<AuditEvent[]>(`/admin/activity?${params}`, { headers: { Authorization: `Bearer ${token}` } });
+  },
+  recruiterPipeline: (token: string) => request<RecruiterPipeline>("/jobs/mine/pipeline", { headers: { Authorization: `Bearer ${token}` } }),
   setAccountActive: (token: string, userId: string, isActive: boolean) =>
     request<AdminUser>(`/admin/users/${userId}`, {
       method: "PATCH", headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify({ is_active: isActive }),

@@ -24,8 +24,8 @@ export function RecruiterOversightPage() {
   const [recruiter, setRecruiter] = useState<AdminRecruiter | null>(null);
   const [jobs, setJobs] = useState<AdminJob[]>([]);
   const [selectedJob, setSelectedJob] = useState<AdminJob | null>(null);
-  const [searchText, setSearchText] = useState("");
-  const [search, setSearch] = useState("");
+  const [searchText, setSearchText] = useState(params.get("q") ?? "");
+  const [search, setSearch] = useState(params.get("q") ?? "");
   const [status, setStatus] = useState<"" | "open" | "closed">("");
   const [attention, setAttention] = useState(params.get("attention") === "1");
   const [offset, setOffset] = useState(0);
@@ -34,6 +34,8 @@ export function RecruiterOversightPage() {
   const [error, setError] = useState<string | null>(null);
   const [refresh, setRefresh] = useState(0);
   const staleDays = summary?.stale_after_days ?? DEFAULT_STALE_DAYS;
+  // Searches launched from the command palette arrive as "?q=" while this page may already be open.
+  useEffect(() => { const q = params.get("q"); if (q !== null) { setSearchText(q); setSearch(q); setOffset(0); } }, [params]);
 
   useEffect(() => {
     let active = true;
