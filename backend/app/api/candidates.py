@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, Upl
 from app.core.rate_limit import limiter
 from pypdf import PdfReader
 from starlette.concurrency import run_in_threadpool
-from sqlalchemy import String, and_, cast, delete, or_, select
+from sqlalchemy import String, and_, cast, delete, func, or_, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
@@ -32,6 +32,30 @@ KNOWN_SKILLS = ("python", "sql", "data analysis", "excel", "power bi", "docker",
 def candidate_applications(offset: int = Query(default=0, ge=0), limit: int = Query(default=100, ge=1, le=100), user: User = Depends(require_roles(UserRole.candidate)), db: Session = Depends(get_db)):
     rows = db.execute(select(JobApplication, JobPosting, Employer.company_name).join(Candidate, JobApplication.candidate_id == Candidate.candidate_id).join(JobPosting, JobPosting.job_id == JobApplication.job_id).join(Employer, Employer.employer_id == JobPosting.employer_id).where(Candidate.user_id == user.user_id).order_by(JobApplication.created_at.desc(), JobApplication.application_id).offset(offset).limit(limit)).all()
     return [CandidateApplicationResponse(**ApplicationResponse.model_validate(application).model_dump(), job_title=job.title, company_name=company, job_location=job.location, job_status=job.status.value) for application, job, company in rows]
+
+
+@router.get("/me/employment", response_model=list[CandidateApplicationResponse])
+def candidate_employment(user: User = Depends(require_roles(UserRole.candidate)), db: Session = Depends(get_db)):
+    """Roles the candidate has been hired into, newest first, for the dashboard's employed badge."""
+    rows = db.execute(select(JobApplication, JobPosting, Employer.company_name).join(Candidate, JobApplication.candidate_id == Candidate.candidate_id).join(JobPosting, JobPosting.job_id == JobApplication.job_id).join(Employer, Employer.employer_id == JobPosting.employer_id).where(Candidate.user_id == user.user_id, JobApplication.status == "hired").order_by(JobApplication.updated_at.desc(), JobApplication.application_id)).all()
+    return [CandidateApplicationResponse(**ApplicationResponse.model_validate(application).model_dump(), job_title=job.title, company_name=company, job_location=job.location, job_status=job.status.value) for application, job, company in rows]
+
+
+@router.post("/me/applications/{application_id}/withdraw", response_model=ApplicationResponse)
+def withdraw_application(application_id: UUID, user: User = Depends(require_roles(UserRole.candidate)), db: Session = Depends(get_db)):
+    """Let a candidate opt out of an application that is still in progress; a decided outcome stays as recorded."""
+    application = db.scalar(select(JobApplication).join(Candidate, JobApplication.candidate_id == Candidate.candidate_id).where(JobApplication.application_id == application_id, Candidate.user_id == user.user_id).with_for_update(of=JobApplication))
+    if application is None:
+        raise HTTPException(status_code=404, detail="Application not found")
+    if application.status not in {"submitted", "reviewing", "shortlisted", "interviewed"}:
+        raise HTTPException(status_code=409, detail="This application can no longer be withdrawn")
+    application.status = "withdrawn"
+    # Downgrade the job card from applied so the candidate can register interest again later.
+    db.execute(update(CandidateOpportunity).where(CandidateOpportunity.candidate_id == application.candidate_id, CandidateOpportunity.job_id == application.job_id, CandidateOpportunity.status == OpportunityStatus.applied).values(status=OpportunityStatus.viewed))
+    db.add(AuditEvent(actor_user_id=user.user_id, action="application.withdrawn", resource_type="application", resource_id=application_id))
+    db.commit()
+    db.refresh(application)
+    return application
 
 
 def _extract_text(filename: str, content: bytes) -> str:
@@ -241,7 +265,9 @@ def update_opportunity_status(
     if payload.status == OpportunityStatus.applied:
         if not result.hard_rule_passed:
             raise HTTPException(status_code=409, detail="Job eligibility requirements are not met")
-        application_id = db.scalar(insert(JobApplication).values(candidate_id=candidate.candidate_id, job_id=job.job_id).on_conflict_do_nothing(constraint="uq_application_candidate_job").returning(JobApplication.application_id))
+        # A withdrawn application is resubmitted from scratch; any other existing application is left untouched.
+        statement = insert(JobApplication).values(candidate_id=candidate.candidate_id, job_id=job.job_id)
+        application_id = db.scalar(statement.on_conflict_do_update(constraint="uq_application_candidate_job", set_={"status": "submitted", "created_at": func.now()}, where=JobApplication.status == "withdrawn").returning(JobApplication.application_id))
         if application_id:
             db.add(AuditEvent(actor_user_id=user.user_id, action="application.submitted", resource_type="application", resource_id=application_id))
     db.execute(insert(CandidateOpportunity).values(candidate_id=candidate.candidate_id, job_id=job.job_id, status=payload.status).on_conflict_do_update(constraint="uq_candidate_opportunity", set_={"status": payload.status}))

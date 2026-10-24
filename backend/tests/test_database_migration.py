@@ -25,7 +25,7 @@ from app.schemas import MatchCandidateResponse
 from app.utils.security import create_access_token, hash_password
 from app.db.base import Base
 from app.db.graph_sync import ensure_graph_schema, sync_graph_events
-from app.db.models import Candidate, Employer, JobApplication, JobPosting, MatchResult, User, UserRole
+from app.db.models import Candidate, Employer, JobApplication, JobPosting, MatchResult, MfaRecoveryCode, User, UserRole
 from app.db.neo4j_db import get_neo4j_driver
 
 pytestmark = pytest.mark.skipif(os.getenv("RUN_DATABASE_MIGRATION_TESTS") != "1", reason="requires local disposable PostgreSQL database privileges and Neo4j")
@@ -368,6 +368,14 @@ def test_authenticated_application_and_match_workflow(migrated_database, monkeyp
             assert applications[0]["job_status"] == "open"
             candidate_score.assert_not_called()
             application_id = applications[0]["application_id"]
+            # Withdrawing frees the job card, and registering interest again resubmits the same application.
+            withdrawn = client.post(f"/api/candidates/me/applications/{application_id}/withdraw", headers=candidate_headers)
+            assert withdrawn.status_code == 200 and withdrawn.json()["status"] == "withdrawn"
+            assert client.get("/api/candidates/opportunities?activity=applied", headers=candidate_headers).json() == []
+            assert client.post(f"/api/candidates/opportunities/{job_id}", json={"status": "applied"}, headers=candidate_headers).status_code == 200
+            applications = client.get("/api/candidates/me/applications", headers=candidate_headers).json()
+            assert [(item["application_id"], item["status"]) for item in applications] == [(application_id, "submitted")]
+            candidate_score.reset_mock()
             assert client.get(f"/api/jobs/{job_id}/applications", headers=other_headers).status_code == 403
             applicant_list = client.get(f"/api/jobs/{job_id}/applications", headers=recruiter_headers)
             assert applicant_list.status_code == 200
@@ -383,9 +391,23 @@ def test_authenticated_application_and_match_workflow(migrated_database, monkeyp
             tracked = client.get("/api/candidates/me/applications", headers=candidate_headers).json()[0]
             assert tracked["status"] == "reviewing"
             assert tracked["updated_at"] == updated.json()["updated_at"]
-            for application_status in ("shortlisted", "hired"):
+            assert client.patch(f"/api/jobs/{job_id}/applications/{application_id}", json={"status": "shortlisted"}, headers=recruiter_headers).status_code == 200
+            # Hiring must wait for a confirmed interview.
+            assert client.patch(f"/api/jobs/{job_id}/applications/{application_id}", json={"status": "hired"}, headers=recruiter_headers).status_code == 409
+            assert client.get("/api/candidates/me/employment", headers=candidate_headers).json() == []
+            for application_status in ("interviewed", "hired"):
                 assert client.patch(f"/api/jobs/{job_id}/applications/{application_id}", json={"status": application_status}, headers=recruiter_headers).status_code == 200
                 assert client.get("/api/candidates/me/applications", headers=candidate_headers).json()[0]["status"] == application_status
+            pipeline = client.get("/api/jobs/mine/pipeline", headers=recruiter_headers).json()
+            assert pipeline["jobs_open"] == 1 and pipeline["applications_by_status"] == {"hired": 1}
+            assert pipeline["jobs"] == {job_id: {"hired": 1}}
+            assert client.get("/api/jobs/mine/pipeline", headers=other_headers).json()["applications_by_status"] == {}
+            employment = client.get("/api/candidates/me/employment", headers=candidate_headers).json()
+            assert [(role["job_title"], role["company_name"]) for role in employment] == [("Senior Analyst", "Test Employer")]
+            assert client.get("/api/candidates/me/employment", headers=recruiter_headers).status_code == 403
+            # A decided outcome cannot be withdrawn, and only the candidate may withdraw.
+            assert client.post(f"/api/candidates/me/applications/{application_id}/withdraw", headers=candidate_headers).status_code == 409
+            assert client.post(f"/api/candidates/me/applications/{application_id}/withdraw", headers=recruiter_headers).status_code == 403
             assert client.patch(f"/api/jobs/{job_id}/applications/{application_id}", json={"status": "reviewing"}, headers=recruiter_headers).status_code == 409
             candidate_score.assert_not_called()
             evaluated = client.post(f"/api/matches/evaluate/{job_id}", headers=recruiter_headers)
@@ -432,6 +454,13 @@ def test_authenticated_application_and_match_workflow(migrated_database, monkeyp
             assert overview.status_code == 200
             actions = {event["action"] for event in overview.json()["recent_activity"]}
             assert {"account.suspended", "account.reactivated", "application.submitted", "matches.evaluated"} <= actions
+            assert overview.json()["application_status_counts"] == {"hired": 1}
+            trend = overview.json()["daily_activity"]
+            assert len(trend) == 14 and trend[-1]["signups"] >= 3 and trend[-1]["hires"] == 1
+            account_log = client.get("/api/admin/activity", params={"category": "account"}, headers=admin_headers).json()
+            assert account_log and all(event["action"].startswith("account.") for event in account_log)
+            suspended_filter = client.get("/api/admin/users", params={"role": "candidate", "status": "active"}, headers=admin_headers).json()
+            assert [account["role"] for account in suspended_filter] == ["candidate"]
             users_response = client.get("/api/admin/users", params={"search": "candidate@example.org"}, headers=admin_headers)
             assert users_response.status_code == 200
             assert len(users_response.json()) == 1
@@ -453,6 +482,67 @@ def test_authenticated_application_and_match_workflow(migrated_database, monkeyp
                 database.execute(text("UPDATE users SET password_reset_expires_at = CURRENT_TIMESTAMP - interval '1 minute' WHERE user_id = :id"), {"id": candidate_id})
                 database.commit()
             assert client.post("/api/auth/reset-password", json={"token": second.json()["token"], "new_password": "UpdatedPassword123!"}).status_code == 400
+    finally:
+        app.dependency_overrides.clear()
+        app.dependency_overrides.update(previous)
+
+
+def test_admin_mfa_enrolment_recovery_and_reset_against_postgres(migrated_database):
+    import pyotp
+    from sqlalchemy import select
+    from app.utils import mfa
+
+    engine, configuration = migrated_database
+    password = "AdminPassword123!"
+
+    def database_dependency():
+        with Session(engine) as database:
+            yield database
+
+    with Session(engine) as database:
+        admin = User(email="admin@jobbridge.example.org", password_hash=hash_password(password), role=UserRole.admin)
+        database.add(admin)
+        database.commit()
+        admin_id = admin.user_id
+    previous = app.dependency_overrides.copy()
+    app.dependency_overrides[get_db] = database_dependency
+    try:
+        with TestClient(app) as client:
+            credentials = {"email": "admin@jobbridge.example.org", "password": password}
+            first = client.post("/api/auth/login", json=credentials).json()
+            assert first["status"] == "mfa_setup_required" and first["access_token"] is None
+            enrolment = {"Authorization": f"Bearer {first['challenge_token']}"}
+            secret = client.post("/api/auth/mfa/setup", json={}, headers=enrolment).json()["secret"]
+            enabled = client.post("/api/auth/mfa/enable", json={"code": pyotp.TOTP(secret).now()}, headers=enrolment)
+            assert enabled.status_code == 200
+            recovery_codes = enabled.json()["recovery_codes"]
+            # The enrolment token stops working once the session version moves on.
+            assert client.post("/api/auth/mfa/setup", json={}, headers=enrolment).status_code == 401
+            session = {"Authorization": f"Bearer {enabled.json()['access_token']}"}
+            profile = client.get("/api/auth/me", headers=session).json()
+            assert profile["mfa_enabled"] and profile["mfa_required"] and profile["mfa_recovery_codes_remaining"] == 10
+
+            with Session(engine) as database:
+                stored = database.get(User, admin_id)
+                assert secret not in stored.mfa_secret_encrypted and mfa.decrypt_secret(stored.mfa_secret_encrypted) == secret
+                hashes = set(database.scalars(select(MfaRecoveryCode.code_hash).where(MfaRecoveryCode.user_id == admin_id)))
+                assert hashes == {mfa.hash_recovery_code(code) for code in recovery_codes}
+
+            challenge = client.post("/api/auth/login", json=credentials).json()
+            assert challenge["status"] == "mfa_required"
+            assert client.post("/api/auth/mfa/verify", json={"challenge_token": challenge["challenge_token"], "code": recovery_codes[0].upper()}).status_code == 200
+            assert client.post("/api/auth/mfa/verify", json={"challenge_token": challenge["challenge_token"], "code": recovery_codes[0]}).status_code == 401
+            assert client.get("/api/auth/me", headers=session).json()["mfa_recovery_codes_remaining"] == 9
+            assert client.post("/api/auth/mfa/disable", json={"password": password, "code": recovery_codes[1]}, headers=session).status_code == 403
+
+            with Session(engine) as database:
+                stored = database.get(User, admin_id)
+                mfa.clear_mfa(database, stored)
+                stored.auth_version += 1
+                database.commit()
+                assert database.scalar(select(MfaRecoveryCode).where(MfaRecoveryCode.user_id == admin_id)) is None
+            assert client.get("/api/auth/me", headers=session).status_code == 401
+            assert client.post("/api/auth/login", json=credentials).json()["status"] == "mfa_setup_required"
     finally:
         app.dependency_overrides.clear()
         app.dependency_overrides.update(previous)

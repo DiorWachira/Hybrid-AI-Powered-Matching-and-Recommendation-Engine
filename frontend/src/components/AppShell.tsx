@@ -1,20 +1,23 @@
-import { useEffect, useState, type ReactNode } from "react";
-import { ArrowUpRight, FlaskConical, LayoutDashboard, LogOut, Menu, Network, ShieldCheck, Target, UserRoundSearch, Users, X } from "lucide-react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { ArrowUpRight, FlaskConical, KeyRound, LayoutDashboard, LogOut, Menu, Network, ShieldCheck, Target, UserRoundSearch, Users, X } from "lucide-react";
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { api, type ApiHealth } from "../lib/api";
 import { clearSession, getSessionRole } from "../lib/session";
+import { CommandPalette } from "./CommandPalette";
 
 const navigationByRole = {
-  candidate: [{ to: "/candidate", label: "My opportunities", icon: Users }],
+  candidate: [{ to: "/candidate", label: "My opportunities", icon: Users }, { to: "/security", label: "Security", icon: KeyRound }],
   recruiter: [
     { to: "/recruiter", label: "Recruiter workspace", icon: LayoutDashboard },
     { to: "/matches", label: "Match analysis", icon: Target },
+    { to: "/security", label: "Security", icon: KeyRound },
   ],
   admin: [
     { to: "/admin", label: "Admin overview", icon: ShieldCheck },
     { to: "/admin/recruiters", label: "Recruiter oversight", icon: UserRoundSearch },
     { to: "/admin/simulation", label: "Simulation", icon: FlaskConical },
     { to: "/matches", label: "Match analysis", icon: Target },
+    { to: "/security", label: "Security", icon: KeyRound },
   ],
 } as const;
 
@@ -38,6 +41,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const sessionRole = getSessionRole() ?? "recruiter";
   const visibleNavigation = navigationByRole[sessionRole];
   const homePath = sessionRole === "candidate" ? "/candidate" : sessionRole === "admin" ? "/admin" : "/recruiter";
+  const signOut = useCallback(() => { clearSession(); navigate("/auth", { replace: true }); }, [navigate]);
 
   return (
     <div className="workspace-shell">
@@ -57,8 +61,8 @@ export function AppShell({ children }: { children: ReactNode }) {
       </aside>
       <div className="workspace-body">
         <header className="workspace-topbar">
-          <div className="topbar-location"><button className="icon-button mobile-only" aria-label="Open navigation" aria-expanded={mobileNav} aria-controls="workspace-navigation" onClick={() => setMobileNav(true)}><Menu size={20} /></button><span>Workspace</span><span className="breadcrumb-slash">/</span><strong>{location.pathname === "/admin/simulation" ? "Simulation" : location.pathname === "/admin/recruiters" ? "Recruiter oversight" : sessionRole === "candidate" ? "Discover" : sessionRole === "admin" ? "Overview" : "Recruitment"}</strong></div>
-          <div className="topbar-actions"><span className="role-tag">{sessionRole}</span><button className="icon-button" title="Sign out" aria-label="Sign out" onClick={() => { clearSession(); navigate("/auth", { replace: true }); }}><LogOut size={18} /></button></div>
+          <div className="topbar-location"><button className="icon-button mobile-only" aria-label="Open navigation" aria-expanded={mobileNav} aria-controls="workspace-navigation" onClick={() => setMobileNav(true)}><Menu size={20} /></button><span>Workspace</span><span className="breadcrumb-slash">/</span><strong>{location.pathname === "/security" ? "Security" : location.pathname === "/admin/simulation" ? "Simulation" : location.pathname === "/admin/recruiters" ? "Recruiter oversight" : sessionRole === "candidate" ? "Discover" : sessionRole === "admin" ? "Overview" : "Recruitment"}</strong></div>
+          <div className="topbar-actions"><CommandPalette role={sessionRole} onSignOut={signOut} /><span className="role-tag">{sessionRole}</span><button className="icon-button" title="Sign out" aria-label="Sign out" onClick={signOut}><LogOut size={18} /></button></div>
         </header>
         <div id="workspace-content">{children}</div>
         <footer className="workspace-footer"><span>JobBridge / Workforce placement</span><span>Rules. Relevance. Opportunity.</span></footer>

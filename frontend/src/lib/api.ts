@@ -47,9 +47,13 @@ export type OversightSummary = {
   applications_total: number; hired_total: number; stale_open_jobs: number; suspended_open_jobs: number;
   attention_jobs: number; stale_after_days: number;
 };
-export type CurrentAccount = { user_id: string; email: string; role: UserRole };
-export type ApplicationStatus = "submitted" | "reviewing" | "shortlisted" | "rejected" | "hired" | "withdrawn";
-export type RecruiterStatus = "reviewing" | "shortlisted" | "rejected" | "hired";
+export type CurrentAccount = { user_id: string; email: string; role: UserRole; mfa_enabled: boolean; mfa_required: boolean; mfa_recovery_codes_remaining: number };
+export type Session = { access_token: string; role: UserRole };
+/** A session, or a short-lived token for the second step when the account uses or must set up two-step verification. */
+export type LoginResult = { status: "authenticated"; access_token: string; role: UserRole } | { status: "mfa_required" | "mfa_setup_required"; challenge_token: string; role: UserRole };
+export type MfaSetup = { secret: string; otpauth_uri: string; qr_svg: string };
+export type ApplicationStatus = "submitted" | "reviewing" | "shortlisted" | "interviewed" | "rejected" | "hired" | "withdrawn";
+export type RecruiterStatus = "reviewing" | "shortlisted" | "interviewed" | "rejected" | "hired";
 export type Application = { application_id: string; candidate_id: string; job_id: string; status: ApplicationStatus; created_at: string; updated_at: string };
 export type Applicant = Application & { candidate_name: string; candidate_location: string | null; years_experience: number; skills: string[]; certifications: string[] };
 export type CandidateApplication = Application & { job_title: string; company_name: string; job_location: string | null; job_status: "open" | "closed" };
@@ -113,11 +117,19 @@ export type AdminUser = {
   is_active: boolean;
   is_demo: boolean;
   created_at: string;
+  mfa_enabled: boolean;
 };
 
 export type OntologySkill = { name: string; category: string | null; source: string | null };
 export type OntologyRelation = { source_skill: string; target_skill: string; weight: number; source: string | null };
 export type OntologyData = { skills: OntologySkill[]; relationships: OntologyRelation[] };
+
+export type AuditEvent = { event_id: string; actor_user_id: string | null; actor_email?: string | null; action: string; resource_type: string; resource_id: string | null; details: Record<string, unknown> | null; created_at: string };
+export type AuditCategory = "account" | "application" | "job" | "matches" | "ontology" | "opportunity" | "profile" | "resume";
+export type DailyActivity = { day: string; events: number; signups: number; applications: number; hires: number };
+export type AdminUserFilters = { search: string; role?: UserRole | ""; status?: "active" | "suspended" | "" };
+/** Application counts per stage across a recruiter's postings, and per posting id. */
+export type RecruiterPipeline = { jobs_open: number; jobs_closed: number; applications_by_status: Partial<Record<ApplicationStatus, number>>; jobs: Record<string, Partial<Record<ApplicationStatus, number>>> };
 
 export type AdminOverview = {
   users_count: number;
@@ -129,7 +141,10 @@ export type AdminOverview = {
   pending_graph_events: number;
   suspended_users_count: number;
   recent_users: AdminUser[];
-  recent_activity: Array<{ event_id: string; actor_user_id: string | null; actor_email?: string | null; action: string; resource_type: string; resource_id: string | null; details: Record<string, unknown> | null; created_at: string }>;
+  recent_activity: AuditEvent[];
+  mfa_enabled_count: number;
+  application_status_counts: Partial<Record<ApplicationStatus, number>>;
+  daily_activity: DailyActivity[];
   recent_jobs: Array<{ job_id: string; title: string; status: string; location?: string; required_experience_years: number; salary_range_max?: number; required_skills?: string[]; mandatory_certifications?: string[]; description: string }>;
 };
 
@@ -202,6 +217,9 @@ export const api = {
     issuePasswordReset: (token: string, userId: string, password: string) => request<{ token: string; expires_at: string }>(`/admin/users/${userId}/password-reset`, {
       method: "POST", headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify({ password }),
     }),
+    resetAccountMfa: (token: string, userId: string, password: string) => request<{ status: string }>(`/admin/users/${userId}/mfa-reset`, {
+      method: "POST", headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify({ password }),
+    }),
   health: () => request<ApiHealth>("/health"),
   register: (payload: RegisterInput) =>
     request<{ access_token: string; role: UserRole }>("/auth/register", {
@@ -209,10 +227,18 @@ export const api = {
       body: JSON.stringify(payload),
     }),
   login: (email: string, password: string) =>
-    request<{ access_token: string; role: UserRole }>("/auth/login", {
+    request<LoginResult>("/auth/login", {
       method: "POST",
       body: JSON.stringify({ email, password }),
     }),
+  googleSignInOptions: () => request<{ client_id: string | null }>("/auth/google"),
+  googleLogin: (credential: string) => request<LoginResult>("/auth/google", { method: "POST", body: JSON.stringify({ credential }) }),
+  verifyMfa: (challengeToken: string, code: string) => request<Session>("/auth/mfa/verify", { method: "POST", body: JSON.stringify({ challenge_token: challengeToken, code }) }),
+  // `token` is a session, or the enrolment token from a login that must set up two-step verification first.
+  startMfaSetup: (token: string, password?: string) => request<MfaSetup>("/auth/mfa/setup", { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify(password ? { password } : {}) }),
+  enableMfa: (token: string, code: string) => request<Session & { recovery_codes: string[] }>("/auth/mfa/enable", { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify({ code }) }),
+  disableMfa: (token: string, password: string, code: string) => request<Session>("/auth/mfa/disable", { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify({ password, code }) }),
+  regenerateRecoveryCodes: (token: string, password: string, code: string) => request<{ recovery_codes: string[] }>("/auth/mfa/recovery-codes", { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify({ password, code }) }),
   createJob: (job: JobInput, token: string) =>
     request<JobPosting>("/jobs/create", {
       method: "POST",
@@ -224,6 +250,8 @@ export const api = {
   changeOwnJobStatus: (jobId: string, status: "open" | "closed", token: string) => request<JobPosting>(`/jobs/${jobId}/status`, { method: "PATCH", headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify({ status }) }),
   jobApplications: (jobId: string, token: string, offset = 0, limit = 6) => request<Applicant[]>(`/jobs/${jobId}/applications?${new URLSearchParams({ offset: String(offset), limit: String(limit) })}`, { headers: { Authorization: `Bearer ${token}` } }),
   changeApplicationStatus: (jobId: string, applicationId: string, status: RecruiterStatus, token: string) => request<Application>(`/jobs/${jobId}/applications/${applicationId}`, { method: "PATCH", headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify({ status }) }),
+  withdrawApplication: (applicationId: string, token: string) => request<Application>(`/candidates/me/applications/${applicationId}/withdraw`, { method: "POST", headers: { Authorization: `Bearer ${token}` } }),
+  myEmployment: (token: string) => request<CandidateApplication[]>("/candidates/me/employment", { headers: { Authorization: `Bearer ${token}` } }),
   myApplications: (token: string, offset = 0, limit = 6) => request<CandidateApplication[]>(`/candidates/me/applications?${new URLSearchParams({ offset: String(offset), limit: String(limit) })}`, { headers: { Authorization: `Bearer ${token}` } }),
   getCandidateProfile: (token: string) =>
     request<CandidateProfileInput>("/candidates/me", {
@@ -282,10 +310,18 @@ export const api = {
     request<OversightSummary>("/admin/recruiters/summary", { headers: { Authorization: `Bearer ${token}` } }),
   currentAccount: (token: string) =>
     request<CurrentAccount>("/auth/me", { headers: { Authorization: `Bearer ${token}` } }),
-  adminUsers: (token: string, search: string, offset: number) =>
-    request<AdminUser[]>(`/admin/users?${new URLSearchParams({ search, offset: String(offset) })}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    }),
+  adminUsers: (token: string, filters: AdminUserFilters, offset: number) => {
+    const params = new URLSearchParams({ search: filters.search, offset: String(offset) });
+    if (filters.role) params.set("role", filters.role);
+    if (filters.status) params.set("status", filters.status);
+    return request<AdminUser[]>(`/admin/users?${params}`, { headers: { Authorization: `Bearer ${token}` } });
+  },
+  auditLog: (token: string, category: AuditCategory | "", offset: number, limit: number) => {
+    const params = new URLSearchParams({ offset: String(offset), limit: String(limit) });
+    if (category) params.set("category", category);
+    return request<AuditEvent[]>(`/admin/activity?${params}`, { headers: { Authorization: `Bearer ${token}` } });
+  },
+  recruiterPipeline: (token: string) => request<RecruiterPipeline>("/jobs/mine/pipeline", { headers: { Authorization: `Bearer ${token}` } }),
   setAccountActive: (token: string, userId: string, isActive: boolean) =>
     request<AdminUser>(`/admin/users/${userId}`, {
       method: "PATCH", headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify({ is_active: isActive }),

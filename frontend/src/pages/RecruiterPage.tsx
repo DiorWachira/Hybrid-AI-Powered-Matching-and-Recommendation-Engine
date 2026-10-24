@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowLeft, ArrowRight, Check, FileText, ListChecks, Plus, RotateCcw, Save, Send, ShieldCheck } from "lucide-react";
 import { api, type JobInput, type JobPosting } from "../lib/api";
 import { RecruiterJobs } from "../components/RecruiterJobs";
@@ -42,6 +42,9 @@ export function RecruiterPage() {
     finally { setBusy(false); }
   };
   const reset = () => { setJob(initialJob); setCertText(initialJob.mandatoryCertifications.join(", ")); setSkillText(initialJob.requiredSkills.join(", ")); setEditingId(null); setEditingStatus("open"); invalidate(); setFailed(false); };
+  const [params, setParams] = useSearchParams();
+  // "?new=1" (from the command palette) opens a blank posting form.
+  useEffect(() => { if (params.get("new") === "1") { reset(); setView("form"); setParams({}, { replace: true }); } }, [params]);
 
   if (view === "postings") return <main className="studio-page"><div className="page-heading"><div><p className="eyebrow">Recruiter workspace</p><h1>Your roles. Your applicants.</h1></div><button className="primary-button" onClick={() => { reset(); setView("form"); }}><Plus size={17} />New job</button></div><RecruiterJobs onEdit={edit} /></main>;
 

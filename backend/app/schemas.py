@@ -1,5 +1,5 @@
 from decimal import Decimal
-from datetime import datetime
+from datetime import date, datetime
 from typing import Literal
 from uuid import UUID
 
@@ -85,6 +85,56 @@ class TokenResponse(BaseModel):
     role: UserRole
 
 
+class GoogleLoginRequest(BaseModel):
+    credential: str = Field(min_length=1, max_length=4096)
+
+
+class GoogleSignInOptions(BaseModel):
+    client_id: str | None
+
+
+class LoginResponse(BaseModel):
+    """A session, or the token for the second step when the account uses or must set up MFA."""
+    status: Literal["authenticated", "mfa_required", "mfa_setup_required"]
+    role: UserRole
+    access_token: str | None = None
+    challenge_token: str | None = None
+    token_type: str = "bearer"
+
+
+class MfaVerifyRequest(BaseModel):
+    challenge_token: str = Field(min_length=20, max_length=2048)
+    code: str = Field(min_length=6, max_length=20)
+
+
+class MfaSetupRequest(BaseModel):
+    # Required when enrolling from a signed-in session; the enrolment token already proved the password.
+    password: str | None = Field(default=None, min_length=1, max_length=72)
+
+
+class MfaSetupResponse(BaseModel):
+    secret: str
+    otpauth_uri: str
+    qr_svg: str
+
+
+class MfaCodeRequest(BaseModel):
+    code: str = Field(min_length=6, max_length=6, pattern=r"^\d{6}$")
+
+
+class MfaConfirmRequest(BaseModel):
+    password: str = Field(min_length=1, max_length=72)
+    code: str = Field(min_length=6, max_length=20)
+
+
+class MfaEnableResponse(TokenResponse):
+    recovery_codes: list[str]
+
+
+class RecoveryCodesResponse(BaseModel):
+    recovery_codes: list[str]
+
+
 class JobCreateRequest(BaseModel):
     title: str = Field(min_length=2, max_length=255)
     description: str = Field(min_length=20, max_length=20_000)
@@ -167,7 +217,7 @@ class JobUpdateRequest(JobCreateRequest):
 
 
 class ApplicationStatusUpdate(BaseModel):
-    status: Literal["reviewing", "shortlisted", "rejected", "hired"]
+    status: Literal["reviewing", "shortlisted", "interviewed", "rejected", "hired"]
 
 
 class ApplicationResponse(BaseModel):
@@ -217,6 +267,9 @@ class ProfileResponse(BaseModel):
     user_id: UUID
     email: EmailStr
     role: UserRole
+    mfa_enabled: bool = False
+    mfa_required: bool = False
+    mfa_recovery_codes_remaining: int = 0
 
 
 class CandidateProfileUpdate(BaseModel):
@@ -313,6 +366,7 @@ class AdminUserResponse(BaseModel):
     is_active: bool
     is_demo: bool
     created_at: datetime
+    mfa_enabled: bool = False
 
 
 class AccountStatusUpdate(BaseModel):
@@ -335,6 +389,14 @@ class AuditEventResponse(BaseModel):
     created_at: datetime
 
 
+class DailyActivity(BaseModel):
+    day: date
+    events: int
+    signups: int
+    applications: int
+    hires: int
+
+
 class AdminOverviewResponse(BaseModel):
     users_count: int
     candidates_count: int
@@ -347,3 +409,15 @@ class AdminOverviewResponse(BaseModel):
     recent_users: list[AdminUserResponse]
     recent_jobs: list[JobResponse]
     recent_activity: list[AuditEventResponse]
+    mfa_enabled_count: int = 0
+    # Applications grouped by pipeline stage, e.g. {"submitted": 4, "hired": 1}.
+    application_status_counts: dict[str, int] = Field(default_factory=dict)
+    daily_activity: list[DailyActivity] = Field(default_factory=list)
+
+
+class RecruiterPipelineSummary(BaseModel):
+    jobs_open: int
+    jobs_closed: int
+    # Applications per stage across all of the recruiter's postings, and per posting.
+    applications_by_status: dict[str, int]
+    jobs: dict[UUID, dict[str, int]]
