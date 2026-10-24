@@ -302,10 +302,14 @@ button, a { transition: background-color .18s, color .18s, border-color .18s; }
 .admin-page .admin-stats div { padding-block: 16px; }
 .admin-page .admin-stats svg { margin-bottom: 10px; }
 .admin-page .data-table td { padding-block: 10px; }
-.admin-jobs-toolbar { display: flex; align-items: end; justify-content: space-between; flex-wrap: wrap; gap: 16px; }
+.admin-jobs-toolbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px 16px; margin-bottom: 16px; }
 .admin-jobs-toolbar .section-heading { margin-bottom: 0; }
-.admin-jobs-filters { display: flex; align-items: end; flex-wrap: wrap; gap: 10px; flex: 1 1 520px; justify-content: flex-end; }
-.admin-jobs-filters .search-field { max-width: 390px; }
+.admin-jobs-filters { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; flex: 1 1 520px; justify-content: flex-end; }
+.admin-jobs-filters .search-field { flex: 1 1 240px; max-width: 390px; height: 42px; }
+.admin-jobs-filters .sort-control { min-height: 42px; }
+.admin-jobs-filters .sort-control select { height: 42px; padding-block: 0; }
+.admin-jobs-filters .sort-control:has(input[type="checkbox"]) { padding: 0 13px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); cursor: pointer; }
+.admin-jobs-filters .sort-control input[type="checkbox"] { margin: 0; accent-color: var(--accent); }
 .admin-jobs-page .data-table { min-width: 680px; }
 .admin-job-employer { margin-top: 5px; color: var(--muted); font-size: 11px; }
 .admin-job-status, .admin-application-status { display: inline-block; padding: 4px 7px; border: 1px solid var(--line); border-radius: 4px; color: var(--muted); text-transform: capitalize; font-size: 10px; }
@@ -351,7 +355,7 @@ button, a { transition: background-color .18s, color .18s, border-color .18s; }
 .oversight-flags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 7px; }
 .oversight-flag { padding: 2px 6px; border: 1px solid var(--line); border-radius: 4px; color: var(--muted); font-size: 10px; }
 .oversight-flag.warn { color: #e9a69a; border-color: #70483d; }
-.oversight-scope { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-block: 14px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 6px; font-size: 12px; color: var(--muted); }
+.oversight-scope { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin: 0 0 16px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 6px; font-size: 12px; color: var(--muted); }
 .oversight-scope strong { color: var(--ink); }
 .data-table tr.is-selected td { background: #242c21; }
 @media (max-width: 1100px) { .oversight-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); } .oversight-stats > :nth-child(3) { border-right: 0; } .oversight-stats > :nth-child(-n+3) { border-bottom: 1px solid var(--line); } }
@@ -386,10 +390,10 @@ button, a { transition: background-color .18s, color .18s, border-color .18s; }
 .kpi-tile > strong { font-size: 30px; font-weight: 500; line-height: 1.1; }
 .kpi-tile > small { font-size: 11px; color: var(--muted); overflow-wrap: anywhere; }
 .kpi-tile.is-highlight { border-color: #596b47; } .kpi-tile.is-highlight > strong { color: var(--accent); }
-.kpi-trend { display: flex; align-items: end; justify-content: space-between; gap: 10px; margin-top: auto; padding-top: 6px; }
-.kpi-trend em { font: 10px var(--font-mono); font-style: normal; color: var(--accent); white-space: nowrap; }
+.kpi-trend { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 6px 10px; margin-top: auto; padding-top: 6px; }
+.kpi-trend em { margin-left: auto; font: 10px var(--font-mono); font-style: normal; color: var(--accent); white-space: nowrap; }
 .kpi-link { display: inline-flex; align-items: center; gap: 5px; margin-top: auto; padding-top: 6px; font-size: 11px; color: var(--accent); }
-.sparkline { width: 120px; height: 32px; flex: 1 1 auto; max-width: 150px; overflow: visible; }
+.sparkline { width: 120px; height: 32px; flex: 1 1 80px; min-width: 80px; max-width: 150px; overflow: visible; }
 .sparkline polyline { fill: none; stroke: var(--accent); stroke-width: 1.6; vector-effect: non-scaling-stroke; stroke-linejoin: round; }
 .sparkline polygon { fill: #d0ef911f; }
 .admin-insights { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 12px; margin-bottom: 26px; }
