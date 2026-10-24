@@ -206,6 +206,8 @@ button, a { transition: background-color .18s, color .18s, border-color .18s; }
 .auth-form input { background: #162219e8; }
 .google-signin { display: grid; gap: 14px; margin-top: 18px; }
 .google-signin[hidden] { display: none; }
+.google-signin-note { font-size: 12px; line-height: 1.6; color: #becbb7; }
+.google-signin-note a { color: var(--accent); text-decoration: underline; }
 .google-signin-divider { display: flex; align-items: center; gap: 12px; color: #becbb7; font-size: 12px; text-transform: uppercase; letter-spacing: .08em; }
 .google-signin-divider::before, .google-signin-divider::after { content: ""; flex: 1; border-top: 1px solid var(--line); }
 .auth-switch { margin-top: 24px; font-size: 12px; color: #becbb7; }

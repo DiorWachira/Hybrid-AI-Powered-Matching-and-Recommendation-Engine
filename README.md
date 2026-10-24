@@ -107,7 +107,7 @@ npm --prefix frontend install
 npm --prefix frontend run dev -- --host 127.0.0.1
 ```
 
-Open `http://127.0.0.1:5173`. Vite proxies `/api` to the backend. Both databases
+Open `http://localhost:5173` (Sign in with Google only works on `localhost`, the origin registered with Google). Vite proxies `/api` to the backend. Both databases
 must be reachable; a build or loaded auth page does not prove live matching works.
 The root `.env` is loaded regardless of the backend launch directory.
 For tests and data tools, install `pip install -r backend/requirements-dev.txt`.
