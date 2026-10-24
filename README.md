@@ -20,6 +20,9 @@ server verifies Google's signed ID token (signature, audience, issuer, expiry an
 Google-verified email) and accepts it only for existing, active, non-admin accounts listed
 in `GOOGLE_SIGNIN_EMAILS`; two-step verification still applies. Everyone else, and every
 administrator, signs in with their password. Google does not create accounts.
+The OAuth client must list every address the app is opened on as an authorized JavaScript
+origin (`http://localhost:5173` and `http://127.0.0.1:5173` locally); Google rejects any other
+origin before a sign-in reaches the API.
 
 Public entry (2026-10-04): `/` now opens the JobBridge landing page with candidate
 and recruiter signup paths, About, approach, FAQs and project feedback links.
