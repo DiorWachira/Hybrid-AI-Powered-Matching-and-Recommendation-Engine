@@ -1,6 +1,9 @@
+from datetime import UTC, datetime
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from datetime import UTC, datetime
+
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -117,6 +120,8 @@ def update_application(job_id: UUID, application_id: UUID, payload: ApplicationS
     }
     if payload.status != application.status and payload.status not in transitions.get(application.status, set()):
         raise HTTPException(status_code=409, detail="Application status transition not allowed")
+    if payload.status != application.status:
+        application.updated_at = datetime.now(UTC)
     application.status = payload.status
     db.add(AuditEvent(actor_user_id=user.user_id, action="application.status_changed", resource_type="application", resource_id=application_id, details={"status": payload.status}))
     db.commit()

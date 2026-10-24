@@ -351,22 +351,23 @@ def _audit_events(db: Session, statement) -> list[AuditEventResponse]:
 def _daily_activity(db: Session) -> list[DailyActivity]:
     today = datetime.now(UTC).date()
     first_day = today - timedelta(days=TREND_DAYS - 1)
-    day = cast(AuditEvent.created_at, Date)
-    rows = db.execute(
-        select(
-            day,
-            func.count(),
-            func.count().filter(AuditEvent.action == "account.registered"),
-            func.count().filter(AuditEvent.action == "application.submitted"),
-            func.count().filter(AuditEvent.action == "application.status_changed", AuditEvent.details["status"].astext == "hired"),
-        )
-        .where(AuditEvent.created_at >= datetime.combine(first_day, datetime.min.time(), UTC))
-        .group_by(day)
-    ).all()
-    counts = {row[0]: row[1:] for row in rows}
-    # Days without events are reported as zeros so the trend has no gaps.
+    since = datetime.combine(first_day, datetime.min.time(), UTC)
+
+    def per_day(column, *conditions) -> dict:
+        day = cast(column, Date)
+        return dict(db.execute(select(day, func.count()).where(column >= since, *conditions).group_by(day)).all())
+
+    # Signups, applications and hires come from the live tables so the trend agrees with the
+    # headline totals; audit events also cover rows that were later deleted.
+    series = {
+        "events": per_day(AuditEvent.created_at),
+        "signups": per_day(User.created_at),
+        "applications": per_day(JobApplication.created_at),
+        "hires": per_day(JobApplication.updated_at, JobApplication.status == "hired"),
+    }
+    # Days without activity are reported as zeros so the trend has no gaps.
     return [
-        DailyActivity(day=current, **dict(zip(("events", "signups", "applications", "hires"), counts.get(current, (0, 0, 0, 0)))))
+        DailyActivity(day=current, **{name: counts.get(current, 0) for name, counts in series.items()})
         for current in (first_day + timedelta(days=offset) for offset in range(TREND_DAYS))
     ]
 
