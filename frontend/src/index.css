@@ -81,7 +81,10 @@ button, a { transition: background-color .18s, color .18s, border-color .18s; }
 .page-heading p:not(.eyebrow) { color: var(--muted); font-size: 13px; margin-top: 10px; max-width: 600px; line-height: 1.7; }
 /* Section-level headers reuse .page-heading; centre the title on its actions and drop the doubled margin. */
 .page-heading:has(> .section-heading) { align-items: center; margin-bottom: 20px; }
-.page-heading > .section-heading { margin-bottom: 0; }
+.page-heading > .section-heading, .page-heading > div > .section-heading { margin-bottom: 0; }
+.page-heading > div > .section-heading + p { margin-top: 6px; }
+/* The applicant pipeline puts its stage bar under the heading, above the list. */
+.page-heading + .stage-bar-wrap, .page-heading + .stage-bar-empty { margin: -12px 0 24px; }
 .primary-button, .secondary-button { display: inline-flex; align-items: center; justify-content: center; gap: 9px; padding: 11px 17px; min-height: 42px; border-radius: 6px; font-size: 12px; font-weight: 600; border: 1px solid transparent; }
 .primary-button { background: var(--accent); color: #182113; }
 .primary-button:hover:not(:disabled) { background: #e3ffb0; }
@@ -470,7 +473,7 @@ button, a { transition: background-color .18s, color .18s, border-color .18s; }
 .stage-bar-legend span { display: inline-flex; align-items: center; gap: 6px; }
 .stage-bar-legend i { width: 7px; height: 7px; border-radius: 2px; background: var(--stage); }
 p.stage-bar-empty { margin-top: 10px; font-size: 11px; color: #7f8b80; }
-.recruiter-kpis { margin-bottom: 8px; }
+.recruiter-kpis { margin-bottom: 28px; }
 .application-progress { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 14px; }
 .application-progress li { display: grid; gap: 6px; flex: 1 1 70px; max-width: 120px; font-size: 10px; color: #7f8b80; }
 .application-progress li i { display: block; height: 4px; border-radius: 2px; background: #2d382e; }
