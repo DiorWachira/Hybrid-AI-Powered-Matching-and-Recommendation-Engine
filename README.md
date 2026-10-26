@@ -3,6 +3,10 @@
 JobBridge is an ICS II prototype combining rule-based eligibility, local ML scoring,
 and graph-based skill explanations for workforce placement.
 
+**Live demo:** <https://140-238-99-64.sslip.io/> (Oracle Cloud Always Free, deployed
+2026-10-26). Scores come from a model trained on synthetic labels and are experimental;
+use fictional CVs only.
+
 ## Current Increment
 
 Two-step verification (2026-10-22): sign-in supports authenticator-app codes (TOTP,
@@ -65,7 +69,6 @@ not done.
 
 Not yet signed off:
 
-- Provisioning the public Oracle VM (runbook and stack ready; tested locally)
 - Independently measured (non-synthetic) model quality
 - Epoch training (2026-10-09 Colab run completed and verified; parity gate now on the shared feature contract)
 - Privacy/fairness evaluation, abuse controls and robust graph consistency
@@ -120,8 +123,9 @@ CI uses that manifest and runs a separate frontend build with `npm ci`.
 The training notebook is intentionally local/ignored and not present in a fresh
 checkout. Notebook-dependent model-contract checks require that local file.
 
-For public hosting, use the production stack in `deploy/` (Caddy HTTPS, FastAPI,
-PostgreSQL, Neo4j in one Docker Compose project) on an Oracle Always Free VM; see
+The live demo at <https://140-238-99-64.sslip.io/> runs the production stack in `deploy/`
+(Caddy HTTPS, FastAPI, PostgreSQL, Neo4j in one Docker Compose project) on an Oracle
+Always Free VM; see
 [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md). Do not expose the Vite server, database
 viewers, default credentials or the repository's seed password publicly.
 
