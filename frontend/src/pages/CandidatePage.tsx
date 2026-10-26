@@ -98,7 +98,7 @@ export function CandidatePage() {
     setUploading(true); setMessage(null);
     try {
       const profile = await api.uploadResume(file, token);
-      setMessage(`Resume saved. ${profile.skills.length} skills identified.`);
+      setMessage(`Resume saved. ${profile.skills.length} skills identified${profile.years_experience ? `; experience on your profile: ${profile.years_experience} years` : "; no years of experience found, so add them in your profile"}.`);
       setReload((value) => value + 1);
     } catch (reason) { setMessage(reason instanceof Error ? reason.message : "Upload failed. Please try again."); }
     finally { setUploading(false); }
@@ -111,6 +111,7 @@ export function CandidatePage() {
     try {
       const updated = await api.updateOpportunityStatus(jobId, status, token);
       setDashboard((current) => current ? {
+        ...current,
         available_opportunities: current.available_opportunities.map((job) => job.job_id === jobId ? updated : job),
         for_you: current.for_you.map((job) => job.job_id === jobId ? updated : job),
         history: [updated, ...current.history.filter((job) => job.job_id !== jobId)],
@@ -148,7 +149,7 @@ export function CandidatePage() {
         <div><span className="eyebrow">JobBridge / Discover</span><h2>Find your place.<br />Build what comes next.</h2><p>Your skills. A new perspective on opportunity.</p></div>
       </section>
       {needsDashboard && <div className="dashboard-stats is-actionable">
-        <button type="button" onClick={() => setTab("all")}><span>Open roles</span><strong>{loading ? "..." : dashboard?.available_opportunities.length ?? "—"}</strong><small>Browse all<ArrowUpRight size={12} /></small></button>
+        <button type="button" onClick={() => setTab("all")}><span>Open roles</span><strong>{loading ? "..." : dashboard?.open_role_count ?? "—"}</strong><small>Browse all<ArrowUpRight size={12} /></small></button>
         <button type="button" onClick={() => setTab("history")}><span>Saved opportunities</span><strong>{loading ? "..." : saved ?? "—"}</strong><small>My activity<ArrowUpRight size={12} /></small></button>
         <button type="button" onClick={() => setTab("applications")}><span>Interest registered</span><strong>{loading ? "..." : applied ?? "—"}</strong><small>Track applications<ArrowUpRight size={12} /></small></button>
         <button type="button" className="profile-strength" onClick={() => setTab(nextStep?.tab ?? "profile")}><span>Profile strength</span><strong>{strength == null ? "—" : `${strength}%`}</strong><span className="meter" aria-hidden="true"><i style={{ width: `${strength ?? 0}%` }} /></span><small>{nextStep ? <>Next: {nextStep.label.toLowerCase()}<ArrowUpRight size={12} /></> : strength === 100 ? "Complete" : "Open profile"}</small></button>

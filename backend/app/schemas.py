@@ -31,7 +31,9 @@ class RegisterRequest(BaseModel):
 
 
 class LoginRequest(BaseModel):
-    email: EmailStr
+    # Sign-in only looks the address up; strict validation would lock out stored addresses
+    # that email-validator rejects, such as reserved domains.
+    email: str = Field(min_length=3, max_length=320, pattern=r"^[^@\s]+@[^@\s]+$")
     password: str = Field(min_length=1, max_length=128)
 
 
@@ -265,8 +267,10 @@ class StoredMatchResponse(BaseModel):
 
 class ProfileResponse(BaseModel):
     user_id: UUID
-    email: EmailStr
+    email: str
     role: UserRole
+    display_name: str | None = None
+    company_name: str | None = None
     mfa_enabled: bool = False
     mfa_required: bool = False
     mfa_recovery_codes_remaining: int = 0
@@ -323,6 +327,7 @@ class BrowsedOpportunityResponse(OpportunityResponse):
 
 class CandidateDashboardResponse(BaseModel):
     available_opportunities: list[OpportunityResponse]
+    open_role_count: int = 0
     for_you: list[OpportunityResponse]
     history: list[OpportunityResponse]
 

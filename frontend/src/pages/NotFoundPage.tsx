@@ -1,2 +1,17 @@
 import { Link } from "react-router-dom";
-export function NotFoundPage() { return <main className="grid min-h-screen place-items-center bg-obsidian p-5 text-center"><div><p className="font-mono text-sm text-spectral-violet">404 / route unavailable</p><h1 className="mt-3 text-3xl font-semibold">This workspace does not exist.</h1><Link to="/recruiter" className="mt-6 inline-block rounded-lg bg-spectral-emerald px-4 py-2 text-sm font-semibold text-obsidian">Return to match queue</Link></div></main>; }
+import { ArrowLeft } from "lucide-react";
+import { Header } from "../components/Header";
+import { Footer } from "../components/Footer";
+import { getSessionRole } from "../lib/session";
+
+const destinations = {
+  candidate: { to: "/candidate", label: "Back to my opportunities" },
+  recruiter: { to: "/recruiter", label: "Back to the recruiter workspace" },
+  admin: { to: "/admin", label: "Back to the admin overview" },
+} as const;
+
+export function NotFoundPage() {
+  const role = getSessionRole();
+  const destination = role ? destinations[role] : { to: "/", label: "Back to JobBridge" };
+  return <div className="public-site"><a className="skip-link" href="#public-main">Skip to content</a><Header /><main id="public-main" className="public-container public-section public-information"><p className="public-kicker">404 / Page not found</p><h1>This page does not exist.</h1><p className="public-lead">The link may be out of date, or the address may have a typo.</p><Link to={destination.to} className="public-text-link"><ArrowLeft size={16} />{destination.label}</Link></main><Footer /></div>;
+}

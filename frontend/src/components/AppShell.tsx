@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { ArrowUpRight, FlaskConical, KeyRound, LayoutDashboard, LogOut, Menu, Network, ShieldCheck, Target, UserRoundSearch, Users, X } from "lucide-react";
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
-import { api, type ApiHealth } from "../lib/api";
+import { api, type ApiHealth, type CurrentAccount } from "../lib/api";
 import { clearSession, getSessionRole } from "../lib/session";
 import { CommandPalette } from "./CommandPalette";
 
@@ -27,13 +27,13 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [mobileNav, setMobileNav] = useState(false);
   const [health, setHealth] = useState<ApiHealth | null>(null);
   const [checking, setChecking] = useState(true);
-  const [accountEmail, setAccountEmail] = useState<string | null>(null);
+  const [account, setAccount] = useState<CurrentAccount | null>(null);
 
   useEffect(() => {
     let active = true;
     void api.health().then((value) => { if (active) setHealth(value); }).catch(() => { if (active) setHealth(null); }).finally(() => { if (active) setChecking(false); });
     const token = localStorage.getItem("jobbridge_token");
-    if (token) void api.currentAccount(token).then((account) => { if (active) setAccountEmail(account.email); }).catch(() => { if (active) setAccountEmail(null); });
+    if (token) void api.currentAccount(token).then((value) => { if (active) setAccount(value); }).catch(() => { if (active) setAccount(null); });
     return () => { active = false; };
   }, []);
 
@@ -41,6 +41,9 @@ export function AppShell({ children }: { children: ReactNode }) {
   const sessionRole = getSessionRole() ?? "recruiter";
   const visibleNavigation = navigationByRole[sessionRole];
   const homePath = sessionRole === "candidate" ? "/candidate" : sessionRole === "admin" ? "/admin" : "/recruiter";
+  const accountName = account?.display_name?.trim() || null;
+  const initials = accountName ? accountName.split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase() : sessionRole === "admin" ? "AD" : sessionRole === "candidate" ? "CA" : "RE";
+  const accountLine = accountName ? [accountName, account?.company_name].filter(Boolean).join(" · ") : account?.company_name || `${sessionRole} account`;
   const signOut = useCallback(() => { clearSession(); navigate("/auth", { replace: true }); }, [navigate]);
 
   return (
@@ -52,7 +55,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <Link to={homePath} className="brand-lockup"><span className="brand-symbol"><Network size={22} /></span><span>JobBridge<span className="brand-dot">.</span></span></Link>
           <button className="icon-button mobile-only" onClick={() => setMobileNav(false)} aria-label="Close navigation"><X size={20} /></button>
         </div>
-        <div className="workspace-identity"><span className="identity-avatar">{sessionRole === "admin" ? "AD" : sessionRole === "candidate" ? "CA" : "RE"}</span><div><strong>{sessionRole === "admin" ? "Administration" : sessionRole === "candidate" ? "Career workspace" : "Talent workspace"}</strong><span>{sessionRole} account</span>{accountEmail && <span className="identity-email" title={accountEmail}>{accountEmail}</span>}</div></div>
+        <div className="workspace-identity"><span className="identity-avatar" aria-hidden="true">{initials}</span><div><strong>{sessionRole === "admin" ? "Administration" : sessionRole === "candidate" ? "Career workspace" : "Talent workspace"}</strong><span title={accountLine}>{accountLine}</span>{account && <span className="identity-email" title={account.email}>{account.email}</span>}</div></div>
         <p className="eyebrow nav-label">Workspace</p>
         <nav aria-label="Primary workspace" className="workspace-links">
           {visibleNavigation.map(({ to, label, icon: Icon }) => <NavLink key={to} to={to} end onClick={() => setMobileNav(false)} className={({ isActive }) => isActive ? "is-active" : ""}><Icon size={18} /><span>{label}</span><ArrowUpRight className="nav-arrow" size={15} /></NavLink>)}
