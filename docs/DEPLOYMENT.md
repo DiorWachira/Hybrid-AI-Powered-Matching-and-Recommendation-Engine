@@ -1,179 +1,128 @@
 # Public Demo Deployment
 
-Status (2026-10-02): **not deployed**. The user permits Oracle Always Free only
-if no payment is required. An existing London account previously showed Free Tier
-with an active trial. Current console access redirects to sign-in. A draft A1 VM
-was not created: a boot-volume estimate of GBP 1.60/month still needs account-wide
-free-allowance confirmation. No paid resources or public hostname were provisioned.
-
-### Current Blockers
-
-- User must sign in to Oracle directly; never send credentials/MFA/private keys
-   through chat. Reconfirm London home region, current free allowance and VM capacity.
-- The model-contract gate now runs and fails on graph overlap, growth and empty
-   required-skill handling. Historical accuracy is not API validation. No new
-   training was authorized or performed; artifact weights remain unchanged.
-- Independent gold-data quality/fairness and Linux ARM resource tests remain.
-- In-memory throttling is suitable only for a single-process demo baseline; host
-   limits, request-size enforcement, parser isolation, backup/recovery, secret rotation
-   and restricted ingress must be verified before exposure.
-- Do not deploy the populated local database or its shared seed passwords. Use
-   isolated fictional data and independently generated accounts on the public host.
-
-Local progress: migration0007/password recovery, bounded ontology controls,
-scheduled graph sync, request throttling, upload guards and security headers are
-implemented. Targeted dependency updates pass 59 tests; installed Python and
-production frontend audits report no known vulnerabilities at this check.
-This does not make public deployment complete or guarantee production security.
-
-## Recommended Host
-
-Oracle Cloud Always Free Ampere A1, subject to capacity and account eligibility.
-Current documentation lists 1,500 OCPU-hours and 9,000 GB-hours monthly, equivalent
-to a total of 2 OCPUs and 12 GB RAM for Always Free tenancies. Verify the console
-allowance before selecting a shape; older 4-OCPU/24-GB tutorials are not the basis
-for this plan. Python/ML dependencies on Linux ARM still need an installation and
-memory test. Do not silently fall back to a paid or undersized instance.
-
-Use an eligible Ubuntu image in the home region, an Always Free-labelled boot
-volume within the total storage allowance, and only resources explicitly shown
-as free. Oracle may require card verification; enter it only on Oracle's site.
-Capacity is not guaranteed and idle VMs may be reclaimed.
-
-Cost guardrails:
-
-- Do not upgrade to Pay As You Go, select paid shapes or rely on trial credits.
-- Stop if provisioning shows a charge or free eligibility is unclear.
-- Check all resources, including storage/networking, against current allowances.
-- Do not add paid load balancers, GPUs, backups or paid DNS/domain purchases.
-- A budget alert is not a hard spending cap. Never promise unconditional zero cost.
-- Back up demo data; Always Free is not an uptime or durability guarantee.
-
-A single VM can host Caddy, the built React app, FastAPI and private PostgreSQL/
-Neo4j containers, subject to memory benchmarking. This preserves the existing
-architecture and avoids extra accounts. Native PostgreSQL on the user's PC need
-not be changed or migrated. Start with new, isolated synthetic demo data.
-
-Optional managed stores, only after a separate choice: Neon Free PostgreSQL and
-Neo4j AuraDB Free. They have quotas, inactivity policies and different operational
-requirements; set SSL/TLS connection URLs and do not assume existing local data
-has been transferred.
-
-## Why Not the Other Free Hosts?
-
-- Hugging Face docs currently require a paid plan to create Docker Spaces despite
-  zero-hourly-cost CPU Basic; outbound port restrictions also conflict with direct
-  PostgreSQL/Bolt access. It is not a no-payment recommendation for this app.
-- Render Free provides 512 MB RAM and sleeps after inactivity. The current
-  sentence-transformers/PyTorch stack is not verified to fit. Free Render Postgres
-  expires after 30 days. Do not label a static frontend-only deployment a live engine.
-
-## Public Request Path
+JobBridge deploys as one Docker Compose stack on one Linux VM:
 
 ```text
-Browser -> HTTPS Caddy -> built frontend files
-                      -> /api/* -> FastAPI on 127.0.0.1:8000
-                                     -> PostgreSQL on loopback 5433
-                                     -> Neo4j on loopback 7687
+Browser --HTTPS--> Caddy (web)  -- built React app
+                     |  /api/*
+                     v
+                  FastAPI (api, 1 worker, encoder baked into the image)
+                     |-- PostgreSQL 16 (private network only)
+                     '-- Neo4j 5      (private network only)
 ```
 
-Use one origin so the current frontend `/api` calls work without code changes.
-Vite's development proxy is not a production server. Database/viewer ports and
-the API's internal port must not be internet-accessible. Allow public 80/443 only;
-restrict SSH to the administrator's source IP in both the cloud and OS firewall.
+Only Caddy publishes ports (80/443). Caddy gets and renews a Let's Encrypt certificate
+by itself. The API applies migrations on start, drains the graph outbox in-process and
+serves the frontend and API from one origin, so no CORS or proxy changes are needed.
 
-Example Caddy configuration below is **not yet validated on a provisioned host**.
-It assumes Caddy installed on the VM, a hostname pointing to it, readable frontend
-build output, and a supervised backend listening only on loopback:
+## Why Oracle Cloud Always Free
 
-```caddyfile
-{$APP_DOMAIN} {
-    encode gzip
-    request_body {
-        max_size 11MB
-    }
-    @api path /api /api/*
-    handle @api {
-        reverse_proxy 127.0.0.1:8000
-    }
-    handle {
-        root * /srv/jobbridge/frontend/dist
-        try_files {path} /index.html
-        file_server
-    }
-}
+| Option | RAM | Verdict |
+| --- | --- | --- |
+| **Oracle Always Free Ampere A1** | up to 24 GB (4 OCPU) per tenancy | **Chosen.** Fits the encoder (~1 GB), Neo4j and PostgreSQL on one VM with room to spare; no expiry |
+| Render / Koyeb free web services | 512 MB | PyTorch + MiniLM alone exceeds this; free Postgres expires |
+| Fly.io, Railway | trial credit only | Not free beyond the trial |
+| Hugging Face Spaces (CPU) | 16 GB | No persistent disk on free tier, no private PostgreSQL/Neo4j |
+| Neon + AuraDB Free + a small host | split | Three accounts, quotas and pausing; the host still needs ~2 GB for the model |
+
+A1 instances are ARM (aarch64). Every image used here (python:3.12-slim, the PyTorch CPU
+wheels, postgres:16-alpine, neo4j:5-community, caddy:2.8-alpine, node:22-alpine) is
+published for arm64, and the stack was tested locally on amd64 with the same files
+(2026-10-26: about 1.6 GB RAM in use with demo data loaded).
+
+Cost guardrails: choose only shapes and volumes labelled **Always Free-eligible**; a
+student or trial credit balance must not be what pays for the VM. Do not add load
+balancers, block-volume backups or paid DNS. Oracle may reclaim an Always Free VM it
+considers idle (very low CPU, network and memory use over 7 days); a demo that is
+used occasionally is normally fine, and upgrading the account to Pay As You Go removes
+reclamation while Always Free resources stay free.
+
+## 1. Create the VM (Oracle console, done by the account owner)
+
+1. Sign in at <https://cloud.oracle.com>. Never share the password, MFA codes or keys in chat.
+2. **Compute -> Instances -> Create instance**
+   - Name: `jobbridge`
+   - Image: **Canonical Ubuntu 24.04** (the aarch64 build is picked automatically for A1)
+   - Shape: **Ampere -> VM.Standard.A1.Flex**, **2 OCPU / 12 GB** (or 4 / 24 if your
+     Always Free allowance shows it). Check the "Always Free-eligible" label.
+   - Networking: create a new VCN with a **public subnet**; **assign a public IPv4 address**.
+   - SSH keys: **Generate a key pair** and download the private key (or paste your own
+     public key). Keep the private key file private.
+   - Boot volume: default (about 47 GB) is enough and within the 200 GB free total.
+   - "Out of capacity" means the region has no free A1 right now: try another
+     availability domain or retry later.
+3. **Open the web ports** in the cloud firewall: Networking -> Virtual cloud networks ->
+   the VCN -> the public subnet -> Default Security List -> **Add Ingress Rules**:
+   source `0.0.0.0/0`, TCP, destination port `80`; again for `443`. Optionally restrict
+   the existing port 22 rule to your own IP address.
+4. Note the instance's **public IP address**.
+
+## 2. Install and start (on the VM)
+
+```bash
+ssh -i path/to/private.key ubuntu@<public-ip>
+git clone https://github.com/DiorWachira/Hybrid-AI-Powered-Matching-and-Recommendation-Engine.git jobbridge
+cd jobbridge
+deploy/jb setup <public-ip-with-dashes>.sslip.io     # e.g. 129-151-10-20.sslip.io
 ```
 
-The `/api` prefix is preserved. Unknown API paths remain API errors rather than
-HTML. Client-side routes fall back to the frontend entry point. Configure
-`APP_DOMAIN` in the Caddy service environment, validate with `caddy validate`,
-then verify certificate issuance and route behavior externally. A hostname/DNS
-choice is still needed; no domain purchase is authorized.
+No domain needs to be bought: `sslip.io` resolves `129-151-10-20.sslip.io` to
+`129.151.10.20`, and Let's Encrypt issues a certificate for it. A real domain works the
+same way: point an A record at the VM and pass that name instead.
 
-## Provisioning Gates
+`deploy/jb setup` installs Docker from Ubuntu's packages, opens 80/443 in the VM's own
+iptables firewall (Oracle images reject them by default), adds swap on small shapes,
+writes `deploy/.env.production` with freshly generated secrets (mode 600), installs a
+nightly backup job and builds and starts the stack. The first build takes 10-20 minutes
+on A1. It finishes by waiting for `/api/health` to report both databases `ok`.
 
-1. User creates/verifies the Oracle account directly and confirms an Always
-   Free-eligible VM is available with no paid resources. Do not send card details,
-   passwords, SSH private keys or tokens through chat.
-2. Resolve the high-priority public-release findings in
-   [IMPLEMENTATION_AUDIT.md](IMPLEMENTATION_AUDIT.md). Until then, keep the instance
-   private or limited to approved testers; do not collect real CVs.
-3. On the VM, install supported Python 3.12, Node.js, Caddy and Docker using their
-   official installation instructions. Confirm ARM wheels/install and resource
-   usage before treating the host as suitable. No container build was tested here.
-4. Deploy a reviewed feature-branch commit only. Do not merge/push main. Exclude
-   local `.env`, Chapter 5 notes, notebook working changes, raw CVs and review
-   checkpoints. There is no authorized deployment commit yet.
-5. Configure a root `.env` privately, readable only by the backend service user.
-   Set `ENVIRONMENT=production`, an independently generated `JWT_SECRET` of at
-   least 32 characters, an independently generated `MFA_ENCRYPTION_KEY` (Fernet key;
-   see `.env.example`), and `CORS_ORIGINS=["https://your-hostname"]`. Back up the MFA
-   key with the database: losing it voids every enrolment. Use unique
-   DB/Neo4j credentials with matching connection URLs. Settings guards cover JWT
-   and browser origins, NOT all deployment safety requirements.
-6. Start only PostgreSQL/Neo4j from Compose; do not launch public DB viewers.
-   Port mappings are now loopback. Validate Neo4j startup rather than relying on
-   the existing disabled-strict-validation workaround. Check resource use.
-7. Install backend requirements in the host venv and run `alembic upgrade head`
-   from `backend/` as a controlled deployment step, before starting API workers.
-   Back up before future migrations; do not run concurrent automatic migrations.
-8. Build with `npm --prefix frontend run build`. Run FastAPI under a dedicated
-   non-root supervisor/service, one worker initially, no reload, bound to
-   `127.0.0.1:8000`. Verify model download/cache permissions. No training is needed.
-9. Configure Caddy/DNS/HTTPS and complete the acceptance checks below. Add abuse
-   throttling and upload resource controls before unrestricted exposure. Avoid
-   deploying shared seed passwords; create independent synthetic demo accounts, or
-   set a unique `SEED_PASSWORD` before running the seed scripts on the host.
+Then:
 
-## Acceptance Checklist
+```bash
+deploy/jb admin you@example.org   # create the administrator (prompts for a password)
+deploy/jb seed                    # optional: synthetic IT demo data (150 candidates, 30 + 26 jobs)
+```
 
-- [ ] Host bills/limits show only Always Free resources; no paid upgrade.
-- [ ] Reviewed commit recorded; Linux ARM install/build succeeds within RAM/disk.
-- [ ] HTTPS works from another device; `/auth` reloads and assets render.
-- [ ] `/api/health` returns `status: ok` and BOTH databases `ok`. HTTP 200 alone
-      is insufficient because the current endpoint also returns 200 when degraded.
-- [ ] Candidate/recruiter signup and login work with real tokens; unauthorized,
-      expired-token and wrong-owner requests fail without data disclosure.
-- [ ] Synthetic CV upload creates the expected PostgreSQL data and Neo4j links;
-      malformed/oversized uploads fail safely.
-- [ ] Recruiter creates a job and evaluates it; results persist. Another recruiter
-      cannot evaluate it. Hard-rule failures do not appear in candidate For You.
-- [ ] Save/history survive reload and sign-in; no data crosses account boundaries.
-- [ ] Model parity and measured latency are recorded; scores are labelled as
-      experimental until independently validated, not certified probabilities.
-- [ ] VM/service restart preserves records and reloads artifacts correctly.
-- [ ] Backup/restore tested; admin/DB ports closed externally; logs omit tokens/CVs.
+Administrators must enrol an authenticator app on first sign-in. Demo accounts sign in
+with the `SEED_PASSWORD` stored in `deploy/.env.production`, not the repository default.
 
-Only after these checks may a real public URL be reported as working. A public
-health endpoint or frontend build alone is not a completed deployment.
+## 3. Operate
 
-## Provider References
+| Task | Command |
+| --- | --- |
+| Status / logs | `deploy/jb status`, `deploy/jb logs api` |
+| Deploy a new commit of `main` | `deploy/jb update` (pull, back up, rebuild, restart) |
+| Manual backup | `deploy/jb backup` (PostgreSQL + env file), `deploy/jb backup --graph` (adds Neo4j, ~1 min offline) |
+| Restore PostgreSQL | `sudo docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env.production exec -T postgres pg_restore -U jobbridge -d jobbridge --clean < /var/backups/jobbridge/postgres-<stamp>.dump` |
 
-Terms change; recheck when provisioning:
+Backups run daily at 03:15 (Neo4j included on Sundays) into `/var/backups/jobbridge`,
+keeping 14 days. They live on the same VM; copy them off occasionally
+(`scp ubuntu@<ip>:/var/backups/jobbridge/* .`). The env file is backed up with them:
+losing `MFA_ENCRYPTION_KEY` voids every two-step enrolment.
 
-- [Oracle Always Free resources](https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm)
-- [Oracle Free Tier and verification](https://www.oracle.com/cloud/free/)
-- [Neon plans](https://neon.com/pricing)
-- [Aura instance creation](https://neo4j.com/docs/aura/getting-started/create-instance/)
-- [Hugging Face Spaces limits](https://huggingface.co/docs/hub/spaces-overview)
-- [Render Free limitations](https://render.com/docs/free)
+Containers restart automatically after a crash or VM reboot (`restart: unless-stopped`).
+
+### Sign in with Google on the public host
+
+Add `https://<APP_DOMAIN>` to the OAuth client's **Authorised JavaScript origins** in
+Google Cloud Console, then set `GOOGLE_CLIENT_ID` and `GOOGLE_SIGNIN_EMAILS` in
+`deploy/.env.production` and run `deploy/jb up`. The consent screen is in Testing mode,
+so only its listed test users can use it.
+
+## Acceptance checklist
+
+- [ ] Oracle shows only Always Free-eligible resources; no charges in Billing.
+- [ ] `https://<APP_DOMAIN>` loads with a valid certificate from another device; `/auth` reloads.
+- [ ] `/api/health` returns `status: ok` with both databases `ok`.
+- [ ] Candidate and recruiter sign-up/sign-in; admin sign-in with two-step verification.
+- [ ] Resume upload extracts skills and experience; the skill graph renders within seconds.
+- [ ] Recruiter publishes a job and evaluates candidates; results persist after reload.
+- [ ] `sudo reboot`, then the site comes back with the same data.
+- [ ] `deploy/jb backup` writes a dump; ports 5432/7474/7687/8000 are closed from outside
+      (`nc -zv <ip> 5432` fails).
+
+## Limits that remain
+
+Scores come from a model trained on synthetic labels and are experimental, not hiring
+probabilities. Rate limiting is per process (fine for one API worker). Use fictional CVs
+on the public demo; there is no automatic data retention or self-service deletion.

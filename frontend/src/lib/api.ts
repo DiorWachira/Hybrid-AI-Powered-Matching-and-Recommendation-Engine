@@ -47,7 +47,7 @@ export type OversightSummary = {
   applications_total: number; hired_total: number; stale_open_jobs: number; suspended_open_jobs: number;
   attention_jobs: number; stale_after_days: number;
 };
-export type CurrentAccount = { user_id: string; email: string; role: UserRole; mfa_enabled: boolean; mfa_required: boolean; mfa_recovery_codes_remaining: number };
+export type CurrentAccount = { user_id: string; email: string; role: UserRole; display_name: string | null; company_name: string | null; mfa_enabled: boolean; mfa_required: boolean; mfa_recovery_codes_remaining: number };
 export type Session = { access_token: string; role: UserRole };
 /** A session, or a short-lived token for the second step when the account uses or must set up two-step verification. */
 export type LoginResult = { status: "authenticated"; access_token: string; role: UserRole } | { status: "mfa_required" | "mfa_setup_required"; challenge_token: string; role: UserRole };
@@ -165,6 +165,8 @@ export type Opportunity = {
 
 export type CandidateDashboard = {
   available_opportunities: Opportunity[];
+  /** Every open role on JobBridge; available_opportunities holds only the top-scored 20. */
+  open_role_count: number;
   for_you: Opportunity[];
   history: Opportunity[];
 };
@@ -187,6 +189,19 @@ export type SimulationRun = {
   events: SimulationEvent[];
 };
 
+const FIELD_LABELS: Record<string, string> = { email: "Email address", password: "Password", new_password: "New password", full_name: "Full name", company_name: "Company name", code: "Code" };
+
+/** Turn a FastAPI validation item into a sentence a person can act on; raw text only as a fallback. */
+function validationMessage(item: { msg: string; loc: string[]; type?: string; ctx?: { min_length?: number; max_length?: number } }): string {
+  const field = String(item.loc[item.loc.length - 1] ?? "");
+  const label = FIELD_LABELS[field] ?? (field ? field.replace(/_/g, " ").replace(/^./, (first) => first.toUpperCase()) : "This field");
+  if (field === "email" || field.endsWith("_email")) return "Enter a valid email address.";
+  if (item.type === "string_too_short" && item.ctx?.min_length) return `${label} must be at least ${item.ctx.min_length} characters.`;
+  if (item.type === "string_too_long" && item.ctx?.max_length) return `${label} must be at most ${item.ctx.max_length} characters.`;
+  if (item.type === "missing") return `${label} is required.`;
+  return `${label}: ${item.msg.replace(/^Value error, /, "")}.`;
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const headers = new Headers(init?.headers);
   if (!(init?.body instanceof FormData)) headers.set("Content-Type", "application/json");
@@ -198,8 +213,8 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   }
 
   if (!response.ok) {
-    const body = await response.json().catch(() => null) as { detail?: string | Array<{ msg: string; loc: string[] }> } | null;
-    const detail = typeof body?.detail === "string" ? body.detail : Array.isArray(body?.detail) ? body.detail.map((item) => `${item.loc.slice(1).join(" ")}: ${item.msg}`).join(". ") : null;
+    const body = await response.json().catch(() => null) as { detail?: string | Array<{ msg: string; loc: string[]; type?: string; ctx?: { min_length?: number; max_length?: number } }> } | null;
+    const detail = typeof body?.detail === "string" ? body.detail : Array.isArray(body?.detail) ? [...new Set(body.detail.map(validationMessage))].join(" ") : null;
     throw new Error(detail ?? (response.status >= 500 ? "The service is currently unavailable. Please try again shortly." : `Request failed (${response.status}). Please try again.`));
   }
 

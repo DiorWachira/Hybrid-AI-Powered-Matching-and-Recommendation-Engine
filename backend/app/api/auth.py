@@ -217,5 +217,13 @@ def reset_password(request: Request, payload: PasswordResetRequest, db: Session 
 @router.get("/me", response_model=ProfileResponse)
 def read_current_profile(user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> ProfileResponse:
     enabled = user.mfa_enabled_at is not None
-    return ProfileResponse(user_id=user.user_id, email=user.email, role=user.role, mfa_enabled=enabled, mfa_required=mfa.is_required(user),
+    display_name = company_name = None
+    if user.role == UserRole.candidate:
+        display_name = db.scalar(select(Candidate.full_name).where(Candidate.user_id == user.user_id))
+    elif user.role == UserRole.recruiter:
+        employer = db.execute(select(Employer.contact_name, Employer.company_name).where(Employer.user_id == user.user_id)).first()
+        if employer:
+            display_name, company_name = employer
+    return ProfileResponse(user_id=user.user_id, email=user.email, role=user.role, display_name=display_name, company_name=company_name,
+                           mfa_enabled=enabled, mfa_required=mfa.is_required(user),
                            mfa_recovery_codes_remaining=mfa.remaining_recovery_codes(db, user) if enabled else 0)

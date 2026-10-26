@@ -1,0 +1,26 @@
+# Keep secrets, local environments and generated data out of image build contexts.
+.env
+.env.*
+!.env.example
+**/.git
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+venv/
+.venv/
+**/node_modules
+frontend/dist
+.qodo/
+.claude/
+notebooks/
+Dataset_sourcing/
+docs/
+*.log
+*.err
+prompt content and context.txt
+data_pipeline/dataset/
+data_pipeline/processed/
+data_pipeline/training_review/
+data_pipeline/training_runs/
+data_pipeline/reports/
+data_pipeline/gold_slice/

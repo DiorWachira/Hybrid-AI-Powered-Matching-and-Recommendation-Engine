@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, Check, CircleAlert, RefreshCw, Search, Target } from "lucide-react";
-import { Link } from "react-router-dom";
-import { api, type MatchCandidate } from "../lib/api";
+import { Link, useSearchParams } from "react-router-dom";
+import { api, type JobPosting, type MatchCandidate } from "../lib/api";
+import { getSessionRole } from "../lib/session";
 import { MatchGraphView } from "../components/MatchGraphView";
 
 const percent = (score: number) => Math.round(Math.max(0, Math.min(1, score)) * 100);
@@ -17,7 +18,27 @@ export function MatchesPage() {
   const [evaluating, setEvaluating] = useState(false);
   const [evaluatedAt, setEvaluatedAt] = useState<string | null>(null);
   const evaluationPending = useRef(false);
-  const jobId = localStorage.getItem("jobbridge_job_id");
+  const [params, setParams] = useSearchParams();
+  // The job lives in the URL so links and refreshes work; the last opened job is the fallback.
+  const jobId = params.get("job") ?? localStorage.getItem("jobbridge_job_id");
+  const role = getSessionRole();
+  const [postings, setPostings] = useState<JobPosting[] | null>(null);
+
+  useEffect(() => {
+    if (!jobId) return;
+    localStorage.setItem("jobbridge_job_id", jobId);
+    if (!params.get("job")) setParams({ job: jobId }, { replace: true });
+  }, [jobId, params, setParams]);
+
+  useEffect(() => {
+    const token = localStorage.getItem("jobbridge_token");
+    if (role !== "recruiter" || !token) return;
+    let active = true;
+    void api.myJobs(token, 0, 50).then((items) => { if (active) setPostings(items); }).catch(() => { if (active) setPostings([]); });
+    return () => { active = false; };
+  }, [role]);
+  const selectJob = (id: string) => { setResults([]); setEvaluatedAt(null); setSelectedId(null); setParams({ job: id }); };
+  const currentPosting = postings?.find((posting) => posting.job_id === jobId);
 
   useEffect(() => {
     let active = true;
@@ -44,16 +65,23 @@ export function MatchesPage() {
   const visible = results.filter((candidate) => (!eligibleOnly || candidate.hard_rule_passed) && candidate.full_name.toLowerCase().includes(query.toLowerCase()));
   const current = visible.find((candidate) => candidate.candidate_id === selectedId) ?? visible[0];
   return <main className="studio-page">
-    <div className="page-heading"><div><p className="eyebrow">Match analysis</p><h1>A shortlist with a reason.</h1><p>{evaluatedAt ? `Evaluated ${new Date(evaluatedAt).toLocaleString()}` : "No saved evaluation"}</p></div><div className="match-actions"><Link to="/recruiter" className="secondary-button"><ArrowLeft size={16} />Role workspace</Link><button className="icon-button" aria-label="Refresh saved results" title="Refresh saved results" disabled={!jobId || loading || evaluating} onClick={() => setRetry((value) => value + 1)}><RefreshCw size={16} /></button><button className="primary-button" disabled={!jobId || loading || evaluating} onClick={() => void evaluate()}><Target size={16} />{evaluating ? "Evaluating..." : "Evaluate candidates"}</button></div></div>
+    <div className="page-heading"><div><p className="eyebrow">Match analysis{currentPosting ? ` / ${currentPosting.title}` : ""}</p><h1>A shortlist with a reason.</h1><p>{evaluatedAt ? `Evaluated ${new Date(evaluatedAt).toLocaleString()}` : "No saved evaluation"}</p></div><div className="match-actions">{role === "recruiter" && postings && postings.length > 0 && <label className="studio-field job-switcher">Role<select aria-label="Role to analyse" value={jobId ?? ""} onChange={(event) => selectJob(event.target.value)}>{!jobId && <option value="" disabled>Choose a role</option>}{postings.map((posting) => <option key={posting.job_id} value={posting.job_id}>{posting.title}{posting.status === "closed" ? " (closed)" : ""}</option>)}</select></label>}<Link to={role === "admin" ? "/admin/recruiters" : "/recruiter"} className="secondary-button"><ArrowLeft size={16} />{role === "admin" ? "Recruiter oversight" : "Role workspace"}</Link><button className="icon-button" aria-label="Refresh saved results" title="Refresh saved results" disabled={!jobId || loading || evaluating} onClick={() => setRetry((value) => value + 1)}><RefreshCw size={16} /></button><button className="primary-button" disabled={!jobId || loading || evaluating} onClick={() => void evaluate()}><Target size={16} />{evaluating ? "Evaluating..." : "Evaluate candidates"}</button></div></div>
     {error && <div className="notice error" role="alert"><CircleAlert size={18} />{error}</div>}
     {evaluating && <p className="notice" role="status">Evaluation in progress</p>}
-    {loading ? <div className="empty-state" role="status"><RefreshCw size={26} className="animate-spin" /><h2>Loading saved results</h2></div> : !jobId ? <div className="empty-state"><Target size={30} /><h2>Your next shortlist starts with a role.</h2><Link to="/recruiter" className="primary-button">Create a role</Link></div> : <>
+    {loading ? <div className="empty-state" role="status"><RefreshCw size={26} className="animate-spin" /><h2>Loading saved results</h2></div> : !jobId ? <NoJobSelected role={role} postings={postings} onSelect={selectJob} /> : <>
       <div className="dashboard-stats"><div><span>Candidates evaluated</span><strong>{results.length}</strong></div><div><span>Passed eligibility</span><strong>{results.filter((item) => item.hard_rule_passed).length}</strong></div><div><span>Recommended by the model</span><strong>{results.length ? results.filter((item) => item.recommended).length : "—"}</strong></div></div>
       <div className="results-toolbar"><label className="search-field"><Search size={17} /><input aria-label="Search candidates" placeholder="Search candidate names" value={query} onChange={(event) => setQuery(event.target.value)} /></label><label className="sort-control"><input type="checkbox" checked={eligibleOnly} onChange={(event) => setEligibleOnly(event.target.checked)} />Eligible candidates only</label></div>
       {current ? <div className="rank-layout"><section aria-label="Ranked candidates" className="rank-list">{visible.map((candidate) => <button className="rank-item" key={candidate.candidate_id} aria-pressed={current.candidate_id === candidate.candidate_id} onClick={() => setSelectedId(candidate.candidate_id)}><span className="rank-number">{String(results.indexOf(candidate) + 1).padStart(2, "0")}</span><div><strong>{candidate.full_name}</strong><small>{!candidate.hard_rule_passed ? "Requirements not met" : candidate.recommended ? "Recommended" : "Eligible"}</small></div><b>{percent(candidate.final_score)}%</b></button>)}</section><section className="score-detail" aria-label="Selected candidate scores"><p className="eyebrow">Individual breakdown</p><h2>{current.full_name}</h2><div className="final-score">{percent(current.final_score)}%<small>Overall match score</small></div><p className="notice">{current.recommended ? "Recommended: at or above the model's decision threshold" : current.recommended === null ? "Scored by an earlier model version; re-evaluate for a recommendation" : current.hard_rule_passed ? "Below the model's decision threshold" : "Not scored: eligibility requirements not met"}</p><p className="match-provenance">Experimental calibration / not a hiring probability</p><Metric label="Semantic relevance" value={current.semantic_score} /><Metric label="Skill alignment" value={current.skill_overlap} tone="blue" /><Metric label="Growth potential" value={current.growth_score} tone="copper" /><div className={`rule-outcome ${current.hard_rule_passed ? "" : "fail"}`}><div>{current.hard_rule_passed ? <Check size={18} /> : <CircleAlert size={18} />}{current.hard_rule_passed ? "All eligibility requirements passed" : "Eligibility requirements not met"}</div>{!current.hard_rule_passed && <ul>{current.rule_reasons.map((reason) => <li key={reason}>{reason}</li>)}</ul>}</div><SkillBreakdown title="Matched skills" skills={current.matched_skills} />{!!current.related_skills?.length && <section className="skill-breakdown" aria-label="Related skills credited"><h3>Credited through related skills</h3><ul className="skill-tags">{current.related_skills.map((item) => <li key={item.required}><span>{item.required} via {item.via} ({percent(item.credit)}%)</span></li>)}</ul></section>}<SkillBreakdown title="Missing skills" skills={current.missing_skills} /><p className="match-provenance">Model: {current.model_version ?? "Unrecorded"}</p></section></div> : <div className="empty-state"><Search size={28} /><h2>{error ? "Results unavailable" : evaluatedAt ? "No candidates to show" : "No saved evaluation"}</h2></div>}
       {current?.match_id && <MatchGraphView key={current.match_id} matchId={current.match_id} />}
     </>}
   </main>;
+}
+
+function NoJobSelected({ role, postings, onSelect }: { role: string | null; postings: JobPosting[] | null; onSelect: (jobId: string) => void }) {
+  if (role === "admin") return <div className="empty-state"><Target size={30} /><h2>Choose a role to analyse.</h2><p>Open a job in Recruiter oversight and select Full match analysis.</p><Link to="/admin/recruiters" className="primary-button">Recruiter oversight</Link></div>;
+  if (postings === null) return <div className="empty-state" role="status"><RefreshCw size={26} className="animate-spin" /><h2>Loading your roles</h2></div>;
+  if (!postings.length) return <div className="empty-state"><Target size={30} /><h2>Your next shortlist starts with a role.</h2><Link to="/recruiter?new=1" className="primary-button">Create a role</Link></div>;
+  return <div className="empty-state"><Target size={30} /><h2>Choose a role to analyse.</h2><section aria-label="Your roles" className="rank-list job-picker">{postings.map((posting) => <button key={posting.job_id} className="rank-item" onClick={() => onSelect(posting.job_id)}><div><strong>{posting.title}</strong><small>{posting.location || "Location not specified"} / {posting.status}</small></div><Target size={17} /></button>)}</section></div>;
 }
 
 function Metric({ label, value, tone = "" }: { label: string; value: number; tone?: string }) {

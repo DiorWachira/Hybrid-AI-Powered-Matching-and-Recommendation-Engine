@@ -1,0 +1,133 @@
+#!/usr/bin/env bash
+# JobBridge server helper for a single Ubuntu VM (tested target: Oracle Cloud Always Free
+# Ampere A1, Ubuntu 22.04/24.04). Run from the repository checkout:
+#   deploy/jb setup <domain>   install Docker, open 80/443, write secrets, start the stack
+#   deploy/jb up               build and (re)start everything
+#   deploy/jb update           git pull, back up, rebuild and restart
+#   deploy/jb seed             load the synthetic demo data (IT roles only)
+#   deploy/jb admin <email>    create an administrator (prompts for a password)
+#   deploy/jb backup [--graph] dump PostgreSQL (and Neo4j with --graph) to /var/backups/jobbridge
+#   deploy/jb status | logs [service]
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+ENV_FILE="$ROOT/deploy/.env.production"
+BACKUP_DIR="${BACKUP_DIR:-/var/backups/jobbridge}"
+compose() { sudo docker compose -f "$ROOT/deploy/docker-compose.prod.yml" --env-file "$ENV_FILE" "$@"; }
+env_value() { grep -E "^$1=" "$ENV_FILE" | head -n1 | cut -d= -f2-; }
+random_secret() { openssl rand -base64 48 | tr -d '/+=\n' | cut -c1-"$1"; }
+
+open_port() {
+  # Oracle's Ubuntu images ship an iptables INPUT chain that rejects everything except SSH.
+  local proto=$1 port=$2
+  sudo iptables -C INPUT -p "$proto" --dport "$port" -j ACCEPT 2>/dev/null && return
+  local reject
+  reject=$(sudo iptables -L INPUT --line-numbers -n | awk '/REJECT/ {print $1; exit}')
+  if [ -n "$reject" ]; then
+    sudo iptables -I INPUT "$reject" -p "$proto" --dport "$port" -j ACCEPT
+  else
+    sudo iptables -A INPUT -p "$proto" --dport "$port" -j ACCEPT
+  fi
+}
+
+cmd_setup() {
+  local domain=${1:?usage: deploy/jb setup <domain, e.g. 129-151-10-20.sslip.io>}
+  if ! command -v docker >/dev/null || ! sudo docker compose version >/dev/null 2>&1; then
+    sudo apt-get update
+    sudo apt-get install -y docker.io git openssl
+    # Compose v2 is packaged as docker-compose-v2 on 24.04 and docker-compose-plugin elsewhere.
+    sudo apt-get install -y docker-compose-v2 || sudo apt-get install -y docker-compose-plugin
+    sudo systemctl enable --now docker
+  fi
+  open_port tcp 80; open_port tcp 443; open_port udp 443
+  if command -v netfilter-persistent >/dev/null; then sudo netfilter-persistent save; fi
+
+  # A small swap file keeps image builds from being OOM-killed on 6 GB shapes.
+  if ! swapon --show | grep -q . && [ "$(awk '/MemTotal/ {print $2}' /proc/meminfo)" -lt 12000000 ]; then
+    sudo fallocate -l 4G /swapfile && sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile
+    echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab >/dev/null
+  fi
+
+  if [ ! -f "$ENV_FILE" ]; then
+    sed -e "s|^APP_DOMAIN=.*|APP_DOMAIN=$domain|" \
+        -e "s|^POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD=$(random_secret 32)|" \
+        -e "s|^NEO4J_PASSWORD=.*|NEO4J_PASSWORD=$(random_secret 32)|" \
+        -e "s|^JWT_SECRET=.*|JWT_SECRET=$(random_secret 64)|" \
+        -e "s|^MFA_ENCRYPTION_KEY=.*|MFA_ENCRYPTION_KEY=$(openssl rand -base64 32 | tr '+/' '-_')|" \
+        -e "s|^SEED_PASSWORD=.*|SEED_PASSWORD=Demo-$(random_secret 16)|" \
+        "$ROOT/deploy/env.production.example" > "$ENV_FILE"
+    chmod 600 "$ENV_FILE"
+    echo "Wrote $ENV_FILE with fresh secrets. Back it up somewhere private."
+  fi
+  cmd_install_backup_timer
+  cmd_up
+}
+
+cmd_up() {
+  compose up -d --build --remove-orphans
+  echo "Waiting for the API to report healthy..."
+  for _ in $(seq 1 60); do
+    if compose exec -T api python -c "import json,urllib.request;s=json.load(urllib.request.urlopen('http://127.0.0.1:8000/api/health',timeout=8));raise SystemExit(s['status']!='ok')" 2>/dev/null; then
+      echo "Up: https://$(env_value APP_DOMAIN)"; return
+    fi
+    sleep 5
+  done
+  echo "API did not become healthy; check: deploy/jb logs api" >&2; exit 1
+}
+
+cmd_update() {
+  git -C "$ROOT" pull --ff-only
+  cmd_backup
+  cmd_up
+}
+
+cmd_seed() {
+  # Synthetic candidates/jobs + ontology, then the recruiter-oversight demo. Demo accounts use
+  # SEED_PASSWORD from the env file, never the default published in the repository.
+  compose run --rm --entrypoint python api data_pipeline/prepare_week4.py --candidates 150 --jobs 30
+  compose run --rm --entrypoint python api data_pipeline/seed_oversight_demo.py
+  echo "Demo accounts sign in with SEED_PASSWORD from $ENV_FILE"
+}
+
+cmd_admin() {
+  local email=${1:?usage: deploy/jb admin <email>}
+  compose run --rm -it -w /app/backend --entrypoint python api create_admin.py "$email"
+}
+
+cmd_backup() {
+  local stamp; stamp=$(date +%Y%m%d-%H%M%S)
+  sudo mkdir -p "$BACKUP_DIR" && sudo chmod 700 "$BACKUP_DIR"
+  compose exec -T postgres sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" --format=custom' | sudo tee "$BACKUP_DIR/postgres-$stamp.dump" >/dev/null
+  sudo cp "$ENV_FILE" "$BACKUP_DIR/env-$stamp" && sudo chmod 600 "$BACKUP_DIR/env-$stamp"
+  if [ "${1:-}" = "--graph" ]; then
+    # Community edition dumps need the database offline; this takes about a minute.
+    compose stop neo4j
+    sudo docker run --rm --volumes-from jobbridge-neo4j-1 -v "$BACKUP_DIR":/backups neo4j:5-community \
+      neo4j-admin database dump neo4j --to-path=/backups --overwrite-destination=true
+    sudo mv "$BACKUP_DIR/neo4j.dump" "$BACKUP_DIR/neo4j-$stamp.dump"
+    compose start neo4j
+  fi
+  sudo find "$BACKUP_DIR" -type f -mtime +14 -delete
+  echo "Backup written to $BACKUP_DIR ($stamp)"
+}
+
+cmd_install_backup_timer() {
+  local self="$ROOT/deploy/jb"
+  # Daily database dump at 03:15; weekly graph dump on Sundays.
+  sudo tee /etc/cron.d/jobbridge-backup >/dev/null <<EOF
+15 3 * * 1-6 root BACKUP_DIR=$BACKUP_DIR $self backup >> /var/log/jobbridge-backup.log 2>&1
+15 3 * * 0 root BACKUP_DIR=$BACKUP_DIR $self backup --graph >> /var/log/jobbridge-backup.log 2>&1
+EOF
+}
+
+case "${1:-}" in
+  setup) shift; cmd_setup "$@" ;;
+  up) cmd_up ;;
+  update) cmd_update ;;
+  seed) cmd_seed ;;
+  admin) shift; cmd_admin "$@" ;;
+  backup) shift; cmd_backup "$@" ;;
+  status) compose ps ;;
+  logs) shift; compose logs --tail=200 -f "$@" ;;
+  *) sed -n '2,12p' "$0"; exit 1 ;;
+esac

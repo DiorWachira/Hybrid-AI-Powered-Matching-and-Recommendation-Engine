@@ -69,30 +69,35 @@ def read_match(match_id: UUID, user: User = Depends(require_roles(UserRole.candi
 def read_match_graph(match_id: UUID, user: User = Depends(require_roles(UserRole.candidate, UserRole.recruiter, UserRole.admin)), db: Session = Depends(get_db)):
     result = read_match(match_id, user, db)
     candidate_id, job_id = str(result.candidate_id), str(result.job_id)
-    try:
-        with get_neo4j_driver() as driver, driver.session(database="neo4j") as graph:
-            entities = graph.run("MATCH (candidate:Candidate {id:$candidate}), (job:Job {id:$job}) RETURN job.title AS title", candidate=candidate_id, job=job_id).single()
-            if entities is None:
-                return {"nodes": [], "edges": [], "state": "awaiting_projection", "truncated": False}
-            candidate_skills = [row["name"] for row in graph.run("MATCH (:Candidate {id:$candidate})-[:HAS_SKILL]->(skill:Skill) RETURN DISTINCT skill.name AS name ORDER BY name LIMIT 26", candidate=candidate_id)]
-            required_skills = [row["name"] for row in graph.run("MATCH (:Job {id:$job})-[:REQUIRES_SKILL]->(skill:Skill) RETURN DISTINCT skill.name AS name ORDER BY name LIMIT 26", job=job_id)]
-            truncated = len(candidate_skills) > 25 or len(required_skills) > 25
-            candidate_skills, required_skills = candidate_skills[:25], required_skills[:25]
-            skill_names = sorted(set(candidate_skills + required_skills))
-            nodes = [{"id": "candidate", "label": "Candidate", "kind": "candidate"}, {"id": "job", "label": entities["title"] or "Job", "kind": "job"}]
-            nodes.extend({"id": "skill:" + name, "label": name, "kind": "skill"} for name in skill_names)
-            edges = [{"id": "has:" + name, "source": "candidate", "target": "skill:" + name, "label": "HAS_SKILL"} for name in candidate_skills]
-            edges.extend({"id": "requires:" + name, "source": "job", "target": "skill:" + name, "label": "REQUIRES_SKILL"} for name in required_skills)
-            links = graph.run("MATCH (source:Skill)-[edge:RELATED_TO]->(target:Skill) WHERE source.name IN $names AND target.name IN $names RETURN source.name AS source, target.name AS target, edge.weight AS weight ORDER BY source.name, target.name LIMIT 51", names=skill_names).data()
-            truncated = truncated or len(links) > 50
-            for index, link in enumerate(links[:50]):
-                edges.append({"id": f"related:{index}", "source": "skill:" + link["source"], "target": "skill:" + link["target"], "label": "RELATED_TO", "weight": link["weight"]})
-            applications = graph.run("MATCH (:Candidate {id:$candidate})-[edge:APPLIED_TO]->(:Job {id:$job}) RETURN edge.status AS status LIMIT 1", candidate=candidate_id, job=job_id).single()
-            if applications:
-                edges.append({"id": "application", "source": "candidate", "target": "job", "label": "APPLIED_TO", "status": applications["status"]})
-            return {"nodes": nodes, "edges": edges, "state": "current_projection", "truncated": truncated}
-    except (Neo4jError, ServiceUnavailable, SessionExpired):
-        raise HTTPException(status_code=503, detail="Skill graph is unavailable; saved evaluation is still accessible") from None
+    # One retry: a fresh driver can fail its first request while Neo4j routing warms up.
+    for attempt in range(2):
+        try:
+            with get_neo4j_driver() as driver, driver.session(database="neo4j") as graph:
+                entities = graph.run("MATCH (candidate:Candidate {id:$candidate}), (job:Job {id:$job}) RETURN job.title AS title", candidate=candidate_id, job=job_id).single()
+                if entities is None:
+                    return {"nodes": [], "edges": [], "state": "awaiting_projection", "truncated": False}
+                candidate_skills = [row["name"] for row in graph.run("MATCH (:Candidate {id:$candidate})-[:HAS_SKILL]->(skill:Skill) RETURN DISTINCT skill.name AS name ORDER BY name LIMIT 26", candidate=candidate_id)]
+                required_skills = [row["name"] for row in graph.run("MATCH (:Job {id:$job})-[:REQUIRES_SKILL]->(skill:Skill) RETURN DISTINCT skill.name AS name ORDER BY name LIMIT 26", job=job_id)]
+                truncated = len(candidate_skills) > 25 or len(required_skills) > 25
+                candidate_skills, required_skills = candidate_skills[:25], required_skills[:25]
+                skill_names = sorted(set(candidate_skills + required_skills))
+                nodes = [{"id": "candidate", "label": "Candidate", "kind": "candidate"}, {"id": "job", "label": entities["title"] or "Job", "kind": "job"}]
+                nodes.extend({"id": "skill:" + name, "label": name, "kind": "skill"} for name in skill_names)
+                edges = [{"id": "has:" + name, "source": "candidate", "target": "skill:" + name, "label": "HAS_SKILL"} for name in candidate_skills]
+                edges.extend({"id": "requires:" + name, "source": "job", "target": "skill:" + name, "label": "REQUIRES_SKILL"} for name in required_skills)
+                links = graph.run("MATCH (source:Skill)-[edge:RELATED_TO]->(target:Skill) WHERE source.name IN $names AND target.name IN $names RETURN source.name AS source, target.name AS target, edge.weight AS weight ORDER BY source.name, target.name LIMIT 51", names=skill_names).data()
+                truncated = truncated or len(links) > 50
+                for index, link in enumerate(links[:50]):
+                    edges.append({"id": f"related:{index}", "source": "skill:" + link["source"], "target": "skill:" + link["target"], "label": "RELATED_TO", "weight": link["weight"]})
+                applications = graph.run("MATCH (:Candidate {id:$candidate})-[edge:APPLIED_TO]->(:Job {id:$job}) RETURN edge.status AS status LIMIT 1", candidate=candidate_id, job=job_id).single()
+                if applications:
+                    edges.append({"id": "application", "source": "candidate", "target": "job", "label": "APPLIED_TO", "status": applications["status"]})
+                return {"nodes": nodes, "edges": edges, "state": "current_projection", "truncated": truncated}
+        except (ServiceUnavailable, SessionExpired):
+            if attempt:
+                raise HTTPException(status_code=503, detail="Skill graph is unavailable; saved evaluation is still accessible") from None
+        except Neo4jError:
+            raise HTTPException(status_code=503, detail="Skill graph is unavailable; saved evaluation is still accessible") from None
 
 
 def _candidate_rule_result(candidate: Candidate, job: JobPosting):

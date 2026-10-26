@@ -24,9 +24,23 @@ Closed in this review:
     test_password_security.py); browser upload of a real PDF remains in the browser group.
 [x] Seed scripts read SEED_PASSWORD from the environment so a shared/public demo need
     not use the password published in this repository (.env.example, DEPLOYMENT.md).
+Wrap-up (2026-10-26):
+[x] GitHub issues #2-#10 fixed and browser-checked (headless Edge): demo accounts sign in
+    (seed domain @jobbridge.example.org, migration 20261026_0010); graph sync runs inside
+    the API every 5 s; resume upload fills years of experience; open-role count, friendly
+    validation messages, blank job form, URL-driven match analysis, named sidebar and a
+    role-aware 404 page.
+[x] NFR-02 latency (warm, local, 7.4 GB laptop): evaluating 170 candidates median 1.15 s
+    (max 2.36 s, n=5); candidate dashboard / For You median 0.28 s. Target 2-5 s met.
+[x] Production deployment kit: deploy/ (Dockerfiles, Compose, Caddy HTTPS, deploy/jb
+    helper with setup/update/seed/admin/backup); CI builds both images. Runbook:
+    docs/DEPLOYMENT.md (Oracle Always Free Ampere A1).
 Needs Docker + running app (Claude can do with the user's go-ahead):
-[ ] NFR-02 latency: measure match evaluation and For You against 2-5 s (next task).
-[ ] Clean-machine path: fresh clone -> .env -> compose up -> migrations -> seed -> run.
+[x] NFR-02 latency: see wrap-up above.
+[x] Clean-machine path (2026-10-26): production images built from the repo with local
+    state excluded (.dockerignore); on fresh volumes the stack migrated, seeded (150 + 78
+    candidates, 56 jobs), served HTTPS via Caddy, evaluated 228 candidates (13 s cold,
+    0.65 s warm), rendered the skill graph and kept its data across a restart. ~1.6 GB RAM.
 [ ] Final sanity run with the demo dataset (seed_database.py + seed_oversight_demo.py).
 Needs a browser walkthrough (Claude in Chrome or the user):
 [ ] Real CV (PDF and DOCX) upload through the UI to stored text and graph skills.

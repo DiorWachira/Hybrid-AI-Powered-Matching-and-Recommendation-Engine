@@ -50,8 +50,10 @@ Implemented on the feature branch, with verification gaps documented in
 - Synthetic data preparation and historical model artifacts
 - Rule, data-tool and API-boundary tests plus backend CI configuration
 
-Automatic graph sync is disabled at the user's request to stop repeated terminals.
-Run the one-shot worker manually. See [docs/WORKFLOW.md](docs/WORKFLOW.md) for
+Graph sync (2026-10-26) runs inside the API process: a background thread drains the
+PostgreSQL outbox into Neo4j every `GRAPH_SYNC_INTERVAL_SECONDS` (default 5; `0` turns it
+off). No scheduled task or extra terminal is involved. The one-shot worker
+(`python -m app.db.graph_sync`) still works for backfills. See [docs/WORKFLOW.md](docs/WORKFLOW.md) for
 status checks and operational limits. The live model is the 2026-10-19 feature
 contract v2 run (related-skill readiness), epoch 4, promoted for prototype testing
 (`PROTOTYPE_TESTING_APPROVED`); it replaced the 2026-10-09 v1 epoch-19 model. `data_pipeline/validate_model_contract.py` now
@@ -63,7 +65,7 @@ not done.
 
 Not yet signed off:
 
-- Current live stack/clean-machine verification and public deployment
+- Provisioning the public Oracle VM (runbook and stack ready; tested locally)
 - Independently measured (non-synthetic) model quality
 - Epoch training (2026-10-09 Colab run completed and verified; parity gate now on the shared feature contract)
 - Privacy/fairness evaluation, abuse controls and robust graph consistency
@@ -118,9 +120,10 @@ CI uses that manifest and runs a separate frontend build with `npm ci`.
 The training notebook is intentionally local/ignored and not present in a fresh
 checkout. Notebook-dependent model-contract checks require that local file.
 
-Public hosting is not active. See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for the
-Always Free-only proposal and required deployment gates. Do not expose the Vite
-server, database viewers, default credentials or seed accounts publicly.
+For public hosting, use the production stack in `deploy/` (Caddy HTTPS, FastAPI,
+PostgreSQL, Neo4j in one Docker Compose project) on an Oracle Always Free VM; see
+[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md). Do not expose the Vite server, database
+viewers, default credentials or the repository's seed password publicly.
 
 ## Service Endpoints
 

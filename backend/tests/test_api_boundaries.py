@@ -160,12 +160,12 @@ def test_admin_lists_recruiters_with_posting_and_hiring_totals(api_client):
     user.role = UserRole.admin
     employer = SimpleNamespace(employer_id=uuid4(), user_id=uuid4(), company_name="Savannah Analytics", contact_name="Asha Njeri")
     posted = datetime.now(UTC)
-    database.execute.return_value.all.return_value = [(employer, "seed-recruiter@jobbridge.local", True, False, 4, 3, 9, 1, 2, posted)]
+    database.execute.return_value.all.return_value = [(employer, "seed-recruiter@jobbridge.example.org", True, False, 4, 3, 9, 1, 2, posted)]
     response = client.get("/api/admin/recruiters", params={"search": "Savannah", "offset": 5, "limit": 6})
     assert response.status_code == 200
     assert response.json() == [{
         "employer_id": str(employer.employer_id), "user_id": str(employer.user_id),
-        "company_name": "Savannah Analytics", "contact_name": "Asha Njeri", "email": "seed-recruiter@jobbridge.local",
+        "company_name": "Savannah Analytics", "contact_name": "Asha Njeri", "email": "seed-recruiter@jobbridge.example.org",
         "is_active": True, "is_demo": False, "jobs_total": 4, "jobs_open": 3, "applications_total": 9,
         "hired_total": 1, "stale_open_jobs": 2, "last_posted_at": posted.isoformat().replace("+00:00", "Z"),
     }]

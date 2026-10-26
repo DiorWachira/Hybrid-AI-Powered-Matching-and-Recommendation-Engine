@@ -17,6 +17,7 @@ from app.api.matches import router as matches_router
 from app.api.simulation import router as simulation_router
 from app.config import get_settings
 from app.core.hybrid_matcher import preload_model
+from app.db.graph_sync import run_sync_loop
 
 settings = get_settings()
 
@@ -25,7 +26,11 @@ settings = get_settings()
 async def lifespan(_: FastAPI):
     if settings.preload_matching_model:
         threading.Thread(target=preload_model, name="matching-model-preload", daemon=True).start()
+    stop_graph_sync = threading.Event()
+    if settings.graph_sync_interval_seconds > 0:
+        threading.Thread(target=run_sync_loop, args=(stop_graph_sync, settings.graph_sync_interval_seconds), name="graph-sync", daemon=True).start()
     yield
+    stop_graph_sync.set()
 
 
 app = FastAPI(title=settings.app_name, lifespan=lifespan)

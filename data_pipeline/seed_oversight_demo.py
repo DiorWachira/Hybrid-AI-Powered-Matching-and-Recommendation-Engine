@@ -1,6 +1,6 @@
 """Seed fictional recruiters, open IT jobs and applications for the admin recruiter-oversight view.
 
-Every record is deterministic (uuid5) and owned by an ``oversight-*@jobbridge.local`` demo account, so
+Every record is deterministic (uuid5) and owned by an ``oversight-*@jobbridge.example.org`` demo account, so
 re-running is a no-op and ``--remove`` deletes exactly this data set. Applications are only created where
 the serving hard-rule filter passes, mirroring what the candidate apply endpoint allows. No match scores
 are written: run "Evaluate all candidates" from the admin view to score a job with the live model.
@@ -33,7 +33,7 @@ from app.db.postgres import SessionLocal  # noqa: E402
 from app.utils.security import hash_password  # noqa: E402
 
 NAMESPACE = "jobbridge-oversight-demo-v1"
-EMAIL_DOMAIN = "@jobbridge.local"
+EMAIL_DOMAIN = "@jobbridge.example.org"
 
 # key, company, industry, location, suspended. Employers span industries; every role they post is a formal IT role.
 RECRUITERS = [

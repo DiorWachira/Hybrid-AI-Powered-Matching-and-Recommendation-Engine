@@ -40,9 +40,9 @@ def seed(candidates_limit: int, jobs_limit: int, skip_graph: bool, data_dir: Pat
     if diversify:
         candidates.extend(profile for job in jobs for profile in job_variants(job))
     with SessionLocal() as db:
-        employer_user = db.scalar(select(User).where(User.email == "seed-recruiter@jobbridge.local"))
+        employer_user = db.scalar(select(User).where(User.email == "seed-recruiter@jobbridge.example.org"))
         if employer_user is None:
-            employer_user = User(email="seed-recruiter@jobbridge.local", password_hash=hash_password(SEED_PASSWORD), role=UserRole.recruiter, is_demo=True)
+            employer_user = User(email="seed-recruiter@jobbridge.example.org", password_hash=hash_password(SEED_PASSWORD), role=UserRole.recruiter, is_demo=True)
             db.add(employer_user)
             db.flush()
         employer = db.scalar(select(Employer).where(Employer.user_id == employer_user.user_id))
@@ -56,12 +56,12 @@ def seed(candidates_limit: int, jobs_limit: int, skip_graph: bool, data_dir: Pat
             existing = db.get(Candidate, candidate_id)
             if existing is not None:
                 owner = db.get(User, existing.user_id)
-                if refresh_demo and owner and owner.email == f"seed-candidate-{candidate_id.hex[:12]}@jobbridge.local":
+                if refresh_demo and owner and owner.email == f"seed-candidate-{candidate_id.hex[:12]}@jobbridge.example.org":
                     existing.full_name = kenyan_name(candidate_id)
                     owner.is_demo = True
                 continue
             user = User(
-                email=f"seed-candidate-{candidate_id.hex[:12]}@jobbridge.local",
+                email=f"seed-candidate-{candidate_id.hex[:12]}@jobbridge.example.org",
                 password_hash=hash_password(SEED_PASSWORD),
                 role=UserRole.candidate,
                 is_demo=True,
@@ -90,13 +90,13 @@ def seed(candidates_limit: int, jobs_limit: int, skip_graph: bool, data_dir: Pat
                 continue
             company_name = str(item.get("company_name") or employer.company_name).strip()
             company_key = uuid.uuid5(uuid.NAMESPACE_URL, company_name.casefold()).hex[:16]
-            company_user = db.scalar(select(User).where(User.email == f"seed-employer-{company_key}@jobbridge.local"))
+            company_user = db.scalar(select(User).where(User.email == f"seed-employer-{company_key}@jobbridge.example.org"))
             job_employer = db.scalar(select(Employer).where(Employer.user_id == company_user.user_id)) if company_user else db.scalar(select(Employer).where(Employer.company_name == company_name))
             if job_employer is None:
                 company_key = uuid.uuid5(uuid.NAMESPACE_URL, company_name.casefold()).hex[:16]
-                employer_user = db.scalar(select(User).where(User.email == f"seed-employer-{company_key}@jobbridge.local"))
+                employer_user = db.scalar(select(User).where(User.email == f"seed-employer-{company_key}@jobbridge.example.org"))
                 if employer_user is None:
-                    employer_user = User(email=f"seed-employer-{company_key}@jobbridge.local", password_hash=hash_password(SEED_PASSWORD), role=UserRole.recruiter, is_demo=True)
+                    employer_user = User(email=f"seed-employer-{company_key}@jobbridge.example.org", password_hash=hash_password(SEED_PASSWORD), role=UserRole.recruiter, is_demo=True)
                     db.add(employer_user)
                     db.flush()
                 job_employer = Employer(user_id=employer_user.user_id, company_name=company_name, contact_name=kenyan_name(employer_user.user_id), industry="Imported employer", location=str(item.get("location") or "Kenya"))
@@ -117,7 +117,7 @@ def seed(candidates_limit: int, jobs_limit: int, skip_graph: bool, data_dir: Pat
             ))
             db.flush()
         if refresh_demo:
-            for owner in db.scalars(select(User).where(User.email.like("seed-%@jobbridge.local"))):
+            for owner in db.scalars(select(User).where(User.email.like("seed-%@jobbridge.example.org"))):
                 if not re.fullmatch(r"seed-(?:recruiter|candidate-[0-9a-f]{12}|employer-[0-9a-f]{16})@jobbridge\.local", owner.email):
                     continue
                 owner.is_demo = True

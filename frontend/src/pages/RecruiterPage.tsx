@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { ArrowLeft, ArrowRight, Check, FileText, ListChecks, Plus, RotateCcw, Save, Send, ShieldCheck } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, FileText, ListChecks, Plus, RotateCcw, Save, Send, ShieldCheck, Sparkles } from "lucide-react";
 import { api, type JobInput, type JobPosting } from "../lib/api";
 import { RecruiterJobs } from "../components/RecruiterJobs";
 
-const initialJob: JobInput = { title: "Senior DevOps Engineer", description: "Own platform reliability, CI/CD delivery and cloud operations for a Nairobi fintech team.", location: "Nairobi", requiredExperienceYears: 5, salaryRangeMax: 250000, requiredSkills: ["CI/CD", "AWS", "Kubernetes", "Docker"], mandatoryCertifications: ["AWS Certified Cloud Practitioner"] };
+const initialJob: JobInput = { title: "", description: "", location: "", requiredExperienceYears: 0, salaryRangeMax: null, requiredSkills: [], mandatoryCertifications: [] };
+// Sample posting for demonstrations; only applied when the recruiter asks for it.
+const exampleJob: JobInput = { title: "Senior DevOps Engineer", description: "Own platform reliability, CI/CD delivery and cloud operations for a Nairobi fintech team.", location: "Nairobi", requiredExperienceYears: 5, salaryRangeMax: 250000, requiredSkills: ["CI/CD", "AWS", "Kubernetes", "Docker"], mandatoryCertifications: ["AWS Certified Cloud Practitioner"] };
 const toList = (value: string) => [...new Set(value.split(",").map((item) => item.trim()).filter(Boolean))];
 
 export function RecruiterPage() {
@@ -41,7 +43,8 @@ export function RecruiterPage() {
     } catch (error) { setFailed(true); setNotice(error instanceof Error ? error.message : "Could not publish this role."); }
     finally { setBusy(false); }
   };
-  const reset = () => { setJob(initialJob); setCertText(initialJob.mandatoryCertifications.join(", ")); setSkillText(initialJob.requiredSkills.join(", ")); setEditingId(null); setEditingStatus("open"); invalidate(); setFailed(false); };
+  const fill = (values: JobInput) => { setJob(values); setCertText(values.mandatoryCertifications.join(", ")); setSkillText(values.requiredSkills.join(", ")); invalidate(); setFailed(false); };
+  const reset = () => { fill(initialJob); setEditingId(null); setEditingStatus("open"); };
   const [params, setParams] = useSearchParams();
   // "?new=1" (from the command palette) opens a blank posting form.
   useEffect(() => { if (params.get("new") === "1") { reset(); setView("form"); setParams({}, { replace: true }); } }, [params]);
@@ -49,24 +52,24 @@ export function RecruiterPage() {
   if (view === "postings") return <main className="studio-page"><div className="page-heading"><div><p className="eyebrow">Recruiter workspace</p><h1>Your roles. Your applicants.</h1></div><button className="primary-button" onClick={() => { reset(); setView("form"); }}><Plus size={17} />New job</button></div><RecruiterJobs onEdit={edit} /></main>;
 
   return <main className="studio-page">
-    <div className="page-heading"><div><p className="eyebrow">Recruiter workspace</p><h1>{editingId ? "Edit job posting" : "Make room for the right talent."}</h1><p>{editingId ? `Current status: ${editingStatus}` : "Create a role with clear requirements."}</p></div><div className="workflow-actions"><button className="secondary-button" disabled={busy} onClick={() => { if (!published && !window.confirm("Leave this form? Unsaved changes will be discarded.")) return; setView("postings"); }}><ArrowLeft size={17} />My postings</button><button className="primary-button" disabled={!published || busy} onClick={() => navigate("/matches")}>Match analysis<ArrowRight size={17} /></button></div></div>
+    <div className="page-heading"><div><p className="eyebrow">Recruiter workspace</p><h1>{editingId ? "Edit job posting" : "Make room for the right talent."}</h1><p>{editingId ? `Current status: ${editingStatus}` : "Create a role with clear requirements."}</p></div><div className="workflow-actions"><button className="secondary-button" disabled={busy} onClick={() => { if (!published && !window.confirm("Leave this form? Unsaved changes will be discarded.")) return; setView("postings"); }}><ArrowLeft size={17} />My postings</button><button className="primary-button" disabled={!published || busy} onClick={() => navigate(`/matches?job=${published}`)}>Match analysis<ArrowRight size={17} /></button></div></div>
     {notice && <p className={`notice ${failed ? "error" : ""}`} role="status">{!failed && <Check size={18} />}{notice}</p>}
     <div className="form-layout">
       <form onSubmit={submit} className="role-form">
         <fieldset disabled={busy} className="form-section"><legend className="section-heading"><FileText size={18} />01 / Role details</legend><div className="form-grid">
-          <label className="studio-field">Role title<input value={job.title} minLength={2} maxLength={255} onChange={(event) => update("title", event.target.value)} required /></label>
-          <label className="studio-field">Location<input value={job.location} maxLength={120} onChange={(event) => update("location", event.target.value)} /></label>
-          <label className="studio-field full">Role description<textarea rows={6} value={job.description} minLength={20} maxLength={20000} onChange={(event) => update("description", event.target.value)} required /></label>
-          <label className="studio-field full">Required skills<input value={skillText} onChange={(event) => { invalidate(); setSkillText(event.target.value); }} /><small>Separate skills with commas</small></label>
+          <label className="studio-field">Role title<input value={job.title} placeholder="e.g. Senior DevOps Engineer" minLength={2} maxLength={255} onChange={(event) => update("title", event.target.value)} required /></label>
+          <label className="studio-field">Location<input value={job.location} placeholder="e.g. Nairobi" maxLength={120} onChange={(event) => update("location", event.target.value)} /></label>
+          <label className="studio-field full">Role description<textarea rows={6} value={job.description} placeholder="What the role owns, the team and how success is measured (at least 20 characters)" minLength={20} maxLength={20000} onChange={(event) => update("description", event.target.value)} required /></label>
+          <label className="studio-field full">Required skills<input value={skillText} placeholder="e.g. CI/CD, AWS, Kubernetes, Docker" onChange={(event) => { invalidate(); setSkillText(event.target.value); }} /><small>Separate skills with commas</small></label>
         </div></fieldset>
         <fieldset disabled={busy} className="form-section"><legend className="section-heading"><ListChecks size={18} />02 / Eligibility criteria</legend><div className="form-grid">
           <label className="studio-field">Minimum experience (years)<input type="number" min={0} max={60} step={1} value={job.requiredExperienceYears} onChange={(event) => update("requiredExperienceYears", Number(event.target.value))} required /></label>
           <label className="studio-field">Salary ceiling (KES)<input type="number" min={0} max={9999999999} step="0.01" value={job.salaryRangeMax ?? ""} onChange={(event) => update("salaryRangeMax", event.target.value === "" ? null : Number(event.target.value))} /></label>
           <label className="studio-field">Salary minimum (KES)<input type="number" min={0} max={9999999999} step="0.01" value={job.salaryRangeMin ?? ""} onChange={(event) => update("salaryRangeMin", event.target.value === "" ? null : Number(event.target.value))} /></label>
           <label className="sort-control"><input type="checkbox" checked={job.requiresWorkAuthorization ?? false} onChange={(event) => update("requiresWorkAuthorization", event.target.checked)} />Work authorization required</label>
-          <label className="studio-field full">Mandatory certifications<input value={certText} onChange={(event) => { invalidate(); setCertText(event.target.value); }} /><small>Optional / separate certifications with commas</small></label>
+          <label className="studio-field full">Mandatory certifications<input value={certText} placeholder="Leave blank unless a certificate is truly required" onChange={(event) => { invalidate(); setCertText(event.target.value); }} /><small>Optional / separate certifications with commas</small></label>
         </div></fieldset>
-        <div className="form-actions">{!editingId && <button className="secondary-button" type="button" disabled={busy} onClick={reset}><RotateCcw size={15} />Reset</button>}<button className="primary-button" disabled={busy || !!published}>{published ? <Check size={16} /> : editingId ? <Save size={16} /> : <Send size={16} />}{busy ? "Saving..." : published ? "Saved" : editingId ? "Save changes" : "Publish role"}</button></div>
+        <div className="form-actions">{!editingId && <><button className="secondary-button" type="button" disabled={busy} onClick={() => fill(exampleJob)}><Sparkles size={15} />Fill with example</button><button className="secondary-button" type="button" disabled={busy} onClick={reset}><RotateCcw size={15} />Clear</button></>}<button className="primary-button" disabled={busy || !!published}>{published ? <Check size={16} /> : editingId ? <Save size={16} /> : <Send size={16} />}{busy ? "Saving..." : published ? "Saved" : editingId ? "Save changes" : "Publish role"}</button></div>
       </form>
       <aside className="role-summary"><p className="eyebrow">Role at a glance</p><h2>{job.title || "Untitled role"}</h2><p>{job.location || "Location not specified"}</p><div className="skill-tags">{toList(skillText).map((skill) => <span key={skill}>{skill}</span>)}</div><h3 className="section-heading mt-8"><ShieldCheck size={17} />Eligibility</h3><div className="summary-line"><span>Experience</span><strong>{job.requiredExperienceYears}+ years</strong></div><div className="summary-line"><span>Salary ceiling</span><strong>{job.salaryRangeMax == null ? "Not disclosed" : `KES ${job.salaryRangeMax.toLocaleString()}`}</strong></div><div className="summary-line"><span>Certifications</span><strong>{toList(certText).length} required</strong></div><div className="score-legend"><p className="eyebrow">Matching signals</p><span><i />Semantic relevance</span><span><i />Skill alignment</span><span><i />Growth potential</span></div></aside>
     </div>

@@ -39,6 +39,9 @@ class Settings(BaseSettings):
 
     # Load the sentence encoder in the background at startup so the first scoring request is not a cold start.
     preload_matching_model: bool = True
+    # Seconds between in-process drains of the PostgreSQL -> Neo4j graph outbox; 0 turns the worker off
+    # (then run `python -m app.db.graph_sync` by hand).
+    graph_sync_interval_seconds: float = Field(default=5, ge=0)
 
     @field_validator("database_url")
     @classmethod
