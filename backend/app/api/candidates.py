@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from io import BytesIO
 from pathlib import Path
 from decimal import Decimal
@@ -86,6 +87,25 @@ def _skills_from_text(text: str) -> list[str]:
     return [skill for skill in KNOWN_SKILLS if re.search(rf"(?<![a-z0-9]){re.escape(skill)}(?![a-z0-9])", normalised)]
 
 
+EXPERIENCE_STATEMENT = re.compile(r"(?<![\d.])(\d{1,2})\s*\+?\s*(?:years?|yrs?)\b(?:\s+of)?(?:\s+[a-z/-]+){0,3}?\s+experience")
+YEAR_RANGE = re.compile(r"\b((?:19|20)\d{2})\s*(?:-|–|—|to)\s*((?:19|20)\d{2}|present|current|now|date)\b")
+
+
+def _experience_years_from_text(text: str, current_year: int) -> int | None:
+    """Years of experience stated in a resume ("6 years of experience"), else the span covered by
+    its year ranges ("2019 - 2023", "2021 - present") with overlaps counted once."""
+    normalised = text.casefold()
+    stated = [int(value) for value in EXPERIENCE_STATEMENT.findall(normalised) if 0 < int(value) <= 60]
+    if stated:
+        return max(stated)
+    years: set[int] = set()
+    for start, end in YEAR_RANGE.findall(normalised):
+        last = current_year if not end[0].isdigit() else int(end)
+        if int(start) <= last <= current_year:
+            years.update(range(int(start), last))
+    return min(len(years), 60) or None
+
+
 # Upper bound on open roles scored per dashboard load; rules run first, so only eligible roles reach the encoder.
 OPEN_JOB_SCAN_LIMIT = 500
 
@@ -162,7 +182,11 @@ async def upload_resume(
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="The resume contains no readable text")
     candidate.parsed_resume_text = anonymize_resume_text(text, (candidate.full_name,))[:20_000]
     candidate.skills = _skills_from_text(text)
-    db.add(AuditEvent(actor_user_id=user.user_id, action="resume.parsed", resource_type="candidate", resource_id=candidate.candidate_id, details={"skills_detected": len(candidate.skills)}))
+    # Fill experience only when the candidate has not entered it, so a typed value is never overwritten.
+    detected_years = _experience_years_from_text(text, datetime.now(UTC).year)
+    if detected_years and not candidate.years_experience:
+        candidate.years_experience = detected_years
+    db.add(AuditEvent(actor_user_id=user.user_id, action="resume.parsed", resource_type="candidate", resource_id=candidate.candidate_id, details={"skills_detected": len(candidate.skills), "experience_years_detected": detected_years}))
     db.commit()
     db.refresh(candidate)
     return candidate
@@ -194,6 +218,7 @@ def candidate_dashboard(
             history.append(_opportunity(item.job, next((entry.match_score for entry in scored if entry.job_id == item.job_id), 0.0), item.status, employer_names.get(item.job.employer_id, "Workforce employer")))
     return CandidateDashboardResponse(
         available_opportunities=scored[:20],
+        open_role_count=len(jobs),
         # Only roles the candidate is eligible for and the model scores at or above its decision threshold.
         for_you=sorted(recommended, key=lambda value: value.match_score, reverse=True)[:5],
         history=history[:20],

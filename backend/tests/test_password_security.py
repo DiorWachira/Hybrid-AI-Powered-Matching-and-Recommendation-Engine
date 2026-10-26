@@ -86,6 +86,20 @@ def test_valid_pdf_resume_text_and_skills_are_extracted():
     assert {"python", "sql"} <= set(_skills_from_text(text))
 
 
+@pytest.mark.parametrize(("text", "years"), [
+    ("Backend software engineer with 6 years of experience in Python", 6),
+    ("10+ years professional experience; 3 years Docker experience", 10),
+    ("Acme Ltd, 2018 - 2021\nBeta Corp, 2020 – 2023", 5),
+    ("Intern 2024 to present", 2),
+    ("Graduated 2025. Skills: Python, SQL", None),
+    ("Planned work 2030 - 2032", None),
+])
+def test_experience_years_are_extracted_from_resume_text(text, years):
+    from app.api.candidates import _experience_years_from_text
+
+    assert _experience_years_from_text(text, 2026) == years
+
+
 def test_docx_expansion_limit():
     buffer = BytesIO()
     with ZipFile(buffer, "w", compression=ZIP_DEFLATED) as archive:
