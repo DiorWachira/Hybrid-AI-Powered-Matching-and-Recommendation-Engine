@@ -18,6 +18,13 @@ compose() { sudo docker compose -f "$ROOT/deploy/docker-compose.prod.yml" --env-
 env_value() { grep -E "^$1=" "$ENV_FILE" | head -n1 | cut -d= -f2-; }
 random_secret() { openssl rand -base64 48 | tr -d '/+=\n' | cut -c1-"$1"; }
 
+neo4j_admin() {
+  # neo4j-admin runs as the image's neo4j user, so the exchange directory must be accessible to it;
+  # :z relabels it for SELinux hosts (Oracle Linux) and is harmless elsewhere.
+  local exchange=$1; shift
+  sudo docker run --rm --volumes-from jobbridge-neo4j-1 -v "$exchange":/backups:z neo4j:5-community neo4j-admin "$@"
+}
+
 open_port() {
   local proto=$1 port=$2
   # Oracle Linux images run firewalld; Oracle's Ubuntu images ship an iptables INPUT chain that
@@ -116,11 +123,12 @@ cmd_backup() {
   sudo cp "$ENV_FILE" "$BACKUP_DIR/env-$stamp" && sudo chmod 600 "$BACKUP_DIR/env-$stamp"
   if [ "${1:-}" = "--graph" ]; then
     # Community edition dumps need the database offline; this takes about a minute.
+    local exchange; exchange=$(mktemp -d) && chmod 777 "$exchange"
     compose stop neo4j
-    sudo docker run --rm --volumes-from jobbridge-neo4j-1 -v "$BACKUP_DIR":/backups neo4j:5-community \
-      neo4j-admin database dump neo4j --to-path=/backups --overwrite-destination=true
-    sudo mv "$BACKUP_DIR/neo4j.dump" "$BACKUP_DIR/neo4j-$stamp.dump"
+    neo4j_admin "$exchange" database dump neo4j --to-path=/backups --overwrite-destination=true
     compose start neo4j
+    sudo mv "$exchange/neo4j.dump" "$BACKUP_DIR/neo4j-$stamp.dump"
+    sudo rm -rf "$exchange"
   fi
   sudo find "$BACKUP_DIR" -type f -mtime +14 -delete
   echo "Backup written to $BACKUP_DIR ($stamp)"
@@ -136,14 +144,16 @@ cmd_restore() {
   compose exec -T postgres sh -c 'dropdb -U "$POSTGRES_USER" --force "$POSTGRES_DB" && createdb -U "$POSTGRES_USER" "$POSTGRES_DB"'
   compose exec -T postgres sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --no-owner --no-acl --exit-on-error' < "$pg_dump"
   if [ -n "$graph_dump" ]; then
-    local staging; staging=$(mktemp -d)
-    sudo cp "$graph_dump" "$staging/neo4j.dump"
+    local exchange; exchange=$(mktemp -d) && chmod 755 "$exchange"
+    sudo install -m 644 "$graph_dump" "$exchange/neo4j.dump"
     compose stop neo4j
-    sudo docker run --rm --volumes-from jobbridge-neo4j-1 -v "$staging":/backups neo4j:5-community       neo4j-admin database load neo4j --from-path=/backups --overwrite-destination=true
-    sudo rm -rf "$staging"
+    neo4j_admin "$exchange" database load neo4j --from-path=/backups --overwrite-destination=true
+    sudo rm -rf "$exchange"
     compose start neo4j
   fi
   # Secrets from another host were encrypted with its key; re-encrypt them with this host's key.
+  # Build first so the image contains rekey_mfa.py.
+  compose build api
   compose run --rm -w /app/backend --entrypoint python api rekey_mfa.py
   cmd_up
 }
