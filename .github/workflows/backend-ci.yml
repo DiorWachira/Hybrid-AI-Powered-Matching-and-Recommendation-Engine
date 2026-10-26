@@ -87,3 +87,17 @@ jobs:
       - name: Type-check and build frontend
         working-directory: frontend
         run: npm run build
+
+  images:
+    # Builds the production images so deploy/ breakage is caught before it reaches the server.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate production compose file
+        run: |
+          cp deploy/env.production.example deploy/.env.production
+          docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env.production config --quiet
+      - name: Build web image
+        run: docker build -f deploy/web.Dockerfile -t jobbridge-web:ci .
+      - name: Build API image
+        run: docker build -f deploy/backend.Dockerfile -t jobbridge-api:ci .
