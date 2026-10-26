@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# JobBridge server helper for a single Ubuntu VM (tested target: Oracle Cloud Always Free
-# Ampere A1, Ubuntu 22.04/24.04). Run from the repository checkout:
+# JobBridge server helper for a single VM running Ubuntu 22.04/24.04 or Oracle Linux 8/9
+# (target: Oracle Cloud Always Free Ampere A1). Run from the repository checkout:
 #   deploy/jb setup <domain>   install Docker, open 80/443, write secrets, start the stack
 #   deploy/jb up               build and (re)start everything
 #   deploy/jb update           git pull, back up, rebuild and restart
@@ -18,8 +18,13 @@ env_value() { grep -E "^$1=" "$ENV_FILE" | head -n1 | cut -d= -f2-; }
 random_secret() { openssl rand -base64 48 | tr -d '/+=\n' | cut -c1-"$1"; }
 
 open_port() {
-  # Oracle's Ubuntu images ship an iptables INPUT chain that rejects everything except SSH.
   local proto=$1 port=$2
+  # Oracle Linux images run firewalld; Oracle's Ubuntu images ship an iptables INPUT chain that
+  # rejects everything except SSH.
+  if systemctl is-active --quiet firewalld; then
+    sudo firewall-cmd --quiet --permanent --add-port="$port/$proto"
+    return
+  fi
   sudo iptables -C INPUT -p "$proto" --dport "$port" -j ACCEPT 2>/dev/null && return
   local reject
   reject=$(sudo iptables -L INPUT --line-numbers -n | awk '/REJECT/ {print $1; exit}')
@@ -33,13 +38,22 @@ open_port() {
 cmd_setup() {
   local domain=${1:?usage: deploy/jb setup <domain, e.g. 129-151-10-20.sslip.io>}
   if ! command -v docker >/dev/null || ! sudo docker compose version >/dev/null 2>&1; then
-    sudo apt-get update
-    sudo apt-get install -y docker.io git openssl
-    # Compose v2 is packaged as docker-compose-v2 on 24.04 and docker-compose-plugin elsewhere.
-    sudo apt-get install -y docker-compose-v2 || sudo apt-get install -y docker-compose-plugin
+    if command -v apt-get >/dev/null; then
+      sudo apt-get update
+      sudo apt-get install -y docker.io git openssl
+      # Compose v2 is packaged as docker-compose-v2 on 24.04 and docker-compose-plugin elsewhere.
+      sudo apt-get install -y docker-compose-v2 || sudo apt-get install -y docker-compose-plugin
+    else
+      # Oracle Linux: Docker's RHEL repository; --allowerasing replaces the preinstalled podman/runc.
+      sudo dnf install -y dnf-plugins-core git openssl cronie
+      sudo dnf config-manager --add-repo https://download.docker.com/linux/rhel/docker-ce.repo
+      sudo dnf install -y --allowerasing docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+      sudo systemctl enable --now crond
+    fi
     sudo systemctl enable --now docker
   fi
   open_port tcp 80; open_port tcp 443; open_port udp 443
+  if systemctl is-active --quiet firewalld; then sudo firewall-cmd --quiet --reload; fi
   if command -v netfilter-persistent >/dev/null; then sudo netfilter-persistent save; fi
 
   # A small swap file keeps image builds from being OOM-killed on 6 GB shapes.
