@@ -66,6 +66,9 @@ cd jobbridge
 deploy/jb setup <public-ip-with-dashes>.sslip.io     # e.g. 129-151-10-20.sslip.io
 ```
 
+On an **Oracle Linux** image the user is `opc` instead of `ubuntu`; `deploy/jb setup` detects
+it and installs Docker from Docker's RHEL repository and opens the ports in firewalld.
+
 No domain needs to be bought: `sslip.io` resolves `129-151-10-20.sslip.io` to
 `129.151.10.20`, and Let's Encrypt issues a certificate for it. A real domain works the
 same way: point an A record at the VM and pass that name instead.
