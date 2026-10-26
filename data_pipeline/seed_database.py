@@ -9,6 +9,7 @@ import sys
 import uuid
 from pathlib import Path
 
+from dotenv import dotenv_values
 from sqlalchemy import select
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -26,8 +27,13 @@ from app.utils.security import hash_password  # noqa: E402
 from app.core.text_preprocessing import anonymize_resume_text  # noqa: E402
 
 DATASET = ROOT / "data_pipeline" / "dataset"
-# Set SEED_PASSWORD on any shared or public host; the default is published in this repository.
-SEED_PASSWORD = os.environ.get("SEED_PASSWORD") or "SeedDataOnly123!"
+# Demo-account password from the environment or the git-ignored repository .env; never committed.
+SEED_PASSWORD = os.environ.get("SEED_PASSWORD") or dotenv_values(ROOT / ".env").get("SEED_PASSWORD") or ""
+
+
+def require_seed_password() -> None:
+    if not SEED_PASSWORD:
+        raise SystemExit("Set SEED_PASSWORD in the environment or the repository .env before seeding demo accounts")
 
 
 def load_json(path: Path) -> list[dict[str, object]]:
@@ -148,6 +154,7 @@ def main() -> None:
     parser.add_argument("--refresh-demo", action="store_true", help="rename only explicitly seed-owned candidates")
     parser.add_argument("--diversify", action="store_true", help="add deterministic job-aligned demo profiles; does not assign scores")
     args = parser.parse_args()
+    require_seed_password()
     candidates, jobs = seed(args.candidates, args.jobs, args.skip_graph, args.data_dir, args.jobs_file, args.refresh_demo, args.diversify)
     print(f"Seed processed up to {candidates} candidates and {jobs} jobs. Local-only demo accounts use the configured seed password.")
 

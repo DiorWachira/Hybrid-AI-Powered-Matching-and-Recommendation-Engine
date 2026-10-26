@@ -87,7 +87,7 @@ deploy/jb seed                    # optional: synthetic IT demo data (150 candid
 ```
 
 Administrators must enrol an authenticator app on first sign-in. Demo accounts sign in
-with the `SEED_PASSWORD` stored in `deploy/.env.production`, not the repository default.
+with the `SEED_PASSWORD` stored in `deploy/.env.production`; no demo password is kept in the repository.
 
 ## 3. Operate
 

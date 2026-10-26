@@ -22,7 +22,7 @@ sys.path.insert(0, str(ROOT / "backend"))
 sys.path.insert(0, str(ROOT))
 
 from data_pipeline.demo_profiles import kenyan_name  # noqa: E402
-from data_pipeline.seed_database import SEED_PASSWORD  # noqa: E402
+from data_pipeline.seed_database import SEED_PASSWORD, require_seed_password  # noqa: E402
 
 from app.api.matches import _candidate_rule_result  # noqa: E402
 from app.core.text_preprocessing import anonymize_resume_text  # noqa: E402
@@ -235,6 +235,7 @@ def main() -> None:
     if args.remove:
         print(f"Removed {remove()} oversight demo accounts and their dependent records.")
         return
+    require_seed_password()
     counts = seed(args.skip_graph)
     print("Oversight demo seed: " + ", ".join(f"{name}={value}" for name, value in counts.items()))
     print("Demo accounts use the configured local seed password.")
