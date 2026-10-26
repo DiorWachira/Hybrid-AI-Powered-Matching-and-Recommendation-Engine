@@ -1,9 +1,14 @@
 """Rebuildable Neo4j projections driven by committed PostgreSQL outbox events."""
+import logging
+import threading
+
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from app.db.models import Candidate, Employer, GraphSyncEvent, JobApplication, JobPosting
 from app.db.neo4j_db import get_neo4j_driver
+
+logger = logging.getLogger(__name__)
 
 CONSTRAINTS = (
     "CREATE CONSTRAINT candidate_id_unique IF NOT EXISTS FOR (node:Candidate) REQUIRE node.id IS UNIQUE",
@@ -91,6 +96,33 @@ def sync_graph_events(database: Session, driver, limit: int = 100) -> int:
             database.delete(event)
         processed += 1
     return processed
+
+
+def run_sync_loop(stop: threading.Event, interval_seconds: float, limit: int = 500) -> None:
+    """Drain the outbox every interval inside the API process until ``stop`` is set.
+
+    Failures are logged and retried on the next tick; events stay queued until they project.
+    """
+    from app.db.postgres import SessionLocal
+
+    driver = None
+    while not stop.is_set():
+        try:
+            if driver is None:
+                driver = get_neo4j_driver()
+                ensure_graph_schema(driver)
+            with SessionLocal() as database:
+                processed = sync_graph_events(database, driver, limit)
+            if processed:
+                logger.info("Graph events processed: %s", processed)
+        except Exception:
+            logger.warning("Graph sync failed; retrying in %ss", interval_seconds, exc_info=True)
+            if driver is not None:
+                driver.close()
+                driver = None
+        stop.wait(interval_seconds)
+    if driver is not None:
+        driver.close()
 
 
 def main() -> None:

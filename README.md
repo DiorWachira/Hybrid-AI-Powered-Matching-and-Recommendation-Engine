@@ -50,8 +50,10 @@ Implemented on the feature branch, with verification gaps documented in
 - Synthetic data preparation and historical model artifacts
 - Rule, data-tool and API-boundary tests plus backend CI configuration
 
-Automatic graph sync is disabled at the user's request to stop repeated terminals.
-Run the one-shot worker manually. See [docs/WORKFLOW.md](docs/WORKFLOW.md) for
+Graph sync (2026-10-26) runs inside the API process: a background thread drains the
+PostgreSQL outbox into Neo4j every `GRAPH_SYNC_INTERVAL_SECONDS` (default 5; `0` turns it
+off). No scheduled task or extra terminal is involved. The one-shot worker
+(`python -m app.db.graph_sync`) still works for backfills. See [docs/WORKFLOW.md](docs/WORKFLOW.md) for
 status checks and operational limits. The live model is the 2026-10-19 feature
 contract v2 run (related-skill readiness), epoch 4, promoted for prototype testing
 (`PROTOTYPE_TESTING_APPROVED`); it replaced the 2026-10-09 v1 epoch-19 model. `data_pipeline/validate_model_contract.py` now

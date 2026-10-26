@@ -100,16 +100,17 @@ acknowledgement and leave events queued. Replays are idempotent; crashes after a
 commit can cause a harmless replay. A PostgreSQL advisory lock serializes workers.
 Only graph entities referenced by events are removed, not the whole ontology.
 
-Run manually from `backend/` after migrations or writes:
+The API drains the queue itself: a background thread started at application startup
+runs a batch every `GRAPH_SYNC_INTERVAL_SECONDS` (default 5 s; `0` disables it). It opens
+no terminal window, so the old JobBridge-GraphSync scheduled task is no longer needed.
+A failed batch is logged and retried on the next tick. For backfills, the one-shot
+worker still runs from `backend/`:
 
 ```powershell
 ..\venv\Scripts\python.exe -m app.db.graph_sync --limit 1000
 ```
 
-This command exits after one batch. **JobBridge-GraphSync is disabled at the user's
-request to stop recurring terminal windows.** Do not re-enable automatically.
-A deployed host needs an independently approved worker. API writes succeed while
-graph work is queued.
+API writes succeed while graph work is queued.
 The seed loader drains up to 10,000 queued events after committing
 unless `--skip-graph` is used; that flag delays projection, not trigger enqueueing.
 Monitor `SELECT count(*) FROM graph_sync_events;`. Failures retain events, so repair
