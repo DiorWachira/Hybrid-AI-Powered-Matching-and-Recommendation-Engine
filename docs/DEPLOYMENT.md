@@ -96,12 +96,30 @@ with the `SEED_PASSWORD` stored in `deploy/.env.production`, not the repository 
 | Status / logs | `deploy/jb status`, `deploy/jb logs api` |
 | Deploy a new commit of `main` | `deploy/jb update` (pull, back up, rebuild, restart) |
 | Manual backup | `deploy/jb backup` (PostgreSQL + env file), `deploy/jb backup --graph` (adds Neo4j, ~1 min offline) |
-| Restore PostgreSQL | `sudo docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env.production exec -T postgres pg_restore -U jobbridge -d jobbridge --clean < /var/backups/jobbridge/postgres-<stamp>.dump` |
+| Restore from dumps | `deploy/jb restore <postgres.dump> [neo4j.dump]` (backs up first, replaces all data, re-encrypts two-step secrets) |
 
 Backups run daily at 03:15 (Neo4j included on Sundays) into `/var/backups/jobbridge`,
 keeping 14 days. They live on the same VM; copy them off occasionally
 (`scp ubuntu@<ip>:/var/backups/jobbridge/* .`). The env file is backed up with them:
 losing `MFA_ENCRYPTION_KEY` voids every two-step enrolment.
+
+### Move data from another machine (e.g. the development laptop)
+
+The server starts with empty databases. To bring over existing accounts, jobs, applications and
+the skill graph, dump both databases on the source machine and restore them on the server:
+
+```bash
+# source machine, with its Compose databases running
+docker exec workforce-postgres pg_dump -U workforce -d workforce --format=custom > postgres-laptop.dump
+docker compose stop neo4j
+docker run --rm --volumes-from workforce-neo4j -v "$PWD":/backups neo4j:5-community   neo4j-admin database dump neo4j --to-path=/backups && mv neo4j.dump neo4j-laptop.dump
+# copy both files to the server (scp), then on the server:
+deploy/jb restore ~/postgres-laptop.dump ~/neo4j-laptop.dump
+```
+
+`restore` replaces everything on the server (after taking a backup) and re-encrypts stored
+authenticator secrets with the server's `MFA_ENCRYPTION_KEY` (`backend/rekey_mfa.py`), so two-step
+sign-in keeps working. Restored demo accounts keep the source machine's seed password.
 
 Containers restart automatically after a crash or VM reboot (`restart: unless-stopped`).
 
