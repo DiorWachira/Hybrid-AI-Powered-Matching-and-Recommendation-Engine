@@ -292,7 +292,11 @@ button, a { transition: background-color .18s, color .18s, border-color .18s; }
 @media (prefers-reduced-motion: no-preference) { .simulation-spinner { animation: simulation-spin 1s linear infinite; } }
 @media (max-width: 1100px) { .simulation-stage { grid-template-columns: minmax(0, 1fr); } .simulation-roster { border-right: 0; } .simulation-feed ol { height: 280px; } }
 @media (max-width: 600px) { .simulation-jobs { grid-template-columns: minmax(0, 1fr); } .simulation-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } .simulation-banner { gap: 12px; } .simulation-toolbar { gap: 10px; } .simulation-controls { flex-basis: 100%; } }
-.match-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+/* One toolbar row: every control is 42px tall and bottom-aligned, so the labelled Role select lines up with the buttons. */
+.match-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
+.match-actions .job-switcher { gap: 6px; width: 260px; }
+.match-actions .job-switcher select { height: 42px; padding-block: 0; text-overflow: ellipsis; }
+.match-actions .icon-button { width: 42px; height: 42px; }
 .match-graph-section { min-width: 0; margin-top: 32px; padding-top: 24px; border-top: 1px solid var(--line); }
 .match-graph { width: 100%; height: 380px; max-width: 100%; overflow: hidden; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; }
 .graph-relationships { display: grid; gap: 8px; padding: 16px 0; font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
@@ -548,6 +552,9 @@ kbd { padding: 2px 6px; border: 1px solid var(--line); border-radius: 4px; font:
   .tab-bar { gap: 18px; }
   .tab-bar button { font-size: 12px; }
   .results-toolbar { align-items: stretch; }
+  .page-heading > .match-actions { width: 100%; }
+  .match-actions .job-switcher { width: 100%; }
+  .match-actions > a, .match-actions > .primary-button { flex: 1 1 0; }
   .search-field { max-width: none; flex-basis: 100%; }
   .job-card { padding: 20px; }
   .auth-scene { padding: 105px 24px 60px; }
