@@ -97,6 +97,10 @@ with the `SEED_PASSWORD` stored in `deploy/.env.production`; no demo password is
 | Deploy a new commit of `main` | `deploy/jb update` (pull, back up, rebuild, restart) |
 | Manual backup | `deploy/jb backup` (PostgreSQL + env file), `deploy/jb backup --graph` (adds Neo4j, ~1 min offline) |
 | Restore from dumps | `deploy/jb restore <postgres.dump> [neo4j.dump]` (backs up first, replaces all data, re-encrypts two-step secrets) |
+| Rotate the demo password | `deploy/jb demo-password` (prompts without echo; updates every demo account, signs them out, saves `SEED_PASSWORD`) |
+
+Run `deploy/jb update` before `deploy/jb demo-password` the first time, so the image contains the
+rotation script. Type the new password on the server and in your local `.env` only; never commit it.
 
 Backups run daily at 03:15 (Neo4j included on Sundays) into `/var/backups/jobbridge`,
 keeping 14 days. They live on the same VM; copy them off occasionally

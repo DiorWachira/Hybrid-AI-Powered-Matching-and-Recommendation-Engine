@@ -6,6 +6,7 @@
 #   deploy/jb update           git pull, back up, rebuild and restart
 #   deploy/jb seed             load the synthetic demo data (IT roles only)
 #   deploy/jb admin <email>    create an administrator (prompts for a password)
+#   deploy/jb demo-password    set a new password on every demo account (prompts; signs them out)
 #   deploy/jb backup [--graph] dump PostgreSQL (and Neo4j with --graph) to /var/backups/jobbridge
 #   deploy/jb restore <postgres.dump> [neo4j.dump]   replace the data with dumps (backs up first)
 #   deploy/jb status | logs [service]
@@ -116,6 +117,23 @@ cmd_admin() {
   compose run --rm -it -w /app/backend --entrypoint python api create_admin.py "$email"
 }
 
+cmd_demo_password() {
+  local password repeat
+  read -rsp "New demo-account password (minimum 12 characters): " password; echo
+  read -rsp "Repeat it: " repeat; echo
+  [ "$password" = "$repeat" ] || { echo "Passwords did not match; nothing changed" >&2; exit 1; }
+  [ "${#password}" -ge 12 ] || { echo "Use at least 12 characters; nothing changed" >&2; exit 1; }
+  # Written single-quoted so Compose reads it literally; a quote inside would end the value.
+  case $password in *"'"*) echo "The password cannot contain a single quote; nothing changed" >&2; exit 1 ;; esac
+  # Piped on stdin so the password never appears in the process list or the shell history.
+  printf '%s\n' "$password" | compose run --rm -T -w /app/backend --entrypoint python api rotate_demo_password.py
+  local updated; updated=$(mktemp "$ENV_FILE.XXXXXX")
+  grep -v '^SEED_PASSWORD=' "$ENV_FILE" > "$updated" || true
+  printf "SEED_PASSWORD='%s'\n" "$password" >> "$updated"
+  chmod 600 "$updated" && mv "$updated" "$ENV_FILE"
+  echo "Saved as SEED_PASSWORD in $ENV_FILE. Put the same value in your local .env if you seed there."
+}
+
 cmd_backup() {
   local stamp; stamp=$(date +%Y%m%d-%H%M%S)
   sudo mkdir -p "$BACKUP_DIR" && sudo chmod 700 "$BACKUP_DIR"
@@ -173,9 +191,10 @@ case "${1:-}" in
   update) cmd_update ;;
   seed) cmd_seed ;;
   admin) shift; cmd_admin "$@" ;;
+  demo-password) cmd_demo_password ;;
   backup) shift; cmd_backup "$@" ;;
   restore) shift; cmd_restore "$@" ;;
   status) compose ps ;;
   logs) shift; compose logs --tail=200 -f "$@" ;;
-  *) sed -n '2,13p' "$0"; exit 1 ;;
+  *) sed -n '2,14p' "$0"; exit 1 ;;
 esac
