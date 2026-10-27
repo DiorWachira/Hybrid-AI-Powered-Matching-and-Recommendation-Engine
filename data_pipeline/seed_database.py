@@ -124,7 +124,7 @@ def seed(candidates_limit: int, jobs_limit: int, skip_graph: bool, data_dir: Pat
             db.flush()
         if refresh_demo:
             for owner in db.scalars(select(User).where(User.email.like("seed-%@jobbridge.example.org"))):
-                if not re.fullmatch(r"seed-(?:recruiter|candidate-[0-9a-f]{12}|employer-[0-9a-f]{16})@jobbridge\.local", owner.email):
+                if not re.fullmatch(r"seed-(?:recruiter|candidate-[0-9a-f]{12}|employer-[0-9a-f]{16})@jobbridge\.example\.org", owner.email):
                     continue
                 owner.is_demo = True
                 profile = db.scalar(select(Candidate).where(Candidate.user_id == owner.user_id))
