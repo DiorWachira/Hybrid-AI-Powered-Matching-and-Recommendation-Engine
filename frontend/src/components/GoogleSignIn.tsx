@@ -10,6 +10,8 @@ type GoogleIdentity = {
 declare global { interface Window { google?: GoogleIdentity } }
 
 const SCRIPT_URL = "https://accounts.google.com/gsi/client";
+// Google renders its button between 200 and 400 px wide; match the form column inside that range.
+const clampWidth = (width: number) => Math.round(Math.min(400, Math.max(200, width)));
 let scriptLoad: Promise<void> | null = null;
 
 function loadGoogleScript(): Promise<void> {
@@ -37,14 +39,29 @@ export function GoogleSignIn({ disabled, onCredential }: { disabled: boolean; on
         await loadGoogleScript();
         if (!active || !container.current || !window.google) return;
         window.google.accounts.id.initialize({ client_id, callback: (response) => callback.current(response.credential), ux_mode: "popup", auto_select: false });
-        window.google.accounts.id.renderButton(container.current, { type: "standard", theme: "filled_black", size: "large", text: "signin_with", shape: "rectangular", width: 320 });
         setReady(true);
       })
       .catch(() => undefined);
     return () => { active = false; };
   }, []);
+  // Render once the wrapper is visible, and again whenever the form column changes width.
+  useEffect(() => {
+    const target = container.current;
+    if (!ready || !target || !window.google) return;
+    let renderedWidth = 0;
+    const render = () => {
+      const width = clampWidth(target.clientWidth);
+      if (!window.google || width === renderedWidth) return;
+      renderedWidth = width;
+      window.google.accounts.id.renderButton(target, { type: "standard", theme: "filled_black", size: "large", text: "signin_with", shape: "rectangular", logo_alignment: "center", width });
+    };
+    render();
+    const observer = new ResizeObserver(render);
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [ready]);
   return <div className="google-signin" hidden={!ready} aria-disabled={disabled}>
     <span className="google-signin-divider">or</span>
-    <div ref={container} style={disabled ? { pointerEvents: "none", opacity: 0.6 } : undefined} />
+    <div ref={container} className="google-signin-button" style={disabled ? { pointerEvents: "none", opacity: 0.6 } : undefined} />
   </div>;
 }
