@@ -5,6 +5,7 @@ import { getSessionRole } from "../lib/session";
 
 const links = [
   { label: "The approach", href: "/#approach" },
+  { label: "In numbers", href: "/#kenya" },
   { label: "About us", href: "/#about" },
   { label: "Questions", href: "/#questions" },
   { label: "Contact", href: "/#contact" },

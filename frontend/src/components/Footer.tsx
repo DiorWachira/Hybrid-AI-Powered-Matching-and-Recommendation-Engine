@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 
 const columns = [
   { title: "Make a connection", links: [["For candidates", "/auth?mode=register&role=candidate"], ["For recruiters", "/auth?mode=register&role=recruiter"], ["Sign in", "/auth"]] },
-  { title: "Get to know us", links: [["About JobBridge", "/#about"], ["Our approach", "/#approach"], ["Common questions", "/#questions"]] },
+  { title: "Get to know us", links: [["About JobBridge", "/#about"], ["Our approach", "/#approach"], ["Kenya in numbers", "/#kenya"], ["Common questions", "/#questions"]] },
   { title: "The details", links: [["Data & privacy", "/privacy"], ["Prototype use", "/terms"], ["Project & feedback", "/#contact"]] },
 ];
 

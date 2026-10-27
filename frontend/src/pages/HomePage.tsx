@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { Header } from "../components/Header";
 import { Hero } from "../components/Hero";
 import { Footer } from "../components/Footer";
+import { LabourGap } from "../components/LabourGap";
 
 const questions = [
   ["Who is JobBridge for?", "Candidates exploring their next role and recruiters looking for relevant skills. Each has a separate workspace and account type."],
@@ -37,6 +38,8 @@ export function HomePage() {
           <article><div><span>03</span><GitBranch size={24} /></div><h3>Relationships, visible</h3><p>Skill connections and saved explanations make the result easier to inspect. The graph is context, not a substitute for a decision.</p></article>
         </div>
       </div></section>
+
+      <LabourGap />
 
       <section className="public-section public-container public-about" id="about" aria-labelledby="about-title">
         <div><p className="public-kicker">About JobBridge</p><h2 id="about-title">Built for a more<br />considered connection.</h2><div className="public-project-label"><span />Academic research prototype</div></div>
