@@ -3,10 +3,9 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowLeft, ArrowRight, Check, FileText, ListChecks, Plus, RotateCcw, Save, Send, ShieldCheck, Sparkles } from "lucide-react";
 import { api, type JobInput, type JobPosting } from "../lib/api";
 import { RecruiterJobs } from "../components/RecruiterJobs";
+import { nextExampleJob } from "../lib/exampleJobs";
 
 const initialJob: JobInput = { title: "", description: "", location: "", requiredExperienceYears: 0, salaryRangeMax: null, requiredSkills: [], mandatoryCertifications: [] };
-// Sample posting for demonstrations; only applied when the recruiter asks for it.
-const exampleJob: JobInput = { title: "Senior DevOps Engineer", description: "Own platform reliability, CI/CD delivery and cloud operations for a Nairobi fintech team.", location: "Nairobi", requiredExperienceYears: 5, salaryRangeMax: 250000, requiredSkills: ["CI/CD", "AWS", "Kubernetes", "Docker"], mandatoryCertifications: ["AWS Certified Cloud Practitioner"] };
 const toList = (value: string) => [...new Set(value.split(",").map((item) => item.trim()).filter(Boolean))];
 
 export function RecruiterPage() {
@@ -69,7 +68,7 @@ export function RecruiterPage() {
           <label className="sort-control"><input type="checkbox" checked={job.requiresWorkAuthorization ?? false} onChange={(event) => update("requiresWorkAuthorization", event.target.checked)} />Work authorization required</label>
           <label className="studio-field full">Mandatory certifications<input value={certText} placeholder="Leave blank unless a certificate is truly required" onChange={(event) => { invalidate(); setCertText(event.target.value); }} /><small>Optional / separate certifications with commas</small></label>
         </div></fieldset>
-        <div className="form-actions">{!editingId && <><button className="secondary-button" type="button" disabled={busy} onClick={() => fill(exampleJob)}><Sparkles size={15} />Fill with example</button><button className="secondary-button" type="button" disabled={busy} onClick={reset}><RotateCcw size={15} />Clear</button></>}<button className="primary-button" disabled={busy || !!published}>{published ? <Check size={16} /> : editingId ? <Save size={16} /> : <Send size={16} />}{busy ? "Saving..." : published ? "Saved" : editingId ? "Save changes" : "Publish role"}</button></div>
+        <div className="form-actions">{!editingId && <><button className="secondary-button" type="button" disabled={busy} onClick={() => fill(nextExampleJob())}><Sparkles size={15} />Fill with example</button><button className="secondary-button" type="button" disabled={busy} onClick={reset}><RotateCcw size={15} />Clear</button></>}<button className="primary-button" disabled={busy || !!published}>{published ? <Check size={16} /> : editingId ? <Save size={16} /> : <Send size={16} />}{busy ? "Saving..." : published ? "Saved" : editingId ? "Save changes" : "Publish role"}</button></div>
       </form>
       <aside className="role-summary"><p className="eyebrow">Role at a glance</p><h2>{job.title || "Untitled role"}</h2><p>{job.location || "Location not specified"}</p><div className="skill-tags">{toList(skillText).map((skill) => <span key={skill}>{skill}</span>)}</div><h3 className="section-heading mt-8"><ShieldCheck size={17} />Eligibility</h3><div className="summary-line"><span>Experience</span><strong>{job.requiredExperienceYears}+ years</strong></div><div className="summary-line"><span>Salary ceiling</span><strong>{job.salaryRangeMax == null ? "Not disclosed" : `KES ${job.salaryRangeMax.toLocaleString()}`}</strong></div><div className="summary-line"><span>Certifications</span><strong>{toList(certText).length} required</strong></div><div className="score-legend"><p className="eyebrow">Matching signals</p><span><i />Semantic relevance</span><span><i />Skill alignment</span><span><i />Growth potential</span></div></aside>
     </div>
