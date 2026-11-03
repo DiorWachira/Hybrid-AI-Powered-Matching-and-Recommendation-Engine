@@ -62,8 +62,8 @@ def create_job(
 
 
 @router.get("/", response_model=list[JobResponse])
-def list_open_jobs(db: Session = Depends(get_db)) -> list[JobPosting]:
-    return list(db.scalars(select(JobPosting).where(JobPosting.status == JobStatus.open).order_by(JobPosting.posted_at.desc())))
+def list_open_jobs(offset: int = Query(default=0, ge=0), limit: int = Query(default=100, ge=1, le=100), db: Session = Depends(get_db)) -> list[JobPosting]:
+    return list(db.scalars(select(JobPosting).where(JobPosting.status == JobStatus.open).order_by(JobPosting.posted_at.desc(), JobPosting.job_id).offset(offset).limit(limit)))
 
 
 def _owned_job(db: Session, user: User, job_id: UUID) -> JobPosting:
