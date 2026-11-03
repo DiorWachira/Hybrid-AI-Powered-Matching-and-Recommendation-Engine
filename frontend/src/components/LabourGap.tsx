@@ -4,8 +4,9 @@ import { useEffect, useRef, useState } from "react";
 const SOURCES = {
   es2025: { label: "KNBS, Economic Survey 2025", url: "https://www.knbs.or.ke/economic-surveys/" },
   es2026: { label: "KNBS, Economic Survey 2026", url: "https://www.knbs.or.ke/economic-surveys/" },
-  afidep: { label: "AFIDEP youth employment brief, 2026", url: "https://citizen.digital/article/about-1-million-youth-enter-labour-market-yearly-over-80-find-informal-jobs-report-n384935" },
-  cue: { label: "Commission for University Education, 2024 graduates", url: "https://thekenyatimes.com/education/kenya-records-more-graduates-as-women-close-gap-in-private-universities/" },
+  afidep: { label: "AFIDEP & CAP-YEI, Political Economy Analysis of Youth Employment in Kenya, 2026", url: "https://afidep.org/strengthen-skills-enterprise-and-investment-to-unlock-dignified-employment-opportunities-for-kenyas-youth-new-study-reveals/" },
+  launch: { label: "Citizen Digital, coverage of the AFIDEP report launch, 2026", url: "https://citizen.digital/article/about-1-million-youth-enter-labour-market-yearly-over-80-find-informal-jobs-report-n384935" },
+  cue: { label: "Commission for University Education, University Statistics 2024/2025", url: "https://www.cue.or.ke/images/2025/Planning/University_Statistics_2024-2025_Report.pdf" },
   ifc: { label: "World Bank & IFC, Demand for Digital Skills in Sub-Saharan Africa, 2021", url: "https://documents1.worldbank.org/curated/en/099614312152318607/pdf/IDU0b36e9e030767f0417e0afb806e2ffdf1e8bf.pdf" },
   ladders: { label: "Ladders eye-tracking study, 2018 (US recruiters)", url: "https://www.hrdive.com/news/eye-tracking-study-shows-recruiters-look-at-resumes-for-7-seconds/541582/" },
 } as const;
@@ -15,7 +16,7 @@ const format = (value: number) => value.toLocaleString("en-KE");
 
 // Fig. 1: one year of supply against formal demand (2024).
 const supply = [
-  { label: "Young people entering the labour market", value: 800_000, note: "estimate, 800,000 to 1 million a year", source: "afidep" },
+  { label: "Young people entering the labour market", value: 800_000, note: "estimate, 800,000 to 1 million a year", source: "launch" },
   { label: "University graduates", value: 123_928, note: "degrees awarded in 2024", source: "cue" },
   { label: "New modern-sector jobs", value: 78_600, note: "wage and self-employment outside the informal sector", source: "es2025", signal: true },
 ] satisfies { label: string; value: number; note: string; source: SourceKey; signal?: boolean }[];
@@ -50,7 +51,7 @@ function SupplyFigure() {
         <small>{item.note} · {SOURCES[item.source].label}</small>
       </li>)}
     </ul>
-    <Source keys={["afidep", "cue", "es2025"]} />
+    <Source keys={["afidep", "launch", "cue", "es2025"]} />
   </figure>;
 }
 
@@ -79,6 +80,7 @@ function ProjectionFigure() {
   const [applications, setApplications] = useState(200);
   const frame = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(560);
+  const dragging = useRef(false);
   useEffect(() => {
     const target = frame.current;
     if (!target) return;
@@ -104,7 +106,11 @@ function ProjectionFigure() {
     <label className="gap-slider">Applications received for one role<strong>{applications}</strong><input type="range" min={10} max={maxApplications} step={10} value={applications} onChange={(event) => setApplications(Number(event.target.value))} /></label>
     <ul className="gap-legend" aria-label="Legend"><li className="is-informal">Reading every application</li><li className="is-modern">Reading a JobBridge shortlist</li></ul>
     <div ref={frame} className="gap-chart">
-      <svg width={width} height={height} role="img" aria-label={`At ${applications} applications: ${manual.toFixed(1)} hours reading every application, ${assisted.toFixed(1)} hours with a shortlist`} onPointerMove={(event) => pick(event.clientX, event.currentTarget)} onPointerDown={(event) => pick(event.clientX, event.currentTarget)}>
+      <svg width={width} height={height} role="img" aria-label={`At ${applications} applications: ${manual.toFixed(1)} hours reading every application, ${assisted.toFixed(1)} hours with a shortlist`} style={{ touchAction: "pan-y" }}
+        onPointerDown={(event) => { dragging.current = true; event.currentTarget.setPointerCapture(event.pointerId); pick(event.clientX, event.currentTarget); }}
+        onPointerMove={(event) => { if (dragging.current) pick(event.clientX, event.currentTarget); }}
+        onPointerUp={() => { dragging.current = false; }}
+        onPointerCancel={() => { dragging.current = false; }}>
         {[0, 5, 10, 15, 20, 25].map((tick) => <g key={tick}><line className="gap-grid" x1={left} x2={width - right} y1={y(tick)} y2={y(tick)} /><text className="gap-axis" x={left - 8} y={y(tick) + 4} textAnchor="end">{tick}</text></g>)}
         {[0, 100, 200, 300, 400, 500].map((tick) => <text key={tick} className="gap-axis" x={x(tick)} y={height - 8} textAnchor={tick === 0 ? "start" : tick === maxApplications ? "end" : "middle"}>{tick}</text>)}
         <text className="gap-axis" x={left} y={top - 2}>hours</text>
@@ -119,7 +125,7 @@ function ProjectionFigure() {
     <ul className="gap-assumptions">
       <li>Assumes {READ_MINUTES} minutes for a considered first read of one application. The often-quoted 7.4-second glance (Ladders, 2018) only decides whether to keep reading.</li>
       <li>With JobBridge, eligibility rules run automatically and the recruiter reads the top {SHORTLIST} ranked candidates, plus {RANKING_MINUTES} minutes to scan the ranking and its reasons.</li>
-      <li>Measured on this deployment: ranking 228 candidates took a median of 1.15 seconds.</li>
+      <li>Measured on a 7.4 GB test laptop, not this server: ranking 170 candidates took a median of 1.15 seconds once the model was loaded.</li>
       <li>This is an estimate, not a measured outcome. The matching model is trained on synthetic labels and its rankings have not yet been validated against real hiring decisions.</li>
     </ul>
     <Source keys={["ladders"]}>. Projection by JobBridge.</Source>
@@ -131,9 +137,9 @@ export function LabourGap() {
   return <section className="public-gap" id="kenya" aria-labelledby="kenya-title"><div className="public-container public-section">
     <div className="public-section-heading"><p className="public-kicker">Kenya's labour market / In numbers</p><h2 id="kenya-title">Many people looking.<br />Few formal openings.</h2><p>Every year far more young Kenyans start looking for work than the formal economy can absorb, and recruiters still read applications one by one. Figures below are sourced; the projection is marked as an estimate.</p></div>
     <dl className="gap-stats">
-      <div><dt>Young people joining the labour market each year</dt><dd>800k–1M</dd><Source keys={["afidep"]} /></div>
-      <div><dt>New jobs in 2025 that were informal</dt><dd>86.9%</dd><Source keys={["es2026"]} /></div>
-      <div><dt>Kenyan jobs needing digital skills by 2030</dt><dd>50–55%</dd><Source keys={["ifc"]} /></div>
+      <div><dt>Young people joining the labour market each year</dt><dd>800k–1M</dd><dd><Source keys={["afidep", "launch"]} /></dd></div>
+      <div><dt>New jobs in 2025 that were informal</dt><dd>86.9%</dd><dd><Source keys={["es2026"]} /></dd></div>
+      <div><dt>Kenyan jobs needing digital skills by 2030</dt><dd>50–55%</dd><dd><Source keys={["ifc"]} /></dd></div>
     </dl>
     <div className="gap-grid-layout"><SupplyFigure /><JobsFigure /></div>
     <ProjectionFigure />

@@ -305,7 +305,8 @@ button, a { transition: background-color .18s, color .18s, border-color .18s; }
 .skill-breakdown { margin-top: 24px; overflow-wrap: anywhere; }
 .skill-breakdown h3 { font-size: 14px; margin-bottom: 8px; }
 .skill-breakdown p, .match-provenance { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
-.data-table-wrap { overflow-x: auto; }
+/* position: relative keeps absolutely positioned screen-reader labels inside the scroll area. */
+.data-table-wrap { position: relative; overflow-x: auto; }
 .admin-dialog { width: min(480px, calc(100vw - 32px)); max-height: calc(100dvh - 40px); overflow: auto; margin: auto; padding: 24px; background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; }
 .admin-dialog::backdrop { background: #000a; }
 .admin-dialog .studio-field { margin-block: 18px; }
@@ -642,7 +643,7 @@ kbd { padding: 2px 6px; border: 1px solid var(--line); border-radius: 4px; font:
 .public-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 36px; }
 .public-steps article { border-top: 1px solid #adbfca; padding-top: 24px; }
 .public-steps article > div { display: flex; align-items: center; justify-content: space-between; margin-bottom: 40px; }
-.public-steps article > div span { font: 12px var(--font-mono); color: #527385; }
+.public-steps article > div span { font: 12px var(--font-mono); color: #466577; }
 .public-steps svg { color: #35596b; }
 .public-steps h3 { font-size: 21px; font-weight: 500; margin-bottom: 14px; }
 .public-steps p { font-size: 14px; line-height: 1.8; color: #50656e; }
@@ -922,3 +923,20 @@ kbd { padding: 2px 6px; border: 1px solid var(--line); border-radius: 4px; font:
   .gap-readout { grid-template-columns: minmax(0, 1fr); gap: 10px; }
   .gap-readout b { display: inline; font-size: 18px; margin-right: 6px; }
 }
+
+/* Route loading and page-failure states */
+.route-status { display: grid; place-items: center; min-height: 40vh; padding: 32px 16px; }
+main.route-status { min-height: 100dvh; }
+.route-status-spinner { width: 28px; height: 28px; border: 2px solid var(--line, #3b4a40); border-top-color: var(--accent, #d0ef91); border-radius: 50%; animation: route-spin .8s linear infinite; }
+@keyframes route-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .route-status-spinner { animation-duration: 2.4s; } }
+.route-status-card { position: relative; z-index: 1; max-width: 460px; }
+.route-status-card h1 { font-size: 28px; margin-bottom: 12px; }
+.route-status-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 20px; }
+
+/* Keep the Fig. 2 hover tooltips of the outer columns inside the page on narrow screens. */
+.gap-column:first-child .gap-tip { left: 0; transform: translate(0, -100%); }
+.gap-column:last-child .gap-tip { left: auto; right: 0; transform: translate(0, -100%); }
+.gap-chart svg { cursor: ew-resize; }
+.gap-stack span.is-modern i { color: #10180c; }
+.gap-stats dd:has(.gap-source) { margin: 0; }

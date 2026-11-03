@@ -28,7 +28,7 @@ export function AuthPage() {
   const [fullName, setFullName] = useState("");
   const [companyName, setCompanyName] = useState("");
   const [location, setLocation] = useState("Nairobi");
-  const [notice, setNotice] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(() => new URLSearchParams(window.location.search).get("session") === "expired" ? "Your session ended. Sign in again to continue." : null);
   const [busy, setBusy] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   // After a correct password: "mfa" asks for a code, "enroll" makes a required-MFA account set one up first.
@@ -103,7 +103,7 @@ export function AuthPage() {
   };
 
   return <main className="auth-scene">
-    <img className="auth-image" src="/media/workspace.jpg" alt="Sunlight falling across an open workspace with plants and shared desks" />
+    <img className="auth-image" src="/media/workspace.jpg" alt="Sunlight falling across an open workspace with plants and shared desks" width={1600} height={1068} fetchPriority="high" />
     <Link to="/" className="brand-lockup auth-brand"><span className="brand-symbol"><Network size={22} /></span><span>JobBridge<span className="brand-dot">.</span></span></Link>
     <div className="auth-content">
       <span className="eyebrow">People. Potential. Possibility.</span>
