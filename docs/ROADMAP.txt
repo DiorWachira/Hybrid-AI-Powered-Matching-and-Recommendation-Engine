@@ -15,7 +15,6 @@ NEEDS YOU, MOST IMPORTANT FIRST
        - Issue #15: light, dark and phone-width review.
        - docs/DEPLOYMENT.md acceptance checklist, including another device, `sudo reboot` with
          data intact, `deploy/jb backup`, and closed database ports.
-       - Google sign-in with the new content security policy; it could not be completed locally.
 [ ] 3. Rehearse docs/DEMO_WALKTHROUGH.md end to end and settle the presentation network
        (hotspot, or ask support@strathmore.edu to allow the host). Week 8's exit criterion.
 [ ] 4. Tag a release commit for the supervisor evaluation build, after 2 and 3.
@@ -92,6 +91,8 @@ DEPLOYED (2026-11-03)
 [x] Audit fixes merged to main 4553782 (CI green, run 41621371230) and deployed with
     `deploy/jb update`. Reported by the user; the audit machine's network blocks the site, so
     this could not be confirmed from there.
+[x] Live site confirmed by the user from outside the Strathmore network, including Google sign-in
+    with the new content security policy.
 
 ROADMAP AUDIT (2026-11-03)
 Evidence: browser walkthrough of 50 steps on the seeded demo data (172 candidates, 54 open
