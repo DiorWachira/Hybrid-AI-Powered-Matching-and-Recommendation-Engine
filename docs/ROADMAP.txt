@@ -748,7 +748,7 @@ RISK WATCHLIST
  - Python 3.14 compatibility: torch/transformers wheels may lag; be
    ready to run the backend on a 3.12 environment if installs fail.
  - Current primary blocker (2026-11-03): independent evaluation evidence (gold slice).
- - Campus firewall: the Fortinet firewall on the Strathmore network blocks the demo host, so
+ - Network firewall: a Fortinet firewall on the audit machine's network blocks the demo host, so
      plan the presentation network in advance (docs/DEMO_WALKTHROUGH.md).
  - Free hosting: Oracle capacity/card verification/idle reclaim can block use;
      stay within Always Free limits and stop if any resource requires payment.
