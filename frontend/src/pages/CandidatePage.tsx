@@ -98,7 +98,7 @@ export function CandidatePage() {
     setUploading(true); setMessage(null);
     try {
       const profile = await api.uploadResume(file, token);
-      setMessage(`Resume saved. ${profile.skills.length} skills identified${profile.years_experience ? `; experience on your profile: ${profile.years_experience} years` : "; no years of experience found, so add them in your profile"}.`);
+      setMessage(`Resume saved. ${profile.skills.length} skills on your profile${profile.years_experience ? `; experience on your profile: ${profile.years_experience} years` : "; no years of experience found, so add them in your profile"}.`);
       setReload((value) => value + 1);
     } catch (reason) { setMessage(reason instanceof Error ? reason.message : "Upload failed. Please try again."); }
     finally { setUploading(false); }
@@ -145,7 +145,7 @@ export function CandidatePage() {
     <main className="studio-page">
       <div className="page-heading"><div><p className="eyebrow">Your next chapter</p><h1>Opportunity, with direction.</h1><p>A closer look at the roles that could come next.</p>{employment.length > 0 && <p className="employment-badge" role="status"><BadgeCheck size={16} aria-hidden="true" /><span><strong>Employed</strong> / {employment[0].job_title} at {employment[0].company_name}{employment.length > 1 ? ` and ${employment.length - 1} more` : ""}</span></p>}</div><button className="secondary-button" onClick={() => setTab("resume")}><UploadCloud size={16} />Update resume</button></div>
       <section className="opportunity-banner" aria-label="Career workspace">
-        <img src="/media/workspace.jpg" alt="A sunlit shared workspace with desks and greenery" />
+        <img src="/media/workspace.jpg" alt="A sunlit shared workspace with desks and greenery" width={1600} height={1068} decoding="async" />
         <div><span className="eyebrow">JobBridge / Discover</span><h2>Find your place.<br />Build what comes next.</h2><p>Your skills. A new perspective on opportunity.</p></div>
       </section>
       {needsDashboard && <div className="dashboard-stats is-actionable">
@@ -172,7 +172,7 @@ export function CandidatePage() {
         </section> : <>
           <div className="results-toolbar"><label className="search-field"><Search size={18} /><input aria-label="Search opportunities" placeholder="Search roles, skills or locations" value={query} onChange={(event) => setQuery(event.target.value)} /></label><label className="sort-control"><SlidersHorizontal size={15} /><span>Sort by</span><select aria-label="Sort opportunities" value={sort} onChange={(event) => setSort(event.target.value)}><option value="match">Match score</option><option value="salary">Salary ceiling</option><option value="title">Role title</option></select></label></div>
           {error && <div className="notice error" role="alert"><CircleAlert size={18} /><span>{error}</span><button className="secondary-button" onClick={() => setReload((value) => value + 1)}><RefreshCw size={14} />Retry</button></div>}
-          {loading ? <div className="opportunity-grid" aria-busy="true" aria-label="Loading opportunities">{[1, 2, 3, 4].map((key) => <div key={key} className="skeleton" />)}</div> : <>
+          {loading ? <div className="opportunity-grid" role="status" aria-busy="true" aria-label="Loading opportunities">{[1, 2, 3, 4].map((key) => <div key={key} className="skeleton" />)}</div> : <>
             <p className="results-meta">{visible.length} {visible.length === 1 ? "opportunity" : "opportunities"}{tab === "for-you" ? " / ordered by your match score" : ""}</p>
             {visible.length ? <div className="opportunity-grid">{visible.map((job, index) => <OpportunityCard key={job.job_id} opportunity={job} rank={sort === "match" && !query ? index + 1 : undefined} onAction={updateOpportunity} onRemove={removeSaved} busy={busyId !== null} />)}</div> : !error && <div className="empty-state"><BriefcaseBusiness size={30} /><h2>{query ? "No matching opportunities" : tab === "for-you" ? "No strong matches yet" : "No opportunities yet"}</h2><p>{query ? "Try another role, location or skill." : tab === "for-you" ? "We only recommend roles where you meet every requirement and your profile is a strong fit. Browse all roles, or add skills and experience to your profile." : "New opportunities will appear as employers publish roles."}</p></div>}
           </>}

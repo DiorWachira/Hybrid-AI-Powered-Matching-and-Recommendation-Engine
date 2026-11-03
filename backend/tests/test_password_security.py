@@ -79,11 +79,11 @@ def _text_pdf(text: str) -> bytes:
 
 
 def test_valid_pdf_resume_text_and_skills_are_extracted():
-    from app.api.candidates import _skills_from_text
+    from app.core.skill_vocabulary import detect_skills
 
     text = _extract_text("resume.pdf", _text_pdf("Data analyst skilled in Python and SQL"))
     assert "Python and SQL" in text
-    assert {"python", "sql"} <= set(_skills_from_text(text))
+    assert {"Python", "SQL"} <= set(detect_skills(text))
 
 
 @pytest.mark.parametrize(("text", "years"), [

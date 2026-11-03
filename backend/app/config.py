@@ -51,6 +51,13 @@ class Settings(BaseSettings):
             return url.set(host="127.0.0.1").render_as_string(hide_password=False)
         return value
 
+    @field_validator("neo4j_uri")
+    @classmethod
+    def normalize_local_neo4j_host(cls, value: str) -> str:
+        # On Windows "localhost" tries IPv6 first, adding about two seconds to every new driver.
+        parts = urlsplit(value)
+        return value.replace("localhost", "127.0.0.1", 1) if parts.hostname == "localhost" else value
+
     model_config = SettingsConfigDict(
         env_file=Path(__file__).resolve().parents[2] / ".env",
         env_file_encoding="utf-8",

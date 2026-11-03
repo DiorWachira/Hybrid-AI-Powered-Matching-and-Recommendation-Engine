@@ -307,9 +307,10 @@ def test_saved_results_mark_recommendations_only_for_the_active_model(api_client
 def test_open_job_listing_filters_query(api_client):
     client, database, user = api_client
     database.scalars.return_value = []
-    assert jobs.list_open_jobs(database) == []
+    assert jobs.list_open_jobs(offset=0, limit=100, db=database) == []
     statement = database.scalars.call_args.args[0]
     assert statement.whereclause.compare(JobPosting.status == JobStatus.open)
+    assert client.get("/api/jobs/?limit=101").status_code == 422
 
 
 @pytest.mark.parametrize("role", [UserRole.recruiter, UserRole.admin])

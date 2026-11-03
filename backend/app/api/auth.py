@@ -1,4 +1,5 @@
 import hashlib
+import secrets
 from datetime import UTC, datetime
 from uuid import UUID
 
@@ -19,6 +20,8 @@ from app.utils.security import (MFA_CHALLENGE_TOKEN, MFA_ENROLLMENT_TOKEN, creat
                                 hash_password, verify_password)
 
 router = APIRouter(prefix="/auth", tags=["authentication"])
+# Checked when an email has no account, so response time does not reveal which emails are registered.
+_UNKNOWN_ACCOUNT_HASH = hash_password(secrets.token_urlsafe(16))
 
 
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
@@ -52,7 +55,8 @@ def register(request: Request, payload: RegisterRequest, db: Session = Depends(g
 @limiter.limit("10/minute")
 def login(request: Request, payload: LoginRequest, db: Session = Depends(get_db)) -> LoginResponse:
     user = db.scalar(select(User).where(User.email == str(payload.email).lower()))
-    if user is None or not verify_password(payload.password, user.password_hash):
+    password_matches = verify_password(payload.password, user.password_hash if user else _UNKNOWN_ACCOUNT_HASH)
+    if user is None or not password_matches:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
     return _first_factor_passed(db, user)
 

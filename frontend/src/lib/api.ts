@@ -1,3 +1,5 @@
+import { clearSession } from "./session";
+
 export type ApiHealth = {
   status: "ok" | "degraded";
   database: { postgres: "ok" | "error"; neo4j: "ok" | "error" };
@@ -202,6 +204,17 @@ function validationMessage(item: { msg: string; loc: string[]; type?: string; ct
   return `${label}: ${item.msg.replace(/^Value error, /, "")}.`;
 }
 
+// The API's answers for a session it no longer accepts. Other 401s, such as a mistyped password when
+// confirming an action, are ordinary errors and must not sign the person out.
+const ENDED_SESSION_MESSAGES = new Set(["Invalid or expired access token", "Session expired; sign in again", "User account not found"]);
+
+function endSession(headers: Headers) {
+  const token = localStorage.getItem("jobbridge_token");
+  if (!token || headers.get("Authorization") !== `Bearer ${token}`) return;
+  clearSession();
+  window.location.assign("/auth?session=expired");
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const headers = new Headers(init?.headers);
   if (!(init?.body instanceof FormData)) headers.set("Content-Type", "application/json");
@@ -214,6 +227,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
   if (!response.ok) {
     const body = await response.json().catch(() => null) as { detail?: string | Array<{ msg: string; loc: string[]; type?: string; ctx?: { min_length?: number; max_length?: number } }> } | null;
+    if (response.status === 401 && typeof body?.detail === "string" && ENDED_SESSION_MESSAGES.has(body.detail)) endSession(headers);
     const detail = typeof body?.detail === "string" ? body.detail : Array.isArray(body?.detail) ? [...new Set(body.detail.map(validationMessage))].join(" ") : null;
     throw new Error(detail ?? (response.status >= 500 ? "The service is currently unavailable. Please try again shortly." : `Request failed (${response.status}). Please try again.`));
   }

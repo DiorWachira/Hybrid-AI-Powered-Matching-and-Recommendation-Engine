@@ -35,8 +35,8 @@ Audit: 2026-10-01. See [implementation audit](IMPLEMENTATION_AUDIT.md).
     official CDACC mappings, model quality or the live scoring feature contract.
 - [x] Reviewed baseline automation: backend and frontend CI passed on main aae5809,
     including fresh dependency installation, migrations and database integration.
-- [ ] Publish and verify remote CI for the new Week 1-4 branch when authorized.
-- [ ] Full clean-machine setup with seed data, launched API/Vite and browser checks.
+- [x] Publish and verify remote CI for the new Week 1-4 branch (main CI green on every later merge).
+- [x] Full clean-machine setup with seed data and browser checks (2026-10-26 and 2026-11-03; see docs/ROADMAP.txt).
 
 ## Historical Evidence (2026-10-01)
 

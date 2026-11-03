@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
 import logging
 import re
 import threading
+from collections import OrderedDict
 from math import exp, isfinite
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -21,6 +23,12 @@ _model_identity: tuple[str, str | None] | None = None
 _model_lock = threading.Lock()
 _artifact_cache: tuple[tuple[str, int, int, int], dict[str, object]] | None = None
 logger = logging.getLogger(__name__)
+# Recent embeddings by text hash. Re-ranking the same resumes or postings then skips the encoder, which is
+# what dominates request time on CPU. 4096 vectors of 384 floats is about 6 MB.
+EMBEDDING_CACHE_SIZE = 4096
+_embedding_cache: OrderedDict[bytes, object] = OrderedDict()
+_embedding_cache_model: object | None = None
+_embedding_cache_lock = threading.Lock()
 
 
 def _artifact() -> dict[str, object]:
@@ -82,6 +90,31 @@ def preload_model() -> None:
         logger.exception("Matching model preload failed")
 
 
+def _embed(texts: list[str], batch_size: int) -> list[object]:
+    """Normalised embeddings for texts, encoding only the ones not cached for the current model."""
+    global _embedding_cache_model
+    model = _get_model()
+    keys = [hashlib.blake2b(text.encode("utf-8"), digest_size=16).digest() for text in texts]
+    with _embedding_cache_lock:
+        if _embedding_cache_model is not model:
+            _embedding_cache.clear()
+            _embedding_cache_model = model
+        found = {key: _embedding_cache[key] for key in keys if key in _embedding_cache}
+        for key in found:
+            _embedding_cache.move_to_end(key)
+    missing = {key: text for key, text in zip(keys, texts) if key not in found}
+    if missing:
+        encoded = model.encode(list(missing.values()), normalize_embeddings=True, batch_size=batch_size, show_progress_bar=False)
+        fresh = dict(zip(missing, encoded))
+        found.update(fresh)
+        with _embedding_cache_lock:
+            if _embedding_cache_model is model:
+                _embedding_cache.update(fresh)
+                while len(_embedding_cache) > EMBEDDING_CACHE_SIZE:
+                    _embedding_cache.popitem(last=False)
+    return [found[key] for key in keys]
+
+
 def semantic_similarity(candidate_text: str, job_text: str) -> float:
     return semantic_similarities([candidate_text], job_text)[0]
 
@@ -90,7 +123,7 @@ def semantic_similarities(candidate_texts: list[str], job_text: str, batch_size:
     if not candidate_texts:
         return []
     texts = [anonymize_resume_text(text) for text in candidate_texts] + [job_text]
-    embeddings = _get_model().encode(texts, normalize_embeddings=True, batch_size=batch_size, show_progress_bar=False)
+    embeddings = _embed(texts, batch_size)
     job_embedding = embeddings[-1]
     return [float(max(0.0, min(1.0, embedding @ job_embedding))) for embedding in embeddings[:-1]]
 
@@ -99,7 +132,7 @@ def job_similarities(candidate_text: str, job_texts: list[str], batch_size: int 
     """Score one candidate against many jobs with a single encode call (candidate recommendations)."""
     if not job_texts:
         return []
-    embeddings = _get_model().encode([anonymize_resume_text(candidate_text), *job_texts], normalize_embeddings=True, batch_size=batch_size, show_progress_bar=False)
+    embeddings = _embed([anonymize_resume_text(candidate_text), *job_texts], batch_size)
     candidate_embedding = embeddings[0]
     return [float(max(0.0, min(1.0, embedding @ candidate_embedding))) for embedding in embeddings[1:]]
 

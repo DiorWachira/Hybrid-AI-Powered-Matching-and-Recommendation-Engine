@@ -195,7 +195,7 @@ def test_resume_upload_persists_profile_and_projects_skills(migrated_database, m
                 response = client.post("/api/candidates/upload-resume", files=files, headers=headers)
                 assert response.status_code == 200
                 profile = response.json()
-                assert set(profile["skills"]) == {"sql", "python"}
+                assert set(profile["skills"]) == {"SQL", "Python"}
                 assert profile["years_experience"] == 4
                 assert profile["expected_salary"] == "50000.00"
                 assert profile["work_authorized"] is True

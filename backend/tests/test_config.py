@@ -13,6 +13,11 @@ def isolated_settings_environment(monkeypatch):
         monkeypatch.delenv(name, raising=False)
 
 
+def test_local_neo4j_host_avoids_the_ipv6_lookup_delay():
+    assert Settings(_env_file=None, neo4j_uri="bolt://localhost:7687").neo4j_uri == "bolt://127.0.0.1:7687"
+    assert Settings(_env_file=None, neo4j_uri="bolt://neo4j:7687").neo4j_uri == "bolt://neo4j:7687"
+
+
 def test_development_defaults_remain_available():
     assert Settings(_env_file=None).environment == "development"
 
