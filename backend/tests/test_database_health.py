@@ -1,5 +1,6 @@
 from unittest.mock import MagicMock
 
+import pytest
 from fastapi.testclient import TestClient
 from uuid import uuid4
 
@@ -9,6 +10,7 @@ from app.db.neo4j_db import get_neo4j_driver, load_skill_ontology, seed_neo4j_on
 client = TestClient(app)
 
 
+@pytest.mark.integration
 def test_health_route_reports_all_databases_ok() -> None:
     response = client.get("/api/health")
 
@@ -19,6 +21,7 @@ def test_health_route_reports_all_databases_ok() -> None:
     assert body["database"]["neo4j"] in {"ok", "healthy"}
 
 
+@pytest.mark.integration
 def test_neo4j_seed_creates_core_ontology() -> None:
     summary = seed_neo4j_ontology()
 
@@ -29,6 +32,7 @@ def test_neo4j_seed_creates_core_ontology() -> None:
     assert seed_neo4j_ontology() == summary
 
 
+@pytest.mark.integration
 def test_ontology_import_is_repeatable_and_counts_standard_mappings():
     prefix = "ontology-test-" + uuid4().hex
     names = [prefix + suffix for suffix in ("-source", "-target", "-standard")]
