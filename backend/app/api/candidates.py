@@ -14,7 +14,7 @@ from pypdf import PdfReader
 from starlette.concurrency import run_in_threadpool
 from sqlalchemy import String, and_, cast, delete, func, or_, select, update
 from sqlalchemy.dialects.postgresql import insert
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.api.dependencies import require_roles
 from app.db.models import AuditEvent, Candidate, CandidateOpportunity, Employer, JobApplication, JobPosting, JobStatus, OpportunityStatus, User, UserRole
@@ -22,11 +22,11 @@ from app.db.postgres import get_db
 from app.schemas import ApplicationResponse, BrowsedOpportunityResponse, CandidateApplicationResponse, CandidateDashboardResponse, CandidateProfileResponse, CandidateProfileUpdate, OpportunityActionRequest, OpportunityResponse
 from app.api.matches import _candidate_rule_result, _score_candidate
 from app.core.hybrid_matcher import job_similarities
+from app.core.skill_vocabulary import detect_skills
 from app.core.text_preprocessing import anonymize_resume_text
 
 router = APIRouter(prefix="/candidates", tags=["candidates"])
 MAX_RESUME_BYTES = 10 * 1024 * 1024
-KNOWN_SKILLS = ("python", "sql", "data analysis", "excel", "power bi", "docker", "kubernetes", "ci/cd", "linux", "aws", "terraform", "ansible", "git", "rest apis", "system design", "financial accounting", "taxation", "business analysis", "project management")
 
 
 @router.get("/me/applications", response_model=list[CandidateApplicationResponse])
@@ -63,28 +63,45 @@ def _extract_text(filename: str, content: bytes) -> str:
     suffix = Path(filename).suffix.casefold()
     if suffix == ".pdf":
         if b"%PDF-" not in content[:1024]:
-            raise HTTPException(status_code=415, detail="Invalid PDF signature")
+            raise HTTPException(status_code=415, detail="This file is not a valid PDF. Export your resume to PDF again, or upload a DOCX.")
         reader = PdfReader(BytesIO(content))
         if reader.is_encrypted or len(reader.pages) > 100:
             raise HTTPException(status_code=422, detail="Resume must be unencrypted and at most 100 pages")
         return "\n".join(page.extract_text() or "" for page in reader.pages).strip()
     if suffix == ".docx":
         if not content.startswith(b"PK\x03\x04"):
-            raise HTTPException(status_code=415, detail="Invalid DOCX signature")
+            raise HTTPException(status_code=415, detail="This file is not a valid DOCX. Save your resume as DOCX again, or upload a PDF.")
         with ZipFile(BytesIO(content)) as archive:
             entries = archive.infolist()
             if len(entries) > 1000 or sum(entry.file_size for entry in entries) > 30 * 1024 * 1024:
                 raise HTTPException(status_code=413, detail="Expanded DOCX exceeds processing limits")
             if "word/document.xml" not in archive.namelist() or any(entry.flag_bits & 1 for entry in entries):
                 raise HTTPException(status_code=422, detail="Invalid or encrypted DOCX")
-        document = Document(BytesIO(content))
-        return "\n".join(paragraph.text for paragraph in document.paragraphs).strip()
+        return _docx_text(Document(BytesIO(content))).strip()
     raise HTTPException(status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, detail="Only PDF and DOCX resumes are supported")
 
 
-def _skills_from_text(text: str) -> list[str]:
-    normalised = text.casefold()
-    return [skill for skill in KNOWN_SKILLS if re.search(rf"(?<![a-z0-9]){re.escape(skill)}(?![a-z0-9])", normalised)]
+def _docx_text(document) -> str:
+    """Body paragraphs plus table cells; many resume templates lay out skills and experience in tables."""
+    parts = [paragraph.text for paragraph in document.paragraphs]
+    tables, seen_cells = list(document.tables), set()
+    while tables:
+        for row in tables.pop(0).rows:
+            for cell in row.cells:
+                # Merged cells appear once per spanned position but share one underlying element.
+                if id(cell._tc) not in seen_cells:
+                    seen_cells.add(id(cell._tc))
+                    parts.extend(paragraph.text for paragraph in cell.paragraphs)
+                    tables.extend(cell.tables)
+    return "\n".join(parts)
+
+
+def _merged_skills(existing: list[str] | None, detected: list[str]) -> list[str]:
+    """Existing skills first, then newly detected ones, so uploading a resume never removes a typed skill."""
+    merged = {skill.casefold(): skill for skill in reversed(existing or [])}
+    known = list(reversed(merged.values()))
+    # The profile form accepts at most 50 skills, so a longer list could not be saved again.
+    return (known + [skill for skill in detected if skill.casefold() not in merged])[:50]
 
 
 EXPERIENCE_STATEMENT = re.compile(r"(?<![\d.])(\d{1,2})\s*\+?\s*(?:years?|yrs?)\b(?:\s+of)?(?:\s+[a-z/-]+){0,3}?\s+experience")
@@ -179,14 +196,15 @@ async def upload_resume(
     except Exception as exc:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="The resume could not be read") from exc
     if not text:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="The resume contains no readable text")
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="No readable text found. A scanned resume is an image, so upload a PDF or DOCX with selectable text.")
     candidate.parsed_resume_text = anonymize_resume_text(text, (candidate.full_name,))[:20_000]
-    candidate.skills = _skills_from_text(text)
+    detected_skills = detect_skills(text)
+    candidate.skills = _merged_skills(candidate.skills, detected_skills)
     # Fill experience only when the candidate has not entered it, so a typed value is never overwritten.
     detected_years = _experience_years_from_text(text, datetime.now(UTC).year)
     if detected_years and not candidate.years_experience:
         candidate.years_experience = detected_years
-    db.add(AuditEvent(actor_user_id=user.user_id, action="resume.parsed", resource_type="candidate", resource_id=candidate.candidate_id, details={"skills_detected": len(candidate.skills), "experience_years_detected": detected_years}))
+    db.add(AuditEvent(actor_user_id=user.user_id, action="resume.parsed", resource_type="candidate", resource_id=candidate.candidate_id, details={"skills_detected": len(detected_skills), "experience_years_detected": detected_years}))
     db.commit()
     db.refresh(candidate)
     return candidate
@@ -202,7 +220,7 @@ def candidate_dashboard(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Candidate profile not found")
     jobs = list(db.scalars(select(JobPosting).where(JobPosting.status == JobStatus.open).order_by(JobPosting.posted_at.desc()).limit(OPEN_JOB_SCAN_LIMIT)))
     employer_names = {employer.employer_id: employer.company_name for employer in db.scalars(select(Employer))}
-    activity = {item.job_id: item for item in db.scalars(select(CandidateOpportunity).where(CandidateOpportunity.candidate_id == candidate.candidate_id))}
+    activity = {item.job_id: item for item in db.scalars(select(CandidateOpportunity).options(selectinload(CandidateOpportunity.job)).where(CandidateOpportunity.candidate_id == candidate.candidate_id))}
     eligible_jobs = [job for job in jobs if _candidate_rule_result(candidate, job).passed]
     similarities = dict(zip((job.job_id for job in eligible_jobs), job_similarities(candidate.parsed_resume_text or "", [job.description for job in eligible_jobs])))
     scored = []
@@ -212,10 +230,11 @@ def candidate_dashboard(
         scored.append(_opportunity(job, result.final_score, activity.get(job.job_id).status if job.job_id in activity else None, employer_names.get(job.employer_id, "Workforce employer"), bool(result.recommended)))
         if result.recommended:
             recommended.append(scored[-1])
+    scores_by_job = {entry.job_id: entry.match_score for entry in scored}
     history = []
     for item in sorted(activity.values(), key=lambda value: value.updated_at, reverse=True):
         if item.job.status == JobStatus.closed or item.status in {OpportunityStatus.saved, OpportunityStatus.applied}:
-            history.append(_opportunity(item.job, next((entry.match_score for entry in scored if entry.job_id == item.job_id), 0.0), item.status, employer_names.get(item.job.employer_id, "Workforce employer")))
+            history.append(_opportunity(item.job, scores_by_job.get(item.job_id, 0.0), item.status, employer_names.get(item.job.employer_id, "Workforce employer")))
     return CandidateDashboardResponse(
         available_opportunities=scored[:20],
         open_role_count=len(jobs),
