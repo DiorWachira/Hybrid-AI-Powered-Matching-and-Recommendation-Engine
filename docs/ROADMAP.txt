@@ -1,13 +1,103 @@
 HYBRID AI-POWERED WORKFORCE PLACEMENT ENGINE
 PROJECT MILESTONE ROADMAP (8 WEEKS)
-Last updated: 2026-11-03 (full audit; see ROADMAP AUDIT directly below)
+Last updated: 2026-11-03. What is left comes first; everything done is further down, newest first.
 
-ROADMAP AUDIT (2026-11-03; current status, supersedes older entries it names)
-Every item that was still open is listed here with where it now stands.
+====================================================================
+WHAT IS LEFT
+====================================================================
+This list is the current status. It overrides any older entry further down.
+
+NEEDS YOU, MOST IMPORTANT FIRST
+[ ] 1. Label the 150 gold-slice pairs (0 of 150 labelled), plus a second labeller if possible,
+       then run `gold_slice evaluate`. Sheet and rubric: data_pipeline/gold_slice/. This is the
+       only independent evidence of match quality; Week 7's exit criterion depends on it.
+[ ] 2. Check the live site from a network that allows it (hotspot, not Strathmore Wi-Fi):
+       - Issue #15: light, dark and phone-width review.
+       - docs/DEPLOYMENT.md acceptance checklist, including another device, `sudo reboot` with
+         data intact, `deploy/jb backup`, and closed database ports.
+       - Google sign-in with the new content security policy; it could not be completed locally.
+[ ] 3. Rehearse docs/DEMO_WALKTHROUGH.md end to end and settle the presentation network
+       (hotspot, or ask support@strathmore.edu to allow the host). Week 8's exit criterion.
+[ ] 4. Tag a release commit for the supervisor evaluation build, after 2 and 3.
+[ ] 5. Re-measure ranking latency on the live server (issue #16), then update the figure on the
+       landing page, which currently quotes the test laptop.
+[ ] 6. Finish the sources (issue #16):
+       - Link the original Ladders 2018 study, which could not be opened from here; the page
+         still links HR Dive's report of it.
+       - Confirm 800k-1M in the full AFIDEP report; AFIDEP's own page says "nearly one million",
+         and the range comes from press coverage of the launch.
+[ ] 7. Do a manual screen-reader pass. Automated axe checks cannot prove usability.
+[ ] 8. Verify ESCO/CDACC mappings against official sources and obtain permitted real job data.
+
+BLOCKED UNTIL THE GOLD SLICE IS LABELLED (item 1)
+[ ] 9. Tune scoring weights and thresholds. Synthetic metrics do not justify changing them.
+[ ] 10. Score the live v2 model and the retired v1 epoch-19 artifact against the human labels, and
+        record precision, recall and F1 against independent ground truth.
+
+CLAUDE CAN DO THIS WHEN YOU ASK
+[ ] 11. Clean up skill names in the graph. The projection lowercases names, leaving case duplicates
+        (AWS/aws) that can hide related-skill links and show lowercase labels. Older databases also
+        keep non-IT skill nodes. This affects the explanation view only: scores read the versioned
+        ontology file, not Neo4j.
+
+ACCEPTED LIMITATIONS (documented; no work planned for this prototype)
+[~] Synthetic labels are not hiring outcomes, and redaction is not proof of anonymity.
+[~] The model contract's deployment gate stays BLOCKED until independent quality evidence exists.
+[~] Resume parser isolation and distributed rate-limit counters are deferred.
+[~] Wider pathway and application-history graph views are deferred.
+[~] CDACC-to-ESCO mappings stay provisional until item 8 is done.
+
+====================================================================
+RISK WATCHLIST
+====================================================================
+ - Dataset access: BrighterMonday scraper runs cost money and are capped
+   per run; keep the synthetic generator as the default path and treat
+   scraped jobs as an enrichment, not a hard dependency.
+ - Model size vs. latency: a large BERT model on CPU may breach the
+   2-5 s target; pre-compute embeddings and consider a smaller model.
+ - Python 3.14 compatibility: torch/transformers wheels may lag; be
+   ready to run the backend on a 3.12 environment if installs fail.
+ - Current primary blocker (2026-11-03): independent evaluation evidence (gold slice).
+ - Campus firewall: Strathmore's Fortinet firewall bans the demo host, so the site does not open on
+     that network. Plan the presentation network in advance (docs/DEMO_WALKTHROUGH.md).
+ - Free hosting: Oracle capacity/card verification/idle reclaim can block use;
+     stay within Always Free limits and stop if any resource requires payment.
+ - Neo4j ontology breadth: seed only the skill families needed by the
+   demo domains (software, data, DevOps, security, business analysis).
+ - Marketplace scope creep: apply/accept/contract/project/milestone/
+   payment features stay in docs/extras/marketplace_features.txt and
+   are out of this roadmap until the core engine is done.
+
+Legend and rules
+Legend: [x] narrowly stated deliverable implemented, with evidence where noted
+    [~] partial, historically verified or awaiting required verification
+    [ ] not implemented or not demonstrated; every one of these is in WHAT IS LEFT below
+    [>] an older entry that is still open and is now tracked in WHAT IS LEFT
+An [x] is NOT production approval. Week exit criteria require separate evidence.
+Audit details: docs/IMPLEMENTATION_AUDIT.md. Workflow: docs/WORKFLOW.md.
+Sprint 1: local runtime, main CI and browser walkthrough verified (2026-11-03).
+Public demo: live on Oracle Always Free since 2026-10-26; audit fixes deployed (see DONE).
+Training runs, model promotion, merges to main and native PostgreSQL changes each need explicit user approval.
+Note: academic documentation tasks (Chapter 5, UML write-ups, report) are
+owned by the student and are deliberately excluded from this roadmap.
+
+
+====================================================================
+DONE
+====================================================================
+Newest first. Entries are a dated log: each describes the project as it was on that date, and [~]
+marks in older entries were true then. Items still open are listed in WHAT IS LEFT.
+
+DEPLOYED (2026-11-03)
+[x] Audit fixes merged to main 4553782 (CI green, run 41621371230) and deployed with
+    `deploy/jb update`. Reported by the user; the audit machine's network blocks the site, so
+    this could not be confirmed from there.
+
+ROADMAP AUDIT (2026-11-03)
 Evidence: browser walkthrough of 50 steps on the seeded demo data (172 candidates, 54 open
 roles), production bundle behind the real deploy/Caddyfile, headless Edge; backend suite with
 PostgreSQL and Neo4j running; model contract gate exit 0.
-DONE AND VERIFIED IN THIS AUDIT
+Verified in this audit
 [x] Final sanity run with the demo dataset (walkthrough above).
 [x] Real CV upload through the UI: generated fictional PDF and DOCX CVs reach stored text,
     profile skills and the Neo4j graph. No personal CV was used. This found and fixed a real bug:
@@ -21,7 +111,7 @@ DONE AND VERIFIED IN THIS AUDIT
 [x] NFR-02, 2-5 s per matching request. Warm, test laptop with under 1 GB of RAM free, n=5:
     evaluate 172 candidates median 1.48 s (6.06 s before the embedding cache), candidate
     dashboard 0.08 s (0.57 s before), saved results 0.09 s. Not yet re-measured on the server.
-DONE DIFFERENTLY THAN PLANNED
+Done differently than planned
 [x] Public demo: Oracle Always Free VM, live since 2026-10-26 at https://140-238-99-64.sslip.io,
     using Docker Compose and Caddy rather than the earlier host-specific plan.
 [x] Graph sync: runs in-process in the API every 5 s (no separate scheduled task, which was what
@@ -30,26 +120,6 @@ DONE DIFFERENTLY THAN PLANNED
     latency gain without a schema change. Scores are unchanged (max similarity gap 0.00000012,
     final-score gap 0.0000, 60 CVs).
 [x] Backend stays FastAPI and the marketplace flow stays out of scope (client notes below).
-STILL OPEN: NEEDS THE USER
-[ ] Live-site visual check (issue #15) and acceptance checklist (docs/DEPLOYMENT.md): the audit
-    machine's network firewall blocks the site. The same checks pass locally. Includes
-    `sudo reboot` persistence and backup on the server, and the latency re-measure (issue #16).
-[ ] Deploy this audit's fixes to the server, then tag a release for the supervisor build.
-[ ] Label the 150 gold-slice pairs (0 of 150 labelled at this audit), plus a second labeller if
-    possible; then run gold_slice evaluate. Week 7's exit criterion and any threshold or weight
-    tuning stay blocked on this, by design.
-[ ] Official ESCO/CDACC source verification and permitted real job data.
-[ ] Manual screen-reader pass. Automated axe checks cannot prove screen-reader usability.
-[ ] Ladders 2018 primary link (issue #16): the study's original PDF could not be opened from
-    here, so the page still links HR Dive's report of it. Also confirm the 800k-1M range in the
-    full AFIDEP report; AFIDEP's own page says "nearly one million".
-FOLLOW-UP (explanation view only; scores read the versioned ontology file, not Neo4j)
-[ ] Graph projection lowercases skill names, leaving case duplicates (AWS/aws) that can hide
-    related-skill links and show lowercase labels. Older databases also keep non-IT skill nodes.
-ACCEPTED LIMITATIONS (documented, not planned for this prototype)
-[~] Synthetic labels are not hiring outcomes; redaction is not proof of anonymity; resume parser
-    isolation and distributed rate-limit counters are deferred; wider pathway/history graph views
-    are deferred. deployment_gate stays BLOCKED until independent quality evidence exists.
 
 CURRENT REPOSITORY STATUS (2026-10-21)
 Main integrates Week 1-4 verification, the Month 2 seeded evaluator and batched
@@ -94,13 +164,13 @@ Needs Docker + running app (Claude can do with the user's go-ahead):
 Needs a browser walkthrough (Claude in Chrome or the user):
 [x] Real CV (PDF and DOCX) upload through the UI to stored text and graph skills: 2026-11-03.
 [x] Simulation playback, auth/session lifecycle, recruiter/candidate/admin flows: 2026-11-03.
-[~] Contrast and 320/390/1440px checks pass (2026-11-03); manual screen-reader pass still open.
+[>] Contrast and 320/390/1440px checks pass (2026-11-03); manual screen-reader pass still open.
 Needs the user:
-[ ] Label the 150 gold-slice pairs (plus a second labeller if possible), then run
+[>] Label the 150 gold-slice pairs (plus a second labeller if possible), then run
     gold_slice evaluate; only then consider threshold/weight tuning.
-[~] Demo assets done (docs/DEMO_WALKTHROUGH.md, docs/demo/); release tag still to do.
+[>] Demo assets done (docs/DEMO_WALKTHROUGH.md, docs/demo/); release tag still to do.
 [x] Oracle Always Free deployment: live since 2026-10-26; acceptance checklist still to sign off.
-[ ] Official ESCO/CDACC source verification and permitted real job data.
+[>] Official ESCO/CDACC source verification and permitted real job data.
 Accepted limitations (documented, not planned work for this prototype):
 [~] Synthetic labels are not hiring outcomes; redaction is not proof of anonymity;
     parser isolation and distributed rate-limit counters are deferred; wider
@@ -156,7 +226,7 @@ GOLD SLICE: HAND-LABELLED INDEPENDENT CHECK (2026-10-19)
     the labelling rubric). Accountant pairs excluded (IT-only platform). Score bands were
     drawn with the v1 epoch-19 model; the answer key freezes scoring inputs, so labels
     stay valid after the v2 promotion.
-[ ] Human labelling of the 150 pairs (ideally a second labeller for kappa), then score
+[>] Human labelling of the 150 pairs (ideally a second labeller for kappa), then score
     the live v2 model and the retired v1 epoch-19 artifact against them.
 
 TRAINING COMPLETION & FEATURE-PARITY GATE UPDATE (2026-10-14)
@@ -182,11 +252,11 @@ TRAINING COMPLETION & FEATURE-PARITY GATE UPDATE (2026-10-14)
     probe inputs, and the promoted artifact matches the verified bundle. It exits 0.
 [x] New regression lock backend/tests/test_model_contract.py. Full backend suite:
     115 passed, 5 skipped, 0 failed (opt-in real-database tests skipped; Docker not used).
-[~] Independent, non-synthetic hiring-quality evaluation remains OPEN and is a separate
+[>] Independent, non-synthetic hiring-quality evaluation remains OPEN and is a separate
     gate: validate_model_contract still reports independent_quality_validated=false and
     deployment_gate=BLOCKED. Parity is NOT a claim of real-world quality or a promotion
     to production. Labels are synthetic (fixed-centre latent Bernoulli v2), not outcomes.
-[ ] Still open: independent gold-slice labelling, real-dataset provenance/permission,
+[>] Still open: independent gold-slice labelling, real-dataset provenance/permission,
     measured inference latency vs the 2-5s target, and public-demo acceptance.
 
 WEEK 1-4 VERIFICATION UPDATE (2026-10-10)
@@ -206,7 +276,7 @@ WEEK 1-4 VERIFICATION UPDATE (2026-10-10)
     was never inspected, but main CI has passed on every later merge (2026-10-21 review)
 [~] Full clean-machine launch/seed/browser walkthrough and current UI acceptance
     remain pending. API TestClient coverage is not browser upload evidence
-[~] Official ESCO/CDACC source verification, permitted real-job inputs and
+[>] Official ESCO/CDACC source verification, permitted real-job inputs and
     independent quality/fairness evidence cannot be closed with synthetic fixtures
 Historical at the time of this 2026-10-10 entry: Week 1-4 branch had not yet been
 merged. It was merged to main at c3fdec3 on 2026-10-10; see current status above.
@@ -286,7 +356,7 @@ NON-TRAINING WEEKLY PROGRESS (2026-10-04; current status)
     workflow/accessibility checks, latency improvements and clean setup
     [2026-10-21: simulation and profile/application controls done; the rest is in
     OPEN ITEMS TRIAGE at the top]
-[ ] Model parity/independent quality, official datasets and public deployment open
+[>] Model parity/independent quality, official datasets and public deployment open
     Epoch training is explicitly ON HOLD; no training files or weights changed
      [SUPERSEDED 2026-10-14: run completed all 100 epochs; epoch 19 promoted for prototype testing; parity verified on shared contract. Independent quality/deployment still open.]
 
@@ -308,7 +378,7 @@ ADMIN RELEASE-READINESS UPDATE (2026-10-02; supersedes older items below)
 [x] Model validation RUN, NOT PASSED: valid artifact structure but different graph,
     growth and empty-required-skills semantics. No training or weight replacement
     [SUPERSEDED 2026-10-14: shared feature contract; validate_model_contract exits 0]
-[ ] Public deployment: fresh Oracle login, verified free capacity/storage, TLS,
+[>] Public deployment: fresh Oracle login, verified free capacity/storage, TLS,
     host-specific verification and model-quality gate remain unresolved
 Current operations/limits: docs/WORKFLOW.md and docs/DEPLOYMENT.md.
 
@@ -330,16 +400,7 @@ The dated 2026-10-01 audit below is retained as historical context, not current
 evidence that local databases are still unavailable. Sprint 1 still requires
 clean-checkout and current remote-CI sign-off.
 
-Legend: [x] narrowly stated deliverable implemented, with evidence where noted
-    [~] partial, historically verified or awaiting required verification
-    [ ] not implemented or not demonstrated
-An [x] is NOT production approval. Week exit criteria require separate evidence.
-Audit details: docs/IMPLEMENTATION_AUDIT.md. Workflow: docs/WORKFLOW.md.
-Sprint 1: local runtime, main CI and browser walkthrough verified (2026-11-03).
-Public demo: live on Oracle Always Free since 2026-10-26; see ROADMAP AUDIT at the top.
-Training runs, model promotion, merges to main and native PostgreSQL changes each need explicit user approval.
-Note: academic documentation tasks (Chapter 5, UML write-ups, report) are
-owned by the student and are deliberately excluded from this roadmap.
+
 
 
 ====================================================================
@@ -674,7 +735,7 @@ WEEK 7  Theme, Explainability, Testing and Tuning
     Warm: F1 0.812, ROC-AUC 0.836, log loss 0.501 (400 pairs). Cold: F1 0.857,
     ROC-AUC 0.846, log loss 0.453 (314 pairs). Report:
     data_pipeline/training_runs/evaluation-2026-10-15/evaluation_report.json
-[ ] Tune scoring weights and thresholds using the evaluation output
+[>] Tune scoring weights and thresholds using the evaluation output
     Deliberately blocked on independent labelled evidence; synthetic metrics do
     not justify weight or threshold changes. No weights changed in this run.
 
@@ -710,7 +771,7 @@ WEEK 7  Theme, Explainability, Testing and Tuning
 [x] RE-RUN the notebook against the regenerated dataset and record the new
     metrics (done locally via nbclient 2026-09-20 -- see TRAINING RUN
     RESULTS above; the committed artifact is now from this run)
-[~] Hand-label a small gold slice (100-200 pairs) as an independent check
+[>] Hand-label a small gold slice (100-200 pairs) as an independent check
     on the new label scheme -- 150-pair blind sheet and scorer ready (see GOLD
     SLICE above); labels themselves still to be filled in
 Exit criterion: measured precision/recall/F1 recorded against a label that
@@ -727,33 +788,11 @@ WEEK 8  Hardening, Cleanup and Demonstration
 [x] Final sanity run of the whole prototype with the demo dataset (2026-11-03)
 [x] Prepare demonstration assets: seeded demo accounts, sample jobs,
     sample CVs and a scripted walkthrough (docs/DEMO_WALKTHROUGH.md)
-[ ] Tag a release commit for the supervisor evaluation build
-[~] Deploy an approved Oracle Always Free-only demo with HTTPS, private DB access and
+[>] Tag a release commit for the supervisor evaluation build
+[>] Deploy an approved Oracle Always Free-only demo with HTTPS, private DB access and
     unique secrets: live 2026-10-26; sign-off from another device still to record
-[~] Restart persistence and ARM support verified (local restart; running on Ampere A1);
+[>] Restart persistence and ARM support verified (local restart; running on Ampere A1);
     server reboot and backup recovery still to confirm on the server
 Exit criterion: the prototype runs from a clean checkout and the demo
 walkthrough is rehearsed end to end.
 Audit (2026-11-03): deployed and walkthrough scripted; release tag and live sign-off remain.
-
-
-====================================================================
-RISK WATCHLIST
-====================================================================
- - Dataset access: BrighterMonday scraper runs cost money and are capped
-   per run; keep the synthetic generator as the default path and treat
-   scraped jobs as an enrichment, not a hard dependency.
- - Model size vs. latency: a large BERT model on CPU may breach the
-   2-5 s target; pre-compute embeddings and consider a smaller model.
- - Python 3.14 compatibility: torch/transformers wheels may lag; be
-   ready to run the backend on a 3.12 environment if installs fail.
- - Current primary blocker (2026-11-03): independent evaluation evidence (gold slice).
- - Network firewall: a Fortinet firewall on the audit machine's network blocks the demo host, so
-     plan the presentation network in advance (docs/DEMO_WALKTHROUGH.md).
- - Free hosting: Oracle capacity/card verification/idle reclaim can block use;
-     stay within Always Free limits and stop if any resource requires payment.
- - Neo4j ontology breadth: seed only the skill families needed by the
-   demo domains (software, data, accounting).
- - Marketplace scope creep: apply/accept/contract/project/milestone/
-   payment features stay in docs/extras/marketplace_features.txt and
-   are out of this roadmap until the core engine is done.

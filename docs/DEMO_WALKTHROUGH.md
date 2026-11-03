@@ -4,7 +4,7 @@ A rehearsed script for showing JobBridge end to end. Every step below was run in
 
 ## Before you present
 
-1. **Check the network first.** A Fortinet firewall on the network used for the 2026-11-03 audit blocks `140-238-99-64.sslip.io` ("Application Control Violation", with a re-signed certificate). The server is not at fault, but the site will not open on that network, so test the room's network in advance. Use a phone hotspot, ask IT to allow the host, or run the local stack below.
+1. **Check the network first.** Strathmore's Fortinet firewall bans `140-238-99-64.sslip.io` ("Application Control Violation", with a re-signed certificate). The server is not at fault, but the site will not open on that network, so test the room's network in advance. Use a phone hotspot, ask support@strathmore.edu to allow the host, or run the local stack below.
 2. **Open the site once before the session** so the page and model are warm. Check `/api/health` reports `ok` for both databases and `ready` for the model.
 3. **Have the admin's authenticator app to hand.** Administrators must enter a 6-digit code.
 4. **Sign in on one IP sparingly.** Sign-in is limited to 10 attempts a minute per IP address, and a whole room on shared Wi-Fi counts as one address.
