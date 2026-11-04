@@ -557,7 +557,8 @@ kbd { padding: 2px 6px; border: 1px solid var(--line); border-radius: 4px; font:
   .results-toolbar { align-items: stretch; }
   .page-heading > .match-actions { width: 100%; }
   .match-actions .job-switcher { width: 100%; }
-  .match-actions > a, .match-actions > .primary-button { flex: 1 1 0; }
+  .match-actions > a { flex: 1 1 calc(100% - 52px); }
+  .match-actions > .primary-button { flex: 1 1 100%; }
   .search-field { max-width: none; flex-basis: 100%; }
   .job-card { padding: 20px; }
   .auth-scene { padding: 105px 24px 60px; }
@@ -940,3 +941,6 @@ main.route-status { min-height: 100dvh; }
 .gap-chart svg { cursor: ew-resize; }
 .gap-stack span.is-modern i { color: #10180c; }
 .gap-stats dd:has(.gap-source) { margin: 0; }
+@media (max-width: 360px) {
+  .role-tag { display: none; }
+}
