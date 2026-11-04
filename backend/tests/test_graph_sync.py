@@ -22,7 +22,7 @@ def test_job_projection_uses_id_and_replaces_edges():
     assert any("edge:REQUIRES_SKILL" in call.args[0] and "DELETE edge" in call.args[0] for call in calls)
     skill_writes = [call for call in calls if "MERGE (target:Skill" in call.args[0]]
     assert len(skill_writes) == 1
-    assert skill_writes[0].kwargs["name"] == "sql"
+    assert skill_writes[0].kwargs["name"] == "SQL"
     assert any("BELONGS_TO" in call.args[0] for call in calls)
 
 

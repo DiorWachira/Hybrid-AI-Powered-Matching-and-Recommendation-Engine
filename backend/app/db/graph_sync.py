@@ -30,12 +30,17 @@ def _replace_edges(transaction, label, identifier, relation, target_label, names
         f"MATCH (node:{label} {{id: $id}})-[edge:{relation}]->() DELETE edge",
         id=identifier,
     ).consume()
-    for name in sorted({value.strip().casefold() for value in names if value.strip()}):
+    # Matching ignores case, but a new node keeps the spelling it arrived with so labels read "AWS", not "aws".
+    spellings: dict[str, str] = {}
+    for value in names:
+        if value.strip():
+            spellings.setdefault(value.strip().casefold(), value.strip())
+    for name, spelling in sorted(spellings.items()):
         existing = transaction.run(
             f"MATCH (target:{target_label}) WHERE toLower(trim(target.name)) = $name "
             "RETURN target.name AS name ORDER BY target.name LIMIT 1", name=name,
         ).single()
-        canonical = existing["name"] if existing else name
+        canonical = existing["name"] if existing else spelling
         transaction.run(
             f"MATCH (node:{label} {{id: $id}}) MERGE (target:{target_label} {{name: $name}}) "
             f"MERGE (node)-[:{relation}]->(target)", id=identifier, name=canonical,
