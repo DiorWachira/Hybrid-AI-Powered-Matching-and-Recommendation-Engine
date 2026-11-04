@@ -1,5 +1,5 @@
 {
-  "mapping_status": "curated working examples; verify labels against the selected official CDACC occupational-standard release before academic claims",
+  "mapping_status": "curated working examples; reviewed 2026-11-04 and not yet confirmed against official sources (see ontology README); do not make academic claims from them",
   "mappings": [
     {"cdacc_name":"Apply Digital Literacy","esco_skill":"ICT literacy","source_note":"Illustrative mapping pending source-document verification"},
     {"cdacc_name":"Perform Data Analysis","esco_skill":"data analysis","source_note":"Illustrative mapping pending source-document verification"},

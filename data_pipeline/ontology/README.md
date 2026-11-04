@@ -32,3 +32,21 @@ They are explicitly marked as pending verification against the relevant official
 CDACC occupational-standard release. Do not describe them as officially
 validated mappings until that source review is completed. The loader creates
 `CDACCStandard` nodes and `MAPS_TO` relationships.
+
+## CDACC and ESCO source review (2026-11-04)
+
+`cdacc_esco_mapping.json` remains provisional. Scoring does not read it.
+
+| Working CDACC name | In CDACC Level 6 guide? | Working ESCO label | Top ESCO skill-search results |
+|---|---|---|---|
+| Apply Digital Literacy | Listed as "Demonstrate Digital Literacy" | ICT literacy | have computer literacy; teach ESOL literacy class; teach digital literacy |
+| Perform Data Analysis | No | data analysis | statistics; use specific data analysis software; perform data analysis |
+| Manage Financial Records | No | financial accounting | monitor financial accounts; synthesise financial information; inspect government expenditures |
+| Prepare Tax Returns | No | taxation | research taxation procedures; spirit taxation regulations; international taxation of transfer prices |
+| Develop Software Applications | No | software development | software frameworks; levels of software testing; manage software releases |
+| Manage Projects | No | project management | project management; project commissioning; project management principles |
+
+Sources: [TVET CDACC Learning Guide for Basic Competencies, Level 6](https://www.tvetcdacc.go.ke/wp-content/uploads/2023/07/LEARNING-GUIDE-FOR-BASIC-COMPETENCIES-LEVEL-6.pdf)
+(all 401 pages searched for the exact names) and the [ESCO search API](https://ec.europa.eu/esco/api/search)
+(top three results only). That guide covers basic units, so "No" does not rule a name out of a
+course-specific occupational standard; those standards still need checking.
