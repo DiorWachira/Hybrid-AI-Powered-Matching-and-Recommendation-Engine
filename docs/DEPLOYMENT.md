@@ -97,6 +97,10 @@ with the `SEED_PASSWORD` stored in `deploy/.env.production`; no demo password is
 | Deploy a new commit of `main` | `deploy/jb update` (pull, back up, rebuild, restart) |
 | Manual backup | `deploy/jb backup` (PostgreSQL + env file), `deploy/jb backup --graph` (adds Neo4j, ~1 min offline) |
 | Restore from dumps | `deploy/jb restore <postgres.dump> [neo4j.dump]` (backs up first, replaces all data, re-encrypts two-step secrets) |
+| Load a recruiter with demo roles and applicants | `deploy/jb seed-recruiter <email>` (add `--dry-run` to preview or `--remove` to undo; applications stay unevaluated) |
+| Tidy graph names | `deploy/jb repair-graph` (add `--dry-run` to preview; merges AWS/aws duplicates and drops unused leftovers) |
+| Measure ranking latency | `deploy/jb measure-latency` (saves nothing) |
+| Remove non-IT and test-named demo roles | `deploy/jb remove-demo-roles` (add `--dry-run` to preview; keeps anything with a real owner or applicant) |
 | Rotate the demo password | `deploy/jb demo-password` (prompts without echo; updates every demo account, signs them out, saves `SEED_PASSWORD`) |
 
 Run `deploy/jb update` before `deploy/jb demo-password` the first time, so the image contains the

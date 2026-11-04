@@ -5,6 +5,10 @@
 #   deploy/jb up               build and (re)start everything
 #   deploy/jb update           git pull, back up, rebuild and restart
 #   deploy/jb seed             load the synthetic demo data (IT roles only)
+#   deploy/jb seed-recruiter <email> [--dry-run|--remove]   give a recruiter roles with unevaluated demo applicants
+#   deploy/jb repair-graph [--dry-run]   merge case-duplicate graph names and drop unused leftovers
+#   deploy/jb measure-latency  time the ranking step on this server (saves nothing)
+#   deploy/jb remove-demo-roles [--dry-run]   delete Accountant and test-named demo postings
 #   deploy/jb admin <email>    create an administrator (prompts for a password)
 #   deploy/jb demo-password    set a new password on every demo account (prompts; signs them out)
 #   deploy/jb backup [--graph] dump PostgreSQL (and Neo4j with --graph) to /var/backups/jobbridge
@@ -112,6 +116,23 @@ cmd_seed() {
   echo "Demo accounts sign in with SEED_PASSWORD from $ENV_FILE"
 }
 
+cmd_seed_recruiter() {
+  local email=${1:?usage: deploy/jb seed-recruiter <email> [--dry-run|--remove]}; shift
+  compose run --rm -T --entrypoint python api data_pipeline/seed_recruiter_pipeline.py --recruiter-email "$email" "$@"
+}
+
+cmd_repair_graph() {
+  compose run --rm -T -w /app/backend --entrypoint python api -m app.db.graph_repair "$@"
+}
+
+cmd_measure_latency() {
+  compose run --rm -T --entrypoint python api data_pipeline/measure_ranking_latency.py "$@"
+}
+
+cmd_remove_demo_roles() {
+  compose run --rm -T --entrypoint python api data_pipeline/remove_demo_roles.py "$@"
+}
+
 cmd_admin() {
   local email=${1:?usage: deploy/jb admin <email>}
   compose run --rm -it -w /app/backend --entrypoint python api create_admin.py "$email"
@@ -190,11 +211,15 @@ case "${1:-}" in
   up) cmd_up ;;
   update) cmd_update ;;
   seed) cmd_seed ;;
+  seed-recruiter) shift; cmd_seed_recruiter "$@" ;;
+  repair-graph) shift; cmd_repair_graph "$@" ;;
+  measure-latency) shift; cmd_measure_latency "$@" ;;
+  remove-demo-roles) shift; cmd_remove_demo_roles "$@" ;;
   admin) shift; cmd_admin "$@" ;;
   demo-password) cmd_demo_password ;;
   backup) shift; cmd_backup "$@" ;;
   restore) shift; cmd_restore "$@" ;;
   status) compose ps ;;
   logs) shift; compose logs --tail=200 -f "$@" ;;
-  *) sed -n '2,14p' "$0"; exit 1 ;;
+  *) sed -n '2,18p' "$0"; exit 1 ;;
 esac
