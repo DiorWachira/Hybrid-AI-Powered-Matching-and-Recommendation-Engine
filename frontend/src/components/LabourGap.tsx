@@ -125,7 +125,7 @@ function ProjectionFigure() {
     <ul className="gap-assumptions">
       <li>Assumes {READ_MINUTES} minutes for a considered first read of one application. The often-quoted 7.4-second glance (Ladders, 2018) only decides whether to keep reading.</li>
       <li>With JobBridge, eligibility rules run automatically and the recruiter reads the top {SHORTLIST} ranked candidates, plus {RANKING_MINUTES} minutes to scan the ranking and its reasons.</li>
-      <li>Measured on a 7.4 GB test laptop, not this server: ranking 170 candidates took a median of 1.15 seconds once the model was loaded.</li>
+      <li>Measured on this server in November 2026, with the model loaded: the ranking step for 170 candidates took a median of 9.46 seconds with nothing cached, and 0.03 seconds when repeated.</li>
       <li>This is an estimate, not a measured outcome. The matching model is trained on synthetic labels and its rankings have not yet been validated against real hiring decisions.</li>
     </ul>
     <Source keys={["ladders"]}>. Projection by JobBridge.</Source>
