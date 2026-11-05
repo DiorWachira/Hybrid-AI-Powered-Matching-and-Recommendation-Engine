@@ -19,6 +19,12 @@ from neo4j.exceptions import Neo4jError, ServiceUnavailable, SessionExpired
 router = APIRouter(prefix="/matches", tags=["matches"])
 
 
+def latest_evaluated_at(db: Session, job_id: UUID) -> datetime | None:
+    """When this job's most recent evaluation ran, or None if it has never been evaluated."""
+    completed = db.scalar(select(AuditEvent).where(AuditEvent.action == "matches.evaluated", AuditEvent.resource_type == "job", AuditEvent.resource_id == job_id).order_by(AuditEvent.created_at.desc(), AuditEvent.event_id.desc()).limit(1))
+    return completed.created_at if completed else db.scalar(select(func.max(MatchResult.created_at)).where(MatchResult.job_id == job_id))
+
+
 @router.get("/jobs/{job_id}", response_model=MatchEvaluationResponse)
 def read_job_matches(job_id: UUID, user: User = Depends(require_roles(UserRole.recruiter, UserRole.admin)), db: Session = Depends(get_db)):
     job = db.get(JobPosting, job_id)
@@ -28,8 +34,7 @@ def read_job_matches(job_id: UUID, user: User = Depends(require_roles(UserRole.r
         employer = db.get(Employer, job.employer_id)
         if employer is None or employer.user_id != user.user_id:
             raise HTTPException(status_code=403, detail="You can only view your own job evaluations")
-    completed = db.scalar(select(AuditEvent).where(AuditEvent.action == "matches.evaluated", AuditEvent.resource_type == "job", AuditEvent.resource_id == job_id).order_by(AuditEvent.created_at.desc(), AuditEvent.event_id.desc()).limit(1))
-    evaluated_at = completed.created_at if completed else db.scalar(select(func.max(MatchResult.created_at)).where(MatchResult.job_id == job_id))
+    evaluated_at = latest_evaluated_at(db, job_id)
     if evaluated_at is None:
         return MatchEvaluationResponse(job_id=job_id, candidates=[])
     artifact = _artifact()

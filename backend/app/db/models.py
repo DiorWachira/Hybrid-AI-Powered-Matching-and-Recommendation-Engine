@@ -211,6 +211,19 @@ class JobApplication(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("CURRENT_TIMESTAMP"))
 
 
+class HiringSimulation(Base):
+    """A simulated hiring run on a job: labels the hire as simulated and holds what is needed to undo it."""
+    __tablename__ = "hiring_simulations"
+
+    job_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("job_postings.job_id", ondelete="CASCADE"), primary_key=True)
+    actor_user_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("users.user_id", ondelete="SET NULL"))
+    hired_application_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("job_applications.application_id", ondelete="SET NULL"))
+    previous_job_status: Mapped[str] = mapped_column(String(16), nullable=False)
+    # {application id: {"from": status before the run, "to": status it set}}
+    previous_statuses: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=text("CURRENT_TIMESTAMP"), nullable=False)
+
+
 class GraphSyncEvent(Base):
     __tablename__ = "graph_sync_events"
     __table_args__ = (

@@ -9,6 +9,7 @@ const named = <Name extends string>(load: () => Promise<Record<Name, () => React
 const AuthPage = named(() => import("./pages/AuthPage"), "AuthPage");
 const CandidatePage = named(() => import("./pages/CandidatePage"), "CandidatePage");
 const MatchesPage = named(() => import("./pages/MatchesPage"), "MatchesPage");
+const FilledRolesPage = named(() => import("./pages/FilledRolesPage"), "FilledRolesPage");
 const NotFoundPage = named(() => import("./pages/NotFoundPage"), "NotFoundPage");
 const RecruiterPage = named(() => import("./pages/RecruiterPage"), "RecruiterPage");
 const AdminPage = named(() => import("./pages/AdminPage"), "AdminPage");
@@ -40,6 +41,7 @@ export default function App() {
         <Route path="/auth" element={<AuthPage />} />
         <Route path="/recruiter" element={<WorkspaceRoute roles={["recruiter"]}><RecruiterPage /></WorkspaceRoute>} />
         <Route path="/candidate" element={<WorkspaceRoute roles={["candidate"]}><CandidatePage /></WorkspaceRoute>} />
+        <Route path="/filled-roles" element={<WorkspaceRoute roles={["recruiter"]}><FilledRolesPage /></WorkspaceRoute>} />
         <Route path="/matches" element={<WorkspaceRoute roles={["recruiter", "admin"]}><MatchesPage /></WorkspaceRoute>} />
         <Route path="/admin" element={<WorkspaceRoute roles={["admin"]}><AdminPage /></WorkspaceRoute>} />
         <Route path="/admin/recruiters" element={<WorkspaceRoute roles={["admin"]}><RecruiterOversightPage /></WorkspaceRoute>} />

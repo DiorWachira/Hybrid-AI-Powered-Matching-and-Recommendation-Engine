@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
-import { ArrowUpRight, FlaskConical, KeyRound, LayoutDashboard, LogOut, Menu, Network, ShieldCheck, Target, UserRoundSearch, Users, X } from "lucide-react";
+import { ArrowUpRight, BadgeCheck, FlaskConical, KeyRound, LayoutDashboard, LogOut, Menu, Network, ShieldCheck, Target, UserRoundSearch, Users, X } from "lucide-react";
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { api, type ApiHealth, type CurrentAccount } from "../lib/api";
 import { clearSession, getSessionRole } from "../lib/session";
@@ -10,6 +10,7 @@ const navigationByRole = {
   recruiter: [
     { to: "/recruiter", label: "Recruiter workspace", icon: LayoutDashboard },
     { to: "/matches", label: "Match analysis", icon: Target },
+    { to: "/filled-roles", label: "Filled roles", icon: BadgeCheck },
     { to: "/security", label: "Security", icon: KeyRound },
   ],
   admin: [

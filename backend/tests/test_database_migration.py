@@ -2,6 +2,7 @@ import os
 from io import BytesIO
 from pathlib import Path
 from types import SimpleNamespace
+from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 from unittest.mock import Mock
 
@@ -130,7 +131,9 @@ def test_graph_projection_update_delete_and_same_title_jobs(migrated_database):
                 database.rollback()
                 with driver.session(database="neo4j") as graph:
                     assert graph.run("MATCH (job:Job) WHERE job.id IN $ids RETURN count(job) AS count", ids=[str(first_job_id), str(second_job_id)]).single()["count"] == 2
-                    assert graph.run("MATCH (:Candidate {id: $id})-[:HAS_SKILL]->(:Skill {name: $skill}) RETURN count(*) AS count", id=str(candidate_id), skill=skill_name).single()["count"] == 1
+                    # Spellings that differ only by case share one node, whichever arrived first.
+                    assert graph.run("MATCH (skill:Skill) WHERE toLower(skill.name) = $skill RETURN collect(skill.name) AS names", skill=skill_name).single()["names"] in ([skill_name], [skill_name.upper()])
+                    assert graph.run("MATCH (:Candidate {id: $id})-[:HAS_SKILL]->(skill:Skill) WHERE toLower(skill.name) = $skill RETURN count(*) AS count", id=str(candidate_id), skill=skill_name).single()["count"] == 1
                     assert graph.run("MATCH ()-[edge:APPLIED_TO {application_id: $id}]->() RETURN edge.status AS status", id=str(application_id)).single()["status"] == "submitted"
                 database.get(Candidate, candidate_id).skills = []
                 database.get(JobApplication, application_id).status = "shortlisted"
@@ -147,7 +150,7 @@ def test_graph_projection_update_delete_and_same_title_jobs(migrated_database):
         finally:
             with driver.session(database="neo4j") as graph:
                 graph.run("MATCH (node) WHERE node.id IN $ids DETACH DELETE node", ids=[str(identifier) for identifier in identifiers]).consume()
-                graph.run("MATCH (node) WHERE node.name IN $names AND NOT (node)--() DELETE node", names=[skill_name, industry]).consume()
+                graph.run("MATCH (node) WHERE node.name IN $names AND NOT (node)--() DELETE node", names=[skill_name, skill_name.upper(), industry]).consume()
 
 
 def test_resume_upload_persists_profile_and_projects_skills(migrated_database, monkeypatch):
@@ -543,6 +546,95 @@ def test_admin_mfa_enrolment_recovery_and_reset_against_postgres(migrated_databa
                 assert database.scalar(select(MfaRecoveryCode).where(MfaRecoveryCode.user_id == admin_id)) is None
             assert client.get("/api/auth/me", headers=session).status_code == 401
             assert client.post("/api/auth/login", json=credentials).json()["status"] == "mfa_setup_required"
+    finally:
+        app.dependency_overrides.clear()
+        app.dependency_overrides.update(previous)
+
+def test_hiring_flow_simulation_undo_and_filled_roles(migrated_database):
+    engine, _ = migrated_database
+
+    def database_dependency():
+        with Session(engine) as database:
+            yield database
+
+    evaluated = datetime(2026, 11, 1, tzinfo=UTC)
+    recruiter_id, job_id = uuid4(), uuid4()
+    candidates_by_name = {}
+    with Session(engine) as database:
+        database.add(User(user_id=recruiter_id, email="flow-recruiter@example.org", password_hash=hash_password("IsolatedTestOnly123!"), role=UserRole.recruiter))
+        database.flush()
+        employer = Employer(user_id=recruiter_id, company_name="Flow Ltd", contact_name="Flow Contact")
+        database.add(employer)
+        database.flush()
+        database.add(JobPosting(job_id=job_id, employer_id=employer.employer_id, title="Data Analyst", description="Analyse data", required_experience_years=1, posted_at=evaluated - timedelta(days=3)))
+        database.flush()
+        # (name, score, demo account, passed hard rules, has an evaluation)
+        for name, score, demo, passed, scored in [("Top", 0.95, True, True, True), ("Second", 0.8, True, True, True), ("Third", 0.6, True, True, True), ("Fourth", 0.4, True, True, True), ("Blocked", 0.0, True, False, True), ("Late", 0.0, True, True, False), ("Real Person", 0.99, False, True, True)]:
+            user_id, candidate_id = uuid4(), uuid4()
+            database.add(User(user_id=user_id, email=f"{name.split()[0].lower()}@example.org", password_hash="x", role=UserRole.candidate, is_demo=demo))
+            database.flush()
+            database.add(Candidate(candidate_id=candidate_id, user_id=user_id, full_name=name, years_experience=3, skills=["SQL"], certifications=[]))
+            database.flush()
+            database.add(JobApplication(candidate_id=candidate_id, job_id=job_id))
+            if scored:
+                database.add(MatchResult(job_id=job_id, candidate_id=candidate_id, hard_rule_passed=passed, similarity_score=score, growth_score=score, skill_overlap_score=score, model_version="test", final_weighted_score=score, created_at=evaluated))
+            candidates_by_name[name] = candidate_id
+        database.commit()
+
+    headers = {"Authorization": "Bearer " + create_access_token(recruiter_id, "recruiter")}
+    previous = app.dependency_overrides.copy()
+    app.dependency_overrides[get_db] = database_dependency
+    try:
+        with TestClient(app) as client:
+            def stages(flow):
+                return {item["candidate_name"]: item["status"] for item in flow["applicants"]}
+
+            flow = client.get(f"/api/jobs/{job_id}/hiring", headers=headers).json()
+            assert [item["candidate_name"] for item in flow["applicants"]][:2] == ["Real Person", "Top"]
+            assert flow["applicants"][-1]["final_score"] is None and flow["simulation"] is None
+            by_name = {item["candidate_name"]: item["application_id"] for item in flow["applicants"]}
+
+            # All or nothing: one illegal move in the batch leaves everyone where they were.
+            batch = {"application_ids": [by_name["Top"], by_name["Second"]], "status": "reviewing"}
+            advanced = client.post(f"/api/jobs/{job_id}/hiring/advance", headers=headers, json=batch)
+            assert advanced.status_code == 200
+            illegal = client.post(f"/api/jobs/{job_id}/hiring/advance", headers=headers, json={"application_ids": [by_name["Top"], by_name["Third"]], "status": "interviewed"})
+            assert illegal.status_code == 409
+            assert stages(client.get(f"/api/jobs/{job_id}/hiring", headers=headers).json())["Third"] == "submitted"
+            assert client.post(f"/api/jobs/{job_id}/hiring/advance", headers=headers, json={"application_ids": [str(uuid4())], "status": "reviewing"}).status_code == 404
+            assert client.post(f"/api/jobs/{job_id}/hiring/complete", headers=headers, json={"close_posting": True}).status_code == 409
+
+            simulated = client.post(f"/api/jobs/{job_id}/hiring/simulate", headers=headers, json={"top_n": 3, "interview_count": 2})
+            assert simulated.status_code == 200
+            body = simulated.json()
+            assert [step["stage"] for step in body["steps"]] == ["selected", "shortlisted", "interviewed", "hired", "closed"]
+            assert body["steps"][0]["candidates"] == ["Top", "Second", "Third"] and body["steps"][1]["candidates"] == ["Top", "Second"]
+            after = stages(body["flow"])
+            # The real applicant outranks everyone but is never hired, released or moved.
+            assert after == {"Top": "hired", "Second": "rejected", "Third": "rejected", "Fourth": "rejected", "Blocked": "rejected", "Late": "rejected", "Real Person": "submitted"}
+            assert body["real_applicants_left"] == 1 and body["flow"]["job_status"] == "open"
+            assert body["flow"]["simulation"]["hired_name"] == "Top"
+            assert client.post(f"/api/jobs/{job_id}/hiring/simulate", headers=headers, json={}).status_code == 409
+
+            filled = client.get("/api/jobs/mine/filled", headers=headers).json()
+            assert len(filled) == 1 and filled[0]["applicants_total"] == 7
+            assert filled[0]["hires"][0]["candidate_name"] == "Top" and filled[0]["hires"][0]["simulated"] is True and filled[0]["hires"][0]["final_score"] == 0.95
+
+            undone = client.post(f"/api/jobs/{job_id}/hiring/simulate/undo", headers=headers)
+            assert undone.status_code == 200
+            assert stages(undone.json()) == {"Top": "reviewing", "Second": "reviewing", "Third": "submitted", "Fourth": "submitted", "Blocked": "submitted", "Late": "submitted", "Real Person": "submitted"}
+            assert undone.json()["simulation"] is None
+            assert client.get("/api/jobs/mine/filled", headers=headers).json() == []
+            assert client.post(f"/api/jobs/{job_id}/hiring/simulate/undo", headers=headers).status_code == 404
+
+            # The manual path through to a hire, then finishing the role, and it counts as a real hire.
+            for status in ("shortlisted", "interviewed", "hired"):
+                assert client.post(f"/api/jobs/{job_id}/hiring/advance", headers=headers, json={"application_ids": [by_name["Top"]], "status": status}).status_code == 200
+            assert client.post(f"/api/jobs/{job_id}/hiring/simulate", headers=headers, json={}).status_code == 409
+            finished = client.post(f"/api/jobs/{job_id}/hiring/complete", headers=headers, json={"close_posting": True}).json()
+            assert finished["job_status"] == "closed"
+            assert set(stages(finished).values()) == {"hired", "rejected"}
+            assert client.get("/api/jobs/mine/filled", headers=headers).json()[0]["hires"][0]["simulated"] is False
     finally:
         app.dependency_overrides.clear()
         app.dependency_overrides.update(previous)

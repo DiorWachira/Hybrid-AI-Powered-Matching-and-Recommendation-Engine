@@ -1,6 +1,6 @@
 HYBRID AI-POWERED WORKFORCE PLACEMENT ENGINE
 PROJECT MILESTONE ROADMAP (8 WEEKS)
-Last updated: 2026-11-03. What is left comes first; everything done is further down, newest first.
+Last updated: 2026-11-04. What is left comes first; everything done is further down, newest first.
 
 ====================================================================
 WHAT IS LEFT
@@ -11,33 +11,34 @@ NEEDS YOU, MOST IMPORTANT FIRST
 [ ] 1. Label the 150 gold-slice pairs (0 of 150 labelled), plus a second labeller if possible,
        then run `gold_slice evaluate`. Sheet and rubric: data_pipeline/gold_slice/. This is the
        only independent evidence of match quality; Week 7's exit criterion depends on it.
-[ ] 2. Check the live site from a network that allows it (hotspot, not Strathmore Wi-Fi):
-       - Issue #15: light, dark and phone-width review.
-       - docs/DEPLOYMENT.md acceptance checklist, including another device, `sudo reboot` with
-         data intact, `deploy/jb backup`, and closed database ports.
+[ ] 2. Finish the live-site checks. Checked from outside on 2026-11-04 (see DONE): issue #15 pages in
+       light, dark, 320/390/1440 px; health; valid certificate; closed database ports. Left:
+       - Confirm the phone fixes on the live site after this branch is deployed, then close #15.
+       - docs/DEPLOYMENT.md checklist items only you can do: Oracle billing, another device,
+         real sign-ins including admin two-step, `sudo reboot` with data intact, `deploy/jb backup`.
 [ ] 3. Rehearse docs/DEMO_WALKTHROUGH.md end to end and settle the presentation network
        (hotspot, or ask support@strathmore.edu to allow the host). Week 8's exit criterion.
 [ ] 4. Tag a release commit for the supervisor evaluation build, after 2 and 3.
-[ ] 5. Re-measure ranking latency on the live server (issue #16), then update the figure on the
-       landing page, which currently quotes the test laptop.
+[ ] 5. Run `deploy/jb measure-latency` on the live server (issue #16), send Claude the result, and the
+       landing-page figure gets updated. It currently quotes the test laptop and says so.
 [ ] 6. Finish the sources (issue #16):
-       - Link the original Ladders 2018 study, which could not be opened from here; the page
-         still links HR Dive's report of it.
-       - Confirm 800k-1M in the full AFIDEP report; AFIDEP's own page says "nearly one million",
-         and the range comes from press coverage of the launch.
+       - Open the Ladders study in a normal browser. theladders.com refuses automated requests, so
+         https://www.theladders.com/static/images/basicSite/pdfs/TheLadders-EyeTracking-StudyC2.pdf
+         is unverified; if it shows the 7.4-second figure, that link replaces HR Dive.
+       - Optional: AFIDEP's full report is behind a Microsoft login (its page links
+         shorturl.at/wpRG7). Ask AFIDEP for a copy if you want to cite the report itself.
 [ ] 7. Do a manual screen-reader pass. Automated axe checks cannot prove usability.
 [ ] 8. Verify ESCO/CDACC mappings against official sources and obtain permitted real job data.
+       Reviewed 2026-11-04 (data_pipeline/ontology/README.md): the mappings do not pass yet. Only
+       "project management" is an exact ESCO match in search, and CDACC's Level 6 basic-competency
+       guide has "Demonstrate Digital Literacy" but none of the other unit names. Correcting them
+       needs the occupational standards for each course, or your decision to cut the mapping.
+[ ] 8a. Run `deploy/jb remove-demo-roles` on the live server. Done locally on 2026-11-04 (see DONE).
 
 BLOCKED UNTIL THE GOLD SLICE IS LABELLED (item 1)
 [ ] 9. Tune scoring weights and thresholds. Synthetic metrics do not justify changing them.
 [ ] 10. Score the live v2 model and the retired v1 epoch-19 artifact against the human labels, and
         record precision, recall and F1 against independent ground truth.
-
-CLAUDE CAN DO THIS WHEN YOU ASK
-[ ] 11. Clean up skill names in the graph. The projection lowercases names, leaving case duplicates
-        (AWS/aws) that can hide related-skill links and show lowercase labels. Older databases also
-        keep non-IT skill nodes. This affects the explanation view only: scores read the versioned
-        ontology file, not Neo4j.
 
 ACCEPTED LIMITATIONS (documented; no work planned for this prototype)
 [~] Synthetic labels are not hiring outcomes, and redaction is not proof of anonymity.
@@ -45,6 +46,8 @@ ACCEPTED LIMITATIONS (documented; no work planned for this prototype)
 [~] Resume parser isolation and distributed rate-limit counters are deferred.
 [~] Wider pathway and application-history graph views are deferred.
 [~] CDACC-to-ESCO mappings stay provisional until item 8 is done.
+[~] Non-IT skill names stay in the graph where PostgreSQL still lists them, for example Taxation on
+    demo candidates. Scores do not read the graph.
 
 ====================================================================
 RISK WATCHLIST
@@ -86,6 +89,33 @@ DONE
 ====================================================================
 Newest first. Entries are a dated log: each describes the project as it was on that date, and [~]
 marks in older entries were true then. Items still open are listed in WHAT IS LEFT.
+
+RECRUITER HIRING FLOW (2026-11-04)
+[x] Match analysis takes a role from evaluation to hire on one page: choose the top N applicants, shortlist,
+    mark interviews, hire, then close the posting and release the rest. Moves are all-or-nothing.
+[x] "Simulate hiring" runs those stages automatically and replays them. It acts on demo applicants only, says
+    no interview took place, picks the highest match score, is labelled as simulated and can be undone.
+[x] New "Filled roles" tab lists roles with a hire, real or simulated, with match score and days to fill.
+    Checked in a browser at 320-1440 px with a throwaway recruiter, on the real API and model. Not yet deployed.
+
+ROADMAP FOLLOW-UPS (2026-11-04)
+[x] Graph skill names (was item 11): new names keep their spelling, and `deploy/jb repair-graph` merges
+    case duplicates and drops unused leftovers. Local run: 6 merged, 45 renamed, 126 removed; a second
+    pass finds nothing; HAS_SKILL 527 and REQUIRES_SKILL 278 equal PostgreSQL. Not yet run on live.
+[x] Issue #15 reviewed on the live site with headless Edge, signed in as the demo recruiter, without
+    evaluating. Passed: toolbar baseline on desktop, Google button width and centring, Fig. 2 and 3
+    colours in dark mode, no console errors. Found and fixed: at 390 px toolbar labels wrapped onto two
+    lines, and at 320 px the sign-out button overflowed by 3 px. Fix checked locally at 320-1440 px with
+    canned API replies; not yet deployed.
+[x] Issue #16: Fig. 3 drag and the CUE link were already done. The 800,000 to 1 million figure is now
+    cited from AFIDEP's own policy-dialogue page instead of press coverage.
+[x] From outside the network: `/api/health` ok with both databases, `/auth` reloads, certificate valid,
+    ports 5432, 5433, 7474, 7687 and 8000 closed.
+[x] `deploy/jb remove-demo-roles` deletes Accountant and test-named demo postings, keeping anything with
+    a real owner or applicant. Local run: 8 postings removed, none with applications or match results.
+    The generator no longer produces Accountant roles, so `deploy/jb seed` does not bring them back.
+[x] `deploy/jb seed-recruiter <email>` loads a recruiter with 14 IT roles and unevaluated demo
+    applicants across great, good, mediocre and bad fits. `deploy/jb measure-latency` added.
 
 DEPLOYED (2026-11-03)
 [x] Audit fixes merged to main 4553782 (CI green, run 41621371230) and deployed with

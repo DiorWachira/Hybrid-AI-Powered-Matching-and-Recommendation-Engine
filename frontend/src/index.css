@@ -557,7 +557,8 @@ kbd { padding: 2px 6px; border: 1px solid var(--line); border-radius: 4px; font:
   .results-toolbar { align-items: stretch; }
   .page-heading > .match-actions { width: 100%; }
   .match-actions .job-switcher { width: 100%; }
-  .match-actions > a, .match-actions > .primary-button { flex: 1 1 0; }
+  .match-actions > a { flex: 1 1 calc(100% - 52px); }
+  .match-actions > .primary-button { flex: 1 1 100%; }
   .search-field { max-width: none; flex-basis: 100%; }
   .job-card { padding: 20px; }
   .auth-scene { padding: 105px 24px 60px; }
@@ -940,3 +941,87 @@ main.route-status { min-height: 100dvh; }
 .gap-chart svg { cursor: ew-resize; }
 .gap-stack span.is-modern i { color: #10180c; }
 .gap-stats dd:has(.gap-source) { margin: 0; }
+@media (max-width: 360px) {
+  .role-tag { display: none; }
+}
+
+/* Hiring flow: a printed run sheet, with hairline rules and numbered stages. Accent marks only the current stage. */
+.hiring-flow { margin: 26px 0 8px; border: 1px solid var(--line); border-radius: 6px; background: #171d19; }
+.hiring-flow-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 14px; padding: 20px 22px 18px; }
+.hiring-flow-head h2 { margin: 4px 0 0; font-size: 20px; }
+.hiring-steps { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); margin: 0; padding: 0; list-style: none; border-block: 1px solid var(--line); }
+.hiring-steps li + li { border-left: 1px solid var(--line); }
+.hiring-steps button { display: block; width: 100%; padding: 13px 16px 14px; text-align: left; background: none; color: var(--muted); }
+.hiring-steps button:hover { background: #1d251e; }
+.hiring-steps button[aria-current="step"] { background: #232d21; color: var(--ink); box-shadow: inset 0 -3px 0 var(--accent); }
+.hiring-step-number { display: block; font: 11px var(--font-mono); margin-bottom: 7px; }
+.hiring-steps strong { display: block; font-size: 13px; color: var(--ink); }
+.hiring-steps small { display: block; margin-top: 3px; font-size: 11px; }
+.hiring-steps small b { font: 12px var(--font-mono); color: var(--ink); }
+.hiring-flow > .notice { margin: 16px 22px 0; }
+.hiring-panel { padding: 18px 22px 22px; }
+.hiring-panel-controls { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px; }
+.hiring-empty { display: flex; align-items: center; gap: 9px; margin: 0; padding: 22px; color: var(--muted); font-size: 13px; }
+.hiring-note { margin: 14px 0 0; color: var(--muted); font-size: 12px; line-height: 1.55; }
+.hiring-panel-controls .hiring-note { margin: 0; flex: 1 1 240px; }
+.top-picker { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); }
+.top-picker button { min-width: 42px; min-height: 38px; padding: 0 12px; border: 1px solid #46513f; border-radius: 4px; background: #1d251e; color: var(--ink); font: 13px var(--font-mono); }
+.top-picker button:hover { border-color: var(--accent); }
+.top-picker button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #182113; }
+.top-picker label { display: inline-flex; align-items: center; gap: 7px; margin-left: 6px; }
+.top-picker input { width: 66px; height: 38px; padding: 0 8px; border: 1px solid #46513f; border-radius: 4px; background: #1d251e; color: var(--ink); font: 13px var(--font-mono); }
+.hiring-people { margin: 16px 0 0; padding: 0; list-style: none; border-top: 1px solid var(--line); }
+.hiring-people li, .hiring-people label { display: flex; align-items: center; gap: 12px; }
+.hiring-people li { padding: 10px 2px; border-bottom: 1px solid var(--line); }
+.hiring-people label { flex: 1; min-width: 0; cursor: pointer; }
+.hiring-people.is-pickable { margin-bottom: 16px; }
+.hiring-people input { width: 16px; height: 16px; flex-shrink: 0; accent-color: var(--accent); }
+.hiring-person { flex: 1; min-width: 0; }
+.hiring-person strong { display: block; font-size: 13px; overflow-wrap: anywhere; }
+.hiring-person small { display: block; margin-top: 3px; font-size: 11px; color: var(--muted); }
+.hiring-score { font: 15px var(--font-mono); color: var(--ink); }
+.rank-item.is-top-pick { box-shadow: inset 3px 0 0 var(--accent); }
+.hiring-filled-card { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; padding: 16px 18px; margin-bottom: 14px; border: 1px solid #596b47; border-radius: 6px; background: #273124; }
+.hiring-filled-card > svg { color: var(--accent); flex-shrink: 0; }
+.hiring-filled-card > div { flex: 1 1 220px; min-width: 0; }
+.hiring-filled-card h3 { margin: 0 0 4px; font-size: 16px; }
+.hiring-filled-card p { margin: 0; font-size: 13px; }
+.hiring-filled .hiring-note { margin: 0 0 12px; }
+.simulated-tag { display: inline-block; padding: 3px 8px; border: 1px solid var(--copper); border-radius: 3px; color: var(--copper); font: 10px var(--font-mono); letter-spacing: .08em; text-transform: uppercase; }
+.simulation-replay { padding: 18px 22px 4px; }
+.simulation-replay-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 42px; margin-bottom: 8px; }
+.simulation-replay > ol { margin: 0; padding: 0; list-style: none; }
+.simulation-replay > ol > li { position: relative; padding: 4px 0 18px 22px; border-left: 1px solid #46513f; margin-left: 5px; animation: replay-in .28s ease-out both; }
+.simulation-replay > ol > li::before { content: ""; position: absolute; left: -5px; top: 9px; width: 9px; height: 9px; background: #46513f; }
+.simulation-replay > ol > li.is-hired::before { background: var(--accent); }
+.simulation-replay > ol > li > strong { font-size: 14px; }
+.simulation-replay > ol > li.is-hired > strong { color: var(--accent); font-size: 16px; }
+.simulation-replay > ol > li > p { margin: 4px 0 8px; color: var(--muted); font-size: 12px; }
+@keyframes replay-in { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .simulation-replay > ol > li { animation: none; } }
+.filled-list { margin-top: 26px; border-top: 1px solid var(--line); }
+.filled-row { display: flex; flex-wrap: wrap; align-items: center; gap: 18px 26px; padding: 20px 0; border-bottom: 1px solid var(--line); }
+.filled-role { flex: 1 1 230px; min-width: 0; }
+.filled-role h2 { margin: 0 0 6px; font-size: 16px; overflow-wrap: anywhere; }
+.filled-role p { margin: 0; color: var(--muted); font-size: 12px; }
+.filled-hires { flex: 1 1 280px; min-width: 0; margin: 0; padding: 0; list-style: none; }
+.filled-hires li { display: flex; align-items: center; gap: 14px; }
+.filled-hires li + li { margin-top: 10px; }
+.filled-hires div { min-width: 0; }
+.filled-hires strong { display: block; font-size: 14px; overflow-wrap: anywhere; }
+.filled-hires small { display: block; margin-top: 3px; color: var(--muted); font-size: 11px; }
+/* A rubber stamp, slightly off true: the one flourish a finished hire earns. */
+.hired-stamp { flex-shrink: 0; padding: 4px 8px; border: 2px solid var(--accent); border-radius: 3px; color: var(--accent); font: 700 10px var(--font-mono); letter-spacing: .1em; text-transform: uppercase; transform: rotate(-4deg); }
+.hired-stamp.is-simulated { border-color: var(--copper); color: var(--copper); }
+@media (max-width: 600px) {
+  .hiring-flow-head, .hiring-panel, .hiring-empty, .simulation-replay { padding-inline: 16px; }
+  .hiring-flow-head > button, .hiring-panel-controls > button { width: 100%; }
+  .hiring-flow > .notice { margin-inline: 16px; }
+  .hiring-steps { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .hiring-steps button { padding: 10px 6px 11px; text-align: center; }
+  .hiring-steps strong { font-size: 10px; }
+  .hiring-steps small { font-size: 0; margin-top: 2px; }
+  .hiring-steps small b { font-size: 12px; }
+  .hiring-step-number { display: none; }
+  .filled-row .workflow-actions { width: 100%; }
+}
