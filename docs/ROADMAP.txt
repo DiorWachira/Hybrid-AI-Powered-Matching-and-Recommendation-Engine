@@ -19,8 +19,8 @@ NEEDS YOU, MOST IMPORTANT FIRST
 [ ] 3. Rehearse docs/DEMO_WALKTHROUGH.md end to end and settle the presentation network
        (hotspot, or ask support@strathmore.edu to allow the host). Week 8's exit criterion.
 [ ] 4. Tag a release commit for the supervisor evaluation build, after 2 and 3.
-[ ] 5. Run `deploy/jb measure-latency` on the live server (issue #16), send Claude the result, and the
-       landing-page figure gets updated. It currently quotes the test laptop and says so.
+[ ] 5. Decide what to do about NFR-02 (2-5 s) on the live server. The first evaluation with nothing cached
+       took a median of 9.46 s, which misses it; repeats took 0.03 s. Figures are in DONE (2026-11-05).
 [ ] 6. Finish the sources (issue #16):
        - Open the Ladders study in a normal browser. theladders.com refuses automated requests, so
          https://www.theladders.com/static/images/basicSite/pdfs/TheLadders-EyeTracking-StudyC2.pdf
@@ -89,6 +89,13 @@ DONE
 ====================================================================
 Newest first. Entries are a dated log: each describes the project as it was on that date, and [~]
 marks in older entries were true then. Items still open are listed in WHAT IS LEFT.
+
+LIVE SERVER LATENCY (2026-11-05)
+[x] `deploy/jb measure-latency` on the live server, 7 runs each, the role with the most eligible candidates:
+    170 candidates, 115 eligible. Nothing cached: median 9.46 s (8.66-10.75). Repeat: median 0.03 s (all 0.03).
+    Model load and first pass, excluded: 16.4 s. Ranking step only: no saving and no HTTP, beside the live API.
+[x] The landing-page figure now quotes these numbers. NFR-02 is met on repeat evaluations and missed on the
+    first one after a restart, because the embedding cache is held in memory (see item 5).
 
 RECRUITER HIRING FLOW (2026-11-04)
 [x] Match analysis takes a role from evaluation to hire on one page: choose the top N applicants, shortlist,
