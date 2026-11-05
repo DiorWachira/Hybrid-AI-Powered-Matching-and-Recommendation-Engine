@@ -1,6 +1,6 @@
 HYBRID AI-POWERED WORKFORCE PLACEMENT ENGINE
 PROJECT MILESTONE ROADMAP (8 WEEKS)
-Last updated: 2026-11-04. What is left comes first; everything done is further down, newest first.
+Last updated: 2026-11-05. What is left comes first; everything done is further down, newest first.
 
 ====================================================================
 WHAT IS LEFT
@@ -13,14 +13,13 @@ NEEDS YOU, MOST IMPORTANT FIRST
        only independent evidence of match quality; Week 7's exit criterion depends on it.
 [ ] 2. Finish the live-site checks. Checked from outside on 2026-11-04 (see DONE): issue #15 pages in
        light, dark, 320/390/1440 px; health; valid certificate; closed database ports. Left:
-       - Confirm the phone fixes on the live site after this branch is deployed, then close #15.
+       - Run `deploy/jb update` so the new latency figure goes live (main 38b8d5a or later).
+       - Confirm the phone fixes on the live site, then close #15.
        - docs/DEPLOYMENT.md checklist items only you can do: Oracle billing, another device,
          real sign-ins including admin two-step, `sudo reboot` with data intact, `deploy/jb backup`.
 [ ] 3. Rehearse docs/DEMO_WALKTHROUGH.md end to end and settle the presentation network
        (hotspot, or ask support@strathmore.edu to allow the host). Week 8's exit criterion.
 [ ] 4. Tag a release commit for the supervisor evaluation build, after 2 and 3.
-[ ] 5. Decide what to do about NFR-02 (2-5 s) on the live server. The first evaluation with nothing cached
-       took a median of 9.46 s, which misses it; repeats took 0.03 s. Figures are in DONE (2026-11-05).
 [ ] 6. Finish the sources (issue #16):
        - Open the Ladders study in a normal browser. theladders.com refuses automated requests, so
          https://www.theladders.com/static/images/basicSite/pdfs/TheLadders-EyeTracking-StudyC2.pdf
@@ -33,7 +32,6 @@ NEEDS YOU, MOST IMPORTANT FIRST
        "project management" is an exact ESCO match in search, and CDACC's Level 6 basic-competency
        guide has "Demonstrate Digital Literacy" but none of the other unit names. Correcting them
        needs the occupational standards for each course, or your decision to cut the mapping.
-[ ] 8a. Run `deploy/jb remove-demo-roles` on the live server. Done locally on 2026-11-04 (see DONE).
 
 BLOCKED UNTIL THE GOLD SLICE IS LABELLED (item 1)
 [ ] 9. Tune scoring weights and thresholds. Synthetic metrics do not justify changing them.
@@ -41,6 +39,11 @@ BLOCKED UNTIL THE GOLD SLICE IS LABELLED (item 1)
         record precision, recall and F1 against independent ground truth.
 
 ACCEPTED LIMITATIONS (documented; no work planned for this prototype)
+[~] NFR-02 (2-5 s) is missed on the first evaluation after a restart: a median of 9.46 s on the live
+    server, against 0.03 s on repeats. Decided 2026-11-05: leave it for now. Building the embedding
+    cache at API startup is the likely fix if this changes.
+[~] The served model's training data includes the non-IT Accountant role (143 candidates, 18 jobs). The
+    generator was fixed after that run; removing the role from the model needs a new training run.
 [~] Synthetic labels are not hiring outcomes, and redaction is not proof of anonymity.
 [~] The model contract's deployment gate stays BLOCKED until independent quality evidence exists.
 [~] Resume parser isolation and distributed rate-limit counters are deferred.
@@ -90,12 +93,27 @@ DONE
 Newest first. Entries are a dated log: each describes the project as it was on that date, and [~]
 marks in older entries were true then. Items still open are listed in WHAT IS LEFT.
 
+MODEL VISUALS (2026-11-05)
+[x] notebooks/model_visuals.ipynb: 18 figures on the dataset, training and evaluation of the served model,
+    saved in notebooks/figures/. It stops if its recalculated metrics differ from the recorded run.
+[x] Findings on synthetic data. Labels are 73% good matches, so always saying yes gets about 72% accuracy.
+    Hybrid recall is 95-99% and specificity 31-42% at threshold 0.46. ROC-AUC is 0.807 warm and 0.847 cold.
+    It clearly beats semantic-only; its gap to the fixed weights is within bootstrap noise, on F1 as well.
+    Loss is flat from epoch 1, with no sign of overfitting, so epoch 4 is the lowest point of later noise.
+
+DEPLOYED (2026-11-05)
+[x] Hiring flow and 2026-11-04 follow-ups merged to main 9fc33a7 (CI green) and deployed by the user with
+    `deploy/jb update`. `deploy/jb measure-latency` then ran on the server.
+[x] `deploy/jb repair-graph` and `deploy/jb remove-demo-roles` were in the same server chain. The user
+    reported all good; their output was not reviewed here, so the live counts are not recorded.
+
 LIVE SERVER LATENCY (2026-11-05)
 [x] `deploy/jb measure-latency` on the live server, 7 runs each, the role with the most eligible candidates:
     170 candidates, 115 eligible. Nothing cached: median 9.46 s (8.66-10.75). Repeat: median 0.03 s (all 0.03).
     Model load and first pass, excluded: 16.4 s. Ranking step only: no saving and no HTTP, beside the live API.
 [x] The landing-page figure now quotes these numbers. NFR-02 is met on repeat evaluations and missed on the
-    first one after a restart, because the embedding cache is held in memory (see item 5).
+    first one after a restart, because the embedding cache is held in memory (see ACCEPTED LIMITATIONS).
+[x] Merged to main 38b8d5a (CI green).
 
 RECRUITER HIRING FLOW (2026-11-04)
 [x] Match analysis takes a role from evaluation to hire on one page: choose the top N applicants, shortlist,
