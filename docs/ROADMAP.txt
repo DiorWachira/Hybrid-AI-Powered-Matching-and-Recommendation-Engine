@@ -90,6 +90,14 @@ DONE
 Newest first. Entries are a dated log: each describes the project as it was on that date, and [~]
 marks in older entries were true then. Items still open are listed in WHAT IS LEFT.
 
+RECRUITER HIRING FLOW (2026-11-04)
+[x] Match analysis takes a role from evaluation to hire on one page: choose the top N applicants, shortlist,
+    mark interviews, hire, then close the posting and release the rest. Moves are all-or-nothing.
+[x] "Simulate hiring" runs those stages automatically and replays them. It acts on demo applicants only, says
+    no interview took place, picks the highest match score, is labelled as simulated and can be undone.
+[x] New "Filled roles" tab lists roles with a hire, real or simulated, with match score and days to fill.
+    Checked in a browser at 320-1440 px with a throwaway recruiter, on the real API and model. Not yet deployed.
+
 ROADMAP FOLLOW-UPS (2026-11-04)
 [x] Graph skill names (was item 11): new names keep their spelling, and `deploy/jb repair-graph` merges
     case duplicates and drops unused leftovers. Local run: 6 merged, 45 renamed, 126 removed; a second

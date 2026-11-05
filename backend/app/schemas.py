@@ -426,3 +426,76 @@ class RecruiterPipelineSummary(BaseModel):
     # Applications per stage across all of the recruiter's postings, and per posting.
     applications_by_status: dict[str, int]
     jobs: dict[UUID, dict[str, int]]
+
+
+class HiringApplicant(BaseModel):
+    application_id: UUID
+    candidate_id: UUID
+    candidate_name: str
+    candidate_location: str | None
+    years_experience: int
+    status: str
+    # None when the person applied after the latest evaluation.
+    final_score: float | None
+    hard_rule_passed: bool | None
+    recommended: bool | None
+    updated_at: datetime
+
+
+class HiringSimulationInfo(BaseModel):
+    ran_at: datetime
+    hired_name: str | None
+
+
+class HiringFlowResponse(BaseModel):
+    job_id: UUID
+    job_status: str
+    evaluated_at: datetime | None
+    applicants: list[HiringApplicant]
+    simulation: HiringSimulationInfo | None
+
+
+class BulkApplicationUpdate(BaseModel):
+    application_ids: list[UUID] = Field(min_length=1, max_length=500)
+    status: Literal["reviewing", "shortlisted", "interviewed", "rejected", "hired"]
+
+
+class HiringCompleteRequest(BaseModel):
+    close_posting: bool = True
+
+
+class HiringSimulationRequest(BaseModel):
+    top_n: int = Field(default=5, ge=1, le=100)
+    interview_count: int = Field(default=3, ge=1, le=20)
+
+
+class HiringSimulationStep(BaseModel):
+    stage: Literal["selected", "shortlisted", "interviewed", "hired", "closed"]
+    title: str
+    detail: str
+    candidates: list[str]
+
+
+class HiringSimulationResponse(BaseModel):
+    steps: list[HiringSimulationStep]
+    real_applicants_left: int
+    flow: HiringFlowResponse
+
+
+class FilledRoleHire(BaseModel):
+    application_id: UUID
+    candidate_name: str
+    final_score: float | None
+    hired_at: datetime
+    days_to_fill: int | None
+    simulated: bool
+
+
+class FilledRole(BaseModel):
+    job_id: UUID
+    title: str
+    location: str | None
+    job_status: str
+    posted_at: datetime | None
+    applicants_total: int
+    hires: list[FilledRoleHire]

@@ -14,6 +14,14 @@ from app.schemas import ApplicantResponse, ApplicationResponse, ApplicationStatu
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
 
+APPLICATION_TRANSITIONS: dict[str, set[str]] = {
+    "submitted": {"reviewing", "shortlisted", "rejected"},
+    "reviewing": {"shortlisted", "rejected"},
+    # A hire must follow a confirmed interview.
+    "shortlisted": {"interviewed", "rejected"},
+    "interviewed": {"hired", "rejected"},
+}
+
 
 @router.get("/mine", response_model=list[JobResponse])
 def list_my_jobs(offset: int = Query(default=0, ge=0), limit: int = Query(default=25, ge=1, le=100), user: User = Depends(require_roles(UserRole.recruiter, UserRole.admin)), db: Session = Depends(get_db)):
@@ -111,14 +119,7 @@ def update_application(job_id: UUID, application_id: UUID, payload: ApplicationS
     application = db.scalar(select(JobApplication).where(JobApplication.application_id == application_id, JobApplication.job_id == job_id).with_for_update())
     if application is None:
         raise HTTPException(status_code=404, detail="Application not found")
-    transitions = {
-        "submitted": {"reviewing", "shortlisted", "rejected"},
-        "reviewing": {"shortlisted", "rejected"},
-        # A hire must follow a confirmed interview.
-        "shortlisted": {"interviewed", "rejected"},
-        "interviewed": {"hired", "rejected"},
-    }
-    if payload.status != application.status and payload.status not in transitions.get(application.status, set()):
+    if payload.status != application.status and payload.status not in APPLICATION_TRANSITIONS.get(application.status, set()):
         raise HTTPException(status_code=409, detail="Application status transition not allowed")
     if payload.status != application.status:
         application.updated_at = datetime.now(UTC)

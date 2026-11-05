@@ -103,6 +103,18 @@ export type MatchEvaluation = {
   candidates: MatchCandidate[];
 };
 
+export type HiringApplicant = {
+  application_id: string; candidate_id: string; candidate_name: string; candidate_location: string | null; years_experience: number;
+  status: ApplicationStatus; final_score: number | null; hard_rule_passed: boolean | null; recommended: boolean | null; updated_at: string;
+};
+export type HiringFlow = { job_id: string; job_status: "open" | "closed"; evaluated_at: string | null; applicants: HiringApplicant[]; simulation: { ran_at: string; hired_name: string | null } | null };
+export type HiringSimulationStep = { stage: "selected" | "shortlisted" | "interviewed" | "hired" | "closed"; title: string; detail: string; candidates: string[] };
+export type HiringSimulation = { steps: HiringSimulationStep[]; real_applicants_left: number; flow: HiringFlow };
+export type FilledRole = {
+  job_id: string; title: string; location: string | null; job_status: "open" | "closed"; posted_at: string | null; applicants_total: number;
+  hires: Array<{ application_id: string; candidate_name: string; final_score: number | null; hired_at: string; days_to_fill: number | null; simulated: boolean }>;
+};
+
 export type MatchGraph = {
   nodes: Array<{ id: string; label: string; kind: "candidate" | "job" | "skill" }>;
   edges: Array<{ id: string; source: string; target: string; label: string; weight?: number | null; status?: string | null }>;
@@ -351,6 +363,16 @@ export const api = {
     return request<AuditEvent[]>(`/admin/activity?${params}`, { headers: { Authorization: `Bearer ${token}` } });
   },
   recruiterPipeline: (token: string) => request<RecruiterPipeline>("/jobs/mine/pipeline", { headers: { Authorization: `Bearer ${token}` } }),
+  hiringFlow: (jobId: string, token: string) => request<HiringFlow>(`/jobs/${jobId}/hiring`, { headers: { Authorization: `Bearer ${token}` } }),
+  advanceApplications: (jobId: string, applicationIds: string[], status: RecruiterStatus, token: string) =>
+    request<HiringFlow>(`/jobs/${jobId}/hiring/advance`, { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify({ application_ids: applicationIds, status }) }),
+  completeHiring: (jobId: string, closePosting: boolean, token: string) =>
+    request<HiringFlow>(`/jobs/${jobId}/hiring/complete`, { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify({ close_posting: closePosting }) }),
+  simulateHiring: (jobId: string, topN: number, interviewCount: number, token: string) =>
+    request<HiringSimulation>(`/jobs/${jobId}/hiring/simulate`, { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify({ top_n: topN, interview_count: interviewCount }) }),
+  undoHiringSimulation: (jobId: string, token: string) =>
+    request<HiringFlow>(`/jobs/${jobId}/hiring/simulate/undo`, { method: "POST", headers: { Authorization: `Bearer ${token}` } }),
+  filledRoles: (token: string) => request<FilledRole[]>("/jobs/mine/filled", { headers: { Authorization: `Bearer ${token}` } }),
   setAccountActive: (token: string, userId: string, isActive: boolean) =>
     request<AdminUser>(`/admin/users/${userId}`, {
       method: "PATCH", headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify({ is_active: isActive }),

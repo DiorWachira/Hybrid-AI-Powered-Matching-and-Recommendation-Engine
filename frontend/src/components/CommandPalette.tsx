@@ -21,6 +21,7 @@ const commandsByRole: Record<UserRole, Command[]> = {
   recruiter: [
     { id: "postings", label: "My postings", group: "Go to", icon: LayoutDashboard, to: "/recruiter" },
     { id: "matches", label: "Match analysis", group: "Go to", icon: Target, to: "/matches" },
+    { id: "filled", label: "Filled roles", group: "Go to", icon: BriefcaseBusiness, to: "/filled-roles", keywords: "hired employed jobs" },
     { id: "new", label: "Create a job posting", group: "Actions", icon: Plus, to: "/recruiter?new=1", keywords: "publish role" },
   ],
   candidate: [
