@@ -7,24 +7,17 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import require_roles
-from app.api.jobs import APPLICATION_TRANSITIONS, _owned_job
-from app.api.matches import latest_evaluated_at
+from app.api.jobs import APPLICATION_TRANSITIONS, _owned_job, override_checks, require_override_reason
+from app.api.matches import latest_scores
 from app.core.hiring_plan import ACTIVE_STATUSES, RankedApplicant, plan_simulation
 from app.core.hybrid_matcher import _artifact
+from app.core.overrides import audit_details
 from app.core.rate_limit import limiter
-from app.db.models import AuditEvent, Candidate, Employer, HiringSimulation, JobApplication, JobPosting, JobStatus, MatchResult, User, UserRole
+from app.db.models import AuditEvent, Candidate, Employer, HiringSimulation, JobApplication, JobPosting, JobStatus, User, UserRole
 from app.db.postgres import get_db
 from app.schemas import BulkApplicationUpdate, FilledRole, FilledRoleHire, HiringApplicant, HiringCompleteRequest, HiringFlowResponse, HiringSimulationInfo, HiringSimulationRequest, HiringSimulationResponse, HiringSimulationStep
 
 router = APIRouter(prefix="/jobs", tags=["hiring"])
-
-
-def _scores(db: Session, job_id: UUID) -> tuple[datetime | None, dict[UUID, MatchResult]]:
-    evaluated_at = latest_evaluated_at(db, job_id)
-    if evaluated_at is None:
-        return None, {}
-    rows = db.scalars(select(MatchResult).where(MatchResult.job_id == job_id, MatchResult.created_at == evaluated_at))
-    return evaluated_at, {row.candidate_id: row for row in rows}
 
 
 def _simulation_info(db: Session, simulation: HiringSimulation | None) -> HiringSimulationInfo | None:
@@ -36,7 +29,7 @@ def _simulation_info(db: Session, simulation: HiringSimulation | None) -> Hiring
 
 
 def _flow(db: Session, job: JobPosting) -> HiringFlowResponse:
-    evaluated_at, scores = _scores(db, job.job_id)
+    evaluated_at, scores = latest_scores(db, job.job_id)
     threshold = _artifact()["decision_threshold"]
     rows = db.execute(
         select(JobApplication, Candidate.full_name, Candidate.location, Candidate.years_experience)
@@ -53,6 +46,7 @@ def _flow(db: Session, job: JobPosting) -> HiringFlowResponse:
             hard_rule_passed=match.hard_rule_passed if match else None,
             recommended=bool(match.hard_rule_passed and (score or 0) >= threshold) if match else None,
             updated_at=application.updated_at,
+            rule_reasons=list((match.skill_gap_breakdown or {}).get("rule_reasons") or []) if match else [],
         ))
     applicants.sort(key=lambda item: (item.final_score is None, -(item.final_score or 0), str(item.application_id)))
     return HiringFlowResponse(
@@ -77,7 +71,7 @@ def filled_roles(user: User = Depends(require_roles(UserRole.recruiter)), db: Se
             applicants = db.scalar(select(func.count()).select_from(JobApplication).where(JobApplication.job_id == job.job_id)) or 0
             roles[job.job_id] = FilledRole(job_id=job.job_id, title=job.title, location=job.location, job_status=job.status.value, posted_at=job.posted_at, applicants_total=applicants, hires=[])
         simulation = db.get(HiringSimulation, job.job_id)
-        _, scores = _scores(db, job.job_id)
+        _, scores = latest_scores(db, job.job_id)
         match = scores.get(application.candidate_id)
         simulated = bool(simulation and simulation.hired_application_id == application.application_id)
         roles[job.job_id].hires.append(FilledRoleHire(
@@ -102,11 +96,13 @@ def advance_applications(job_id: UUID, payload: BulkApplicationUpdate, user: Use
         raise HTTPException(status_code=404, detail="Application not found")
     if any(payload.status not in APPLICATION_TRANSITIONS.get(application.status, set()) for application in applications):
         raise HTTPException(status_code=409, detail="Application status transition not allowed")
+    checks = override_checks(db, job_id, applications, payload.status)
+    require_override_reason(db, checks, payload.override_reason, applications)
     now = datetime.now(UTC)
     for application in applications:
         application.status = payload.status
         application.updated_at = now
-        db.add(AuditEvent(actor_user_id=user.user_id, action="application.status_changed", resource_type="application", resource_id=application.application_id, details={"status": payload.status}))
+        db.add(AuditEvent(actor_user_id=user.user_id, action="application.status_changed", resource_type="application", resource_id=application.application_id, details=audit_details(payload.status, checks.get(application.application_id), payload.override_reason)))
     db.commit()
     return _flow(db, job)
 
@@ -141,7 +137,7 @@ def simulate_hiring(request: Request, job_id: UUID, payload: HiringSimulationReq
         raise HTTPException(status_code=409, detail="This role already has a simulated hire. Undo it to run again")
     if db.scalar(select(JobApplication.application_id).where(JobApplication.job_id == job_id, JobApplication.status == "hired").limit(1)):
         raise HTTPException(status_code=409, detail="This role already has a hire")
-    evaluated_at, scores = _scores(db, job_id)
+    evaluated_at, scores = latest_scores(db, job_id)
     if evaluated_at is None:
         raise HTTPException(status_code=409, detail="Evaluate candidates before simulating")
     rows = db.execute(

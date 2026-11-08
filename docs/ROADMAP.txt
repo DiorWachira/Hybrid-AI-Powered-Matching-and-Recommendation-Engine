@@ -1,6 +1,6 @@
 HYBRID AI-POWERED WORKFORCE PLACEMENT ENGINE
 PROJECT MILESTONE ROADMAP (8 WEEKS)
-Last updated: 2026-11-05. What is left comes first; everything done is further down, newest first.
+Last updated: 2026-11-08. What is left comes first; everything done is further down, newest first.
 
 ====================================================================
 WHAT IS LEFT
@@ -13,7 +13,6 @@ NEEDS YOU, MOST IMPORTANT FIRST
        only independent evidence of match quality; Week 7's exit criterion depends on it.
 [ ] 2. Finish the live-site checks. Checked from outside on 2026-11-04 (see DONE): issue #15 pages in
        light, dark, 320/390/1440 px; health; valid certificate; closed database ports. Left:
-       - Run `deploy/jb update` so the new latency figure goes live (main 38b8d5a or later).
        - Confirm the phone fixes on the live site, then close #15.
        - docs/DEPLOYMENT.md checklist items only you can do: Oracle billing, another device,
          real sign-ins including admin two-step, `sudo reboot` with data intact, `deploy/jb backup`.
@@ -92,6 +91,27 @@ DONE
 ====================================================================
 Newest first. Entries are a dated log: each describes the project as it was on that date, and [~]
 marks in older entries were true then. Items still open are listed in WHAT IS LEFT.
+
+DECISION TRANSPARENCY AND BIAS (2026-11-08)
+[x] Supervisor request: after an evaluation, the match analysis page explains how each result was reached
+    and where bias could enter. "Fairness check for this evaluation" shows the same rules, model and
+    threshold for everyone, how many candidates each rule removed, and what the model is never given.
+    "How this decision was reached" walks through four steps (eligibility rules, what the model read,
+    the score calculation, the recruiter's decision) with the bias risk and how it is avoided at each,
+    plus a summary for each scenario: recommended, below the threshold, requirements not met, earlier
+    model. Wording: frontend/src/lib/decisionGuide.ts; reference: docs/BIAS_AND_EXPLAINABILITY.md
+    (rewritten; the old one was out of date) and docs/Explanations.md section 13.
+[x] Blind review switch hides names and locations behind a stable candidate code.
+[x] Evaluations now save the posting's rules with them, so later edits cannot rewrite them.
+[x] Recruiter override warning (Explanations section 12): warn and record, never block. Moving forward
+    anyone not recommended shows a warning on the hiring flow and the roles-page applicant list, which
+    now shows scores. A failed hard rule needs a reason of at least 10 characters, enforced on the server;
+    decided 2026-11-08 that low scores alone need no reason. Audit events keep score, threshold, rule
+    result and reason; admin gets an Overrides filter and a dashboard count.
+[x] Warm and cold checks added to notebooks/model_visuals.ipynb as Figure 22 (Part 5), with
+    warm_cold_checks.csv. Results match the one-off analysis: gap +0.040 (31% of 5,000 shuffles as big),
+    -0.050 on the fresh population (14%), cold 0.839-0.858 leaving one job out.
+[x] The user ran `deploy/jb update` for the latency figure (confirmed 2026-11-08).
 
 MODEL VISUALS (2026-11-05)
 [x] notebooks/model_visuals.ipynb: 18 figures on the dataset, training and evaluation of the served model,

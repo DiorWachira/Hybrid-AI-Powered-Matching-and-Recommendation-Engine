@@ -8,6 +8,9 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.api.dependencies import require_roles
+from app.api.matches import latest_scores
+from app.core.hybrid_matcher import _artifact
+from app.core.overrides import FORWARD_STATUSES, OverrideCheck, audit_details, check_override, missing_reason
 from app.db.models import AuditEvent, Candidate, Employer, JobApplication, JobPosting, JobStatus, User, UserRole
 from app.db.postgres import get_db
 from app.schemas import ApplicantResponse, ApplicationResponse, ApplicationStatusUpdate, JobCreateRequest, JobResponse, JobStatusUpdate, JobUpdateRequest, RecruiterPipelineSummary
@@ -74,6 +77,25 @@ def list_open_jobs(offset: int = Query(default=0, ge=0), limit: int = Query(defa
     return list(db.scalars(select(JobPosting).where(JobPosting.status == JobStatus.open).order_by(JobPosting.posted_at.desc(), JobPosting.job_id).offset(offset).limit(limit)))
 
 
+def override_checks(db: Session, job_id: UUID, applications: list, status: str) -> dict[UUID, OverrideCheck]:
+    """For a forward move, how each application stands against the job's latest evaluation."""
+    if status not in FORWARD_STATUSES:
+        return {}
+    _, scores = latest_scores(db, job_id)
+    threshold = _artifact()["decision_threshold"]
+    return {application.application_id: check_override(scores.get(application.candidate_id), threshold) for application in applications}
+
+
+def require_override_reason(db: Session, checks: dict[UUID, OverrideCheck], reason: str | None, applications: list) -> None:
+    """Moving forward someone who failed an eligibility rule needs a written reason. The server checks it so the API cannot skip it."""
+    missing = set(missing_reason(checks, reason))
+    if not missing:
+        return
+    names = [db.get(Candidate, application.candidate_id) for application in applications if application.application_id in missing]
+    listed = ", ".join(candidate.full_name for candidate in names if candidate is not None) or "this applicant"
+    raise HTTPException(status_code=422, detail=f"Give a reason of at least 10 characters to move forward {listed}, who did not meet this role's eligibility rules.")
+
+
 def _owned_job(db: Session, user: User, job_id: UUID) -> JobPosting:
     job = db.get(JobPosting, job_id)
     if job is None:
@@ -110,7 +132,20 @@ def change_job_status(job_id: UUID, payload: JobStatusUpdate, user: User = Depen
 def list_applications(job_id: UUID, offset: int = Query(default=0, ge=0), limit: int = Query(default=100, ge=1, le=100), user: User = Depends(require_roles(UserRole.recruiter, UserRole.admin)), db: Session = Depends(get_db)):
     _owned_job(db, user, job_id)
     rows = db.execute(select(JobApplication, Candidate).join(Candidate, Candidate.candidate_id == JobApplication.candidate_id).where(JobApplication.job_id == job_id).order_by(JobApplication.created_at.desc(), JobApplication.application_id).offset(offset).limit(limit)).all()
-    return [ApplicantResponse(**ApplicationResponse.model_validate(application).model_dump(), candidate_name=candidate.full_name, candidate_location=candidate.location, years_experience=candidate.years_experience, skills=candidate.skills or [], certifications=candidate.certifications or []) for application, candidate in rows]
+    _, scores = latest_scores(db, job_id)
+    threshold = _artifact()["decision_threshold"]
+    applicants = []
+    for application, candidate in rows:
+        match = scores.get(candidate.candidate_id)
+        score = match.final_weighted_score if match else None
+        applicants.append(ApplicantResponse(
+            **ApplicationResponse.model_validate(application).model_dump(), candidate_name=candidate.full_name, candidate_location=candidate.location,
+            years_experience=candidate.years_experience, skills=candidate.skills or [], certifications=candidate.certifications or [],
+            final_score=score, hard_rule_passed=match.hard_rule_passed if match else None,
+            rule_reasons=list((match.skill_gap_breakdown or {}).get("rule_reasons") or []) if match else [],
+            recommended=bool(match.hard_rule_passed and (score or 0) >= threshold) if match else None,
+        ))
+    return applicants
 
 
 @router.patch("/{job_id}/applications/{application_id}", response_model=ApplicationResponse)
@@ -121,10 +156,13 @@ def update_application(job_id: UUID, application_id: UUID, payload: ApplicationS
         raise HTTPException(status_code=404, detail="Application not found")
     if payload.status != application.status and payload.status not in APPLICATION_TRANSITIONS.get(application.status, set()):
         raise HTTPException(status_code=409, detail="Application status transition not allowed")
-    if payload.status != application.status:
+    changed = payload.status != application.status
+    checks = override_checks(db, job_id, [application], payload.status) if changed else {}
+    require_override_reason(db, checks, payload.override_reason, [application])
+    if changed:
         application.updated_at = datetime.now(UTC)
     application.status = payload.status
-    db.add(AuditEvent(actor_user_id=user.user_id, action="application.status_changed", resource_type="application", resource_id=application_id, details={"status": payload.status}))
+    db.add(AuditEvent(actor_user_id=user.user_id, action="application.status_changed", resource_type="application", resource_id=application_id, details=audit_details(payload.status, checks.get(application.application_id), payload.override_reason)))
     db.commit()
     db.refresh(application)
     return application

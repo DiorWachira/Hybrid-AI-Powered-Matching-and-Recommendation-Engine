@@ -220,6 +220,8 @@ class JobUpdateRequest(JobCreateRequest):
 
 class ApplicationStatusUpdate(BaseModel):
     status: Literal["reviewing", "shortlisted", "interviewed", "rejected", "hired"]
+    # Required, at least 10 characters, when moving forward someone who failed an eligibility rule.
+    override_reason: str | None = Field(default=None, max_length=500)
 
 
 class ApplicationResponse(BaseModel):
@@ -239,6 +241,11 @@ class ApplicantResponse(ApplicationResponse):
     years_experience: int
     skills: list[str]
     certifications: list[str]
+    # From the job's latest evaluation; None when the person applied after it.
+    final_score: float | None = None
+    hard_rule_passed: bool | None = None
+    rule_reasons: list[str] = Field(default_factory=list)
+    recommended: bool | None = None
 
 
 class CandidateApplicationResponse(ApplicationResponse):
@@ -356,10 +363,35 @@ class MatchCandidateResponse(BaseModel):
     recommended: bool | None = False
 
 
+class ScoringInput(BaseModel):
+    key: Literal["semantic_score", "skill_overlap", "growth_score"]
+    weight: float
+    mean: float
+    scale: float
+
+
+class ScoringModel(BaseModel):
+    """The served combiner's parameters, so a recruiter can follow each score from inputs to decision."""
+    version: str
+    threshold: float
+    intercept: float
+    inputs: list[ScoringInput]
+
+
+class EligibilityRequirement(BaseModel):
+    """One hard rule as the posting stated it when the evaluation ran."""
+    rule: Literal["work_authorization", "experience", "location", "salary", "certifications"]
+    applied: bool
+    requirement: str | None = None
+
+
 class MatchEvaluationResponse(BaseModel):
     job_id: UUID
     evaluated_at: datetime | None = None
     candidates: list[MatchCandidateResponse]
+    model: ScoringModel | None = None
+    # None for evaluations saved before requirements were recorded.
+    requirements: list[EligibilityRequirement] | None = None
 
 
 class AdminUserResponse(BaseModel):
@@ -418,6 +450,9 @@ class AdminOverviewResponse(BaseModel):
     # Applications grouped by pipeline stage, e.g. {"submitted": 4, "hired": 1}.
     application_status_counts: dict[str, int] = Field(default_factory=dict)
     daily_activity: list[DailyActivity] = Field(default_factory=list)
+    # Forward moves against the evaluation's advice: all of them, and those past a failed eligibility rule.
+    overrides_count: int = 0
+    hard_rule_overrides_count: int = 0
 
 
 class RecruiterPipelineSummary(BaseModel):
@@ -440,6 +475,7 @@ class HiringApplicant(BaseModel):
     hard_rule_passed: bool | None
     recommended: bool | None
     updated_at: datetime
+    rule_reasons: list[str] = Field(default_factory=list)
 
 
 class HiringSimulationInfo(BaseModel):
@@ -458,6 +494,8 @@ class HiringFlowResponse(BaseModel):
 class BulkApplicationUpdate(BaseModel):
     application_ids: list[UUID] = Field(min_length=1, max_length=500)
     status: Literal["reviewing", "shortlisted", "interviewed", "rejected", "hired"]
+    # Required, at least 10 characters, when anyone moved forward failed an eligibility rule.
+    override_reason: str | None = Field(default=None, max_length=500)
 
 
 class HiringCompleteRequest(BaseModel):

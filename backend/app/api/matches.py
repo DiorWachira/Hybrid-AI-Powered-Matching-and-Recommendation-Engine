@@ -12,17 +12,55 @@ from app.db.models import AuditEvent, Candidate, Employer, JobPosting, MatchResu
 from app.core.hybrid_matcher import _artifact, calibrated_score, semantic_similarities, semantic_similarity
 from app.core.match_features import CONTRACT_V1, contract_features, skill_credits
 from app.db.postgres import get_db
-from app.schemas import MatchCandidateResponse, MatchEvaluationResponse, StoredMatchResponse
+from app.schemas import MatchCandidateResponse, MatchEvaluationResponse, ScoringInput, ScoringModel, StoredMatchResponse
 from app.db.neo4j_db import get_neo4j_driver
 from neo4j.exceptions import Neo4jError, ServiceUnavailable, SessionExpired
 
 router = APIRouter(prefix="/matches", tags=["matches"])
 
 
+def _latest_evaluation(db: Session, job_id: UUID) -> AuditEvent | None:
+    return db.scalar(select(AuditEvent).where(AuditEvent.action == "matches.evaluated", AuditEvent.resource_type == "job", AuditEvent.resource_id == job_id).order_by(AuditEvent.created_at.desc(), AuditEvent.event_id.desc()).limit(1))
+
+
 def latest_evaluated_at(db: Session, job_id: UUID) -> datetime | None:
     """When this job's most recent evaluation ran, or None if it has never been evaluated."""
-    completed = db.scalar(select(AuditEvent).where(AuditEvent.action == "matches.evaluated", AuditEvent.resource_type == "job", AuditEvent.resource_id == job_id).order_by(AuditEvent.created_at.desc(), AuditEvent.event_id.desc()).limit(1))
+    completed = _latest_evaluation(db, job_id)
     return completed.created_at if completed else db.scalar(select(func.max(MatchResult.created_at)).where(MatchResult.job_id == job_id))
+
+
+def latest_scores(db: Session, job_id: UUID) -> tuple[datetime | None, dict[UUID, MatchResult]]:
+    """The job's latest saved evaluation, keyed by candidate."""
+    evaluated_at = latest_evaluated_at(db, job_id)
+    if evaluated_at is None:
+        return None, {}
+    rows = db.scalars(select(MatchResult).where(MatchResult.job_id == job_id, MatchResult.created_at == evaluated_at))
+    return evaluated_at, {row.candidate_id: row for row in rows}
+
+
+def scoring_model(artifact: dict) -> ScoringModel:
+    model = artifact["logistic_regression"]
+    keys = ("semantic_score", "skill_overlap", "growth_score")  # The artifact's S_bert, S_graph, S_growth order.
+    return ScoringModel(
+        version=artifact["model_version"], threshold=artifact["decision_threshold"], intercept=model["intercept"],
+        inputs=[ScoringInput(key=key, weight=weight, mean=mean, scale=scale) for key, weight, mean, scale in zip(keys, model["coefficients"], artifact["scaler_mean"], artifact["scaler_scale"])],
+    )
+
+
+def requirements_snapshot(job: JobPosting) -> list[dict]:
+    """The hard rules exactly as the posting set them, saved with each evaluation so later edits cannot rewrite it."""
+    certifications = sorted(getattr(job, "mandatory_certifications", None) or [])
+    salary = getattr(job, "salary_range_max", None)
+    authorization = bool(getattr(job, "requires_work_authorization", False))
+    years = getattr(job, "required_experience_years", None) or 0
+    location = getattr(job, "location", None) or None
+    return [
+        {"rule": "work_authorization", "applied": authorization, "requirement": "Confirmed right to work" if authorization else None},
+        {"rule": "experience", "applied": years > 0, "requirement": f"At least {years} {'year' if years == 1 else 'years'}" if years else None},
+        {"rule": "location", "applied": bool(location), "requirement": location},
+        {"rule": "salary", "applied": salary is not None, "requirement": f"Up to {salary:,.0f}" if salary is not None else None},
+        {"rule": "certifications", "applied": bool(certifications), "requirement": ", ".join(certifications) or None},
+    ]
 
 
 @router.get("/jobs/{job_id}", response_model=MatchEvaluationResponse)
@@ -34,10 +72,12 @@ def read_job_matches(job_id: UUID, user: User = Depends(require_roles(UserRole.r
         employer = db.get(Employer, job.employer_id)
         if employer is None or employer.user_id != user.user_id:
             raise HTTPException(status_code=403, detail="You can only view your own job evaluations")
-    evaluated_at = latest_evaluated_at(db, job_id)
+    evaluation = _latest_evaluation(db, job_id)
+    evaluated_at = evaluation.created_at if evaluation else latest_evaluated_at(db, job_id)
     if evaluated_at is None:
         return MatchEvaluationResponse(job_id=job_id, candidates=[])
     artifact = _artifact()
+    requirements = (getattr(evaluation, "details", None) or {}).get("requirements")
     rows = db.execute(select(MatchResult, Candidate.full_name).join(Candidate, Candidate.candidate_id == MatchResult.candidate_id).join(User, User.user_id == Candidate.user_id).where(MatchResult.job_id == job_id, MatchResult.created_at == evaluated_at, User.is_active.is_(True)).order_by(MatchResult.final_weighted_score.desc(), MatchResult.candidate_id)).all()
     candidates = []
     for result, name in rows:
@@ -50,7 +90,7 @@ def read_job_matches(job_id: UUID, user: User = Depends(require_roles(UserRole.r
             matched_skills=explanation.get("matched_skills"), missing_skills=explanation.get("missing_skills"), related_skills=explanation.get("related_skills"), model_version=result.model_version,
             recommended=(result.hard_rule_passed and (result.final_weighted_score or 0.0) >= artifact["decision_threshold"]) if result.model_version == artifact["model_version"] else None,
         ))
-    return MatchEvaluationResponse(job_id=job_id, evaluated_at=evaluated_at, candidates=candidates)
+    return MatchEvaluationResponse(job_id=job_id, evaluated_at=evaluated_at, candidates=candidates, model=scoring_model(artifact), requirements=requirements)
 
 
 @router.get("/{match_id}", response_model=StoredMatchResponse)
@@ -215,6 +255,7 @@ def evaluate_matches(
             final_weighted_score=result.final_score,
             skill_gap_breakdown={"matched_skills": matched_skills, "missing_skills": missing_skills, "related_skills": related_skills, "rule_reasons": result.rule_reasons},
         ))
-    db.add(AuditEvent(actor_user_id=user.user_id, action="matches.evaluated", resource_type="job", resource_id=job.job_id, created_at=evaluated_at, details={"candidates": len(ranked), "eligible": sum(result.hard_rule_passed for result in ranked)}))
+    requirements = requirements_snapshot(job)
+    db.add(AuditEvent(actor_user_id=user.user_id, action="matches.evaluated", resource_type="job", resource_id=job.job_id, created_at=evaluated_at, details={"candidates": len(ranked), "eligible": sum(result.hard_rule_passed for result in ranked), "requirements": requirements}))
     db.commit()
-    return MatchEvaluationResponse(job_id=job.job_id, evaluated_at=evaluated_at, candidates=ranked)
+    return MatchEvaluationResponse(job_id=job.job_id, evaluated_at=evaluated_at, candidates=ranked, model=scoring_model(artifact), requirements=requirements)

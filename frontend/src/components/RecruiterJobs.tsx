@@ -4,6 +4,7 @@ import { ArrowLeft, BadgeCheck, BriefcaseBusiness, Inbox, Pencil, RefreshCw, Tar
 import { api, type Applicant, type ApplicationStatus, type JobPosting, type RecruiterPipeline, type RecruiterStatus } from "../lib/api";
 import { ADMIN_PAGE_SIZE as PAGE_SIZE, ListPagination } from "./ListPagination";
 import { StageBar } from "./Insights";
+import { OverrideDialog, overrideFlags, type OverrideRequest } from "./OverrideDialog";
 
 const transitions: Record<ApplicationStatus, RecruiterStatus[]> = {
   submitted: ["reviewing", "shortlisted", "rejected"], reviewing: ["shortlisted", "rejected"],
@@ -82,6 +83,7 @@ function ApplicationPipeline({ job, counts: initialCounts, onBack, onJobChanged 
   // Set after a hire on an open posting, so the recruiter decides whether to keep recruiting.
   const [hiredName, setHiredName] = useState<string | null>(null);
   const [counts, setCounts] = useState(initialCounts);
+  const [pending, setPending] = useState<OverrideRequest | null>(null);
   useEffect(() => {
     let active = true;
     setLoading(true); setError(null);
@@ -91,11 +93,17 @@ function ApplicationPipeline({ job, counts: initialCounts, onBack, onJobChanged 
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [job.job_id, offset, refresh]);
-  const changeStatus = async (application: Applicant, status: RecruiterStatus) => {
-    if (busy || !window.confirm(`${actionLabels[status]} for ${application.candidate_name}?`)) return;
+  /** A forward move for someone who was not recommended opens the warning; a failed rule also needs a reason. */
+  const changeStatus = (application: Applicant, status: RecruiterStatus) => {
+    if (busy) return;
+    const flagged = status === "rejected" ? [] : overrideFlags([{ ...application, id: application.application_id, name: application.candidate_name }]);
+    if (flagged.length) { setPending({ action: `${actionLabels[status].toLowerCase()} for ${application.candidate_name}`, flagged, onConfirm: (reason) => void applyStatus(application, status, reason) }); return; }
+    if (window.confirm(`${actionLabels[status]} for ${application.candidate_name}?`)) void applyStatus(application, status);
+  };
+  const applyStatus = async (application: Applicant, status: RecruiterStatus, reason?: string) => {
     setBusy(application.application_id); setError(null); setNotice(null); setHiredName(null);
     try {
-      const updated = await api.changeApplicationStatus(job.job_id, application.application_id, status, localStorage.getItem("jobbridge_token") ?? "");
+      const updated = await api.changeApplicationStatus(job.job_id, application.application_id, status, localStorage.getItem("jobbridge_token") ?? "", reason);
       setApplications((items) => items.map((item) => item.application_id === updated.application_id ? { ...item, ...updated } : item));
       setCounts((current) => ({ ...current, [application.status]: Math.max(0, (current[application.status] ?? 0) - 1), [updated.status]: (current[updated.status] ?? 0) + 1 }));
       setNotice(`${application.candidate_name}: ${statusLabels[updated.status]}.`);
@@ -119,9 +127,17 @@ function ApplicationPipeline({ job, counts: initialCounts, onBack, onJobChanged 
     {error && <p className="notice error" role="alert">{error}</p>}{notice && <p className="notice" role="status">{notice}</p>}
     {hiredName && <div className="hire-decision" role="region" aria-label="Posting decision"><BadgeCheck size={20} /><div><h3>{hiredName} hired</h3><p>Close this posting if you are not recruiting further, or keep it open to consider more candidates.</p></div><div className="workflow-actions"><button className="primary-button" disabled={busy !== null} onClick={() => void decidePosting(true)}>Close posting</button><button className="secondary-button" disabled={busy !== null} onClick={() => void decidePosting(false)}>Keep open</button></div></div>}
     {loading ? <p role="status">Loading applicants...</p> : <div className="workflow-list">{applications.slice(0, PAGE_SIZE).map((application) => <article className="workflow-row" key={application.application_id} aria-label={application.candidate_name}>
-      <div className="workflow-identity"><h3>{application.candidate_name}</h3><p>{application.candidate_location || "Location not specified"} / {application.years_experience} years experience</p><p>Applied {new Date(application.created_at).toLocaleDateString()} / Updated {new Date(application.updated_at).toLocaleString()}</p><details><summary>Skills and qualifications</summary><div className="skill-tags">{application.skills.length ? application.skills.map((skill) => <span key={skill}>{skill}</span>) : "No skills recorded"}</div><p>Certifications: {application.certifications.join(", ") || "None recorded"}</p></details></div>
-      <label className="studio-field workflow-status">Application status<select aria-label={`Application status for ${application.candidate_name}`} value={application.status} disabled={busy !== null || !transitions[application.status].length} onChange={(event) => void changeStatus(application, event.target.value as RecruiterStatus)}><option value={application.status}>{statusLabels[application.status]}</option>{transitions[application.status].map((status) => <option key={status} value={status}>{actionLabels[status]}</option>)}</select></label>
+      <div className="workflow-identity"><h3>{application.candidate_name}</h3><p>{application.candidate_location || "Location not specified"} / {application.years_experience} years experience</p><p>Applied {new Date(application.created_at).toLocaleDateString()} / Updated {new Date(application.updated_at).toLocaleString()}</p><MatchLine application={application} /><details><summary>Skills and qualifications</summary><div className="skill-tags">{application.skills.length ? application.skills.map((skill) => <span key={skill}>{skill}</span>) : "No skills recorded"}</div><p>Certifications: {application.certifications.join(", ") || "None recorded"}</p></details></div>
+      <label className="studio-field workflow-status">Application status<select aria-label={`Application status for ${application.candidate_name}`} value={application.status} disabled={busy !== null || !transitions[application.status].length} onChange={(event) => changeStatus(application, event.target.value as RecruiterStatus)}><option value={application.status}>{statusLabels[application.status]}</option>{transitions[application.status].map((status) => <option key={status} value={status}>{actionLabels[status]}</option>)}</select></label>
     </article>)}{!applications.length && <p role="status">{error ? "Applications unavailable" : "No applications for this role yet"}</p>}</div>}
     <ListPagination label="applicants" offset={offset} hasNext={applications.length > PAGE_SIZE} disabled={loading || busy !== null} onChange={setOffset} />
+    <OverrideDialog request={pending} onClose={() => setPending(null)} />
   </section>;
+}
+
+/** The applicant's result in the role's latest evaluation, so a recruiter sees it before moving them. */
+function MatchLine({ application }: { application: Applicant }) {
+  if (application.hard_rule_passed === null) return <p className="applicant-match">Not in the latest evaluation. Evaluate the role to score this applicant.</p>;
+  if (!application.hard_rule_passed) return <p className="applicant-match"><span className="override-tag hard_rule">Failed a rule</span>{application.rule_reasons.join("; ") || "Eligibility requirements not met"}</p>;
+  return <p className="applicant-match">{application.recommended ? <span className="applicant-recommended">Recommended</span> : <span className="override-tag below_threshold">Below threshold</span>}Match score {Math.round(Math.max(0, Math.min(1, application.final_score ?? 0)) * 100)}%</p>;
 }

@@ -1,10 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowLeft, Check, CircleAlert, RefreshCw, Search, Target } from "lucide-react";
+import { ArrowLeft, Check, CircleAlert, EyeOff, RefreshCw, Search, Target } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
-import { api, type HiringFlow as Flow, type JobPosting, type MatchCandidate } from "../lib/api";
+import { api, type EligibilityRequirement, type HiringFlow as Flow, type JobPosting, type MatchCandidate, type MatchEvaluation, type ScoringModel } from "../lib/api";
 import { getSessionRole } from "../lib/session";
 import { MatchGraphView } from "../components/MatchGraphView";
-import { HiringFlow, selectablePool } from "../components/HiringFlow";
+import { HiringFlow, blindLabel, selectablePool } from "../components/HiringFlow";
+import { DecisionWalkthrough, FairnessPanel } from "../components/DecisionWalkthrough";
+
+const BLIND_KEY = "jobbridge_blind_review";
+const readBlind = () => { try { return localStorage.getItem(BLIND_KEY) === "1"; } catch { return false; } };
 
 const percent = (score: number) => Math.round(Math.max(0, Math.min(1, score)) * 100);
 const STAGE_NAMES: Record<string, string> = { submitted: "Applied", reviewing: "Selected", shortlisted: "Shortlisted", interviewed: "Interviewed", hired: "Hired", rejected: "Released", withdrawn: "Withdrawn" };
@@ -19,6 +23,11 @@ export function MatchesPage() {
   const [eligibleOnly, setEligibleOnly] = useState(false);
   const [evaluating, setEvaluating] = useState(false);
   const [evaluatedAt, setEvaluatedAt] = useState<string | null>(null);
+  const [scoring, setScoring] = useState<ScoringModel | null>(null);
+  const [requirements, setRequirements] = useState<EligibilityRequirement[] | null>(null);
+  // Blind review hides names and locations while shortlisting; remembered per browser.
+  const [blind, setBlind] = useState(readBlind);
+  const toggleBlind = (value: boolean) => { setBlind(value); try { localStorage.setItem(BLIND_KEY, value ? "1" : "0"); } catch { /* storage may be unavailable */ } };
   const evaluationPending = useRef(false);
   const [params, setParams] = useSearchParams();
   // The job lives in the URL so links and refreshes work; the last opened job is the fallback.
@@ -43,7 +52,9 @@ export function MatchesPage() {
     void api.myJobs(token, 0, 50).then((items) => { if (active) setPostings(items); }).catch(() => { if (active) setPostings([]); });
     return () => { active = false; };
   }, [role]);
-  const selectJob = (id: string) => { setResults([]); setEvaluatedAt(null); setSelectedId(null); setFlow(null); setParams({ job: id }); };
+  const selectJob = (id: string) => { setResults([]); setEvaluatedAt(null); setScoring(null); setRequirements(null); setSelectedId(null); setFlow(null); setParams({ job: id }); };
+  const show = (response: MatchEvaluation) => { setResults(response.candidates); setEvaluatedAt(response.evaluated_at); setScoring(response.model ?? null); setRequirements(response.requirements ?? null); setSelectedId(response.candidates[0]?.candidate_id ?? null); };
+  const nameOf = (candidate: MatchCandidate) => blind ? blindLabel(candidate.candidate_id) : candidate.full_name;
   const currentPosting = postings?.find((posting) => posting.job_id === jobId);
 
   useEffect(() => {
@@ -51,7 +62,7 @@ export function MatchesPage() {
     const token = localStorage.getItem("jobbridge_token");
     if (!token || !jobId) { setLoading(false); return; }
     setLoading(true); setError(null);
-    void api.savedMatches(jobId, token).then((response) => { if (active) { setResults(response.candidates); setEvaluatedAt(response.evaluated_at); setSelectedId(response.candidates[0]?.candidate_id ?? null); } })
+    void api.savedMatches(jobId, token).then((response) => { if (active) show(response); })
       .catch((reason: Error) => { if (active) setError(reason.message); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
@@ -71,8 +82,7 @@ export function MatchesPage() {
     if (!jobId || !token || evaluationPending.current || loading) return;
     evaluationPending.current = true; setEvaluating(true); setError(null);
     try {
-      const response = await api.evaluateMatches(jobId, token);
-      setResults(response.candidates); setEvaluatedAt(response.evaluated_at); setSelectedId(response.candidates[0]?.candidate_id ?? null);
+      show(await api.evaluateMatches(jobId, token));
       await loadFlow(jobId);
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Evaluation failed."); }
     finally { evaluationPending.current = false; setEvaluating(false); }
@@ -82,7 +92,7 @@ export function MatchesPage() {
   const showApplicantsOnly = applicantsOnly && stageOf.size > 0;
   const topPicks = new Set(flow ? selectablePool(flow).slice(0, topN).map((item) => item.candidate_id) : []);
   const ranked = showApplicantsOnly ? results.filter((candidate) => stageOf.has(candidate.candidate_id)) : results;
-  const visible = ranked.filter((candidate) => (!eligibleOnly || candidate.hard_rule_passed) && candidate.full_name.toLowerCase().includes(query.toLowerCase()));
+  const visible = ranked.filter((candidate) => (!eligibleOnly || candidate.hard_rule_passed) && nameOf(candidate).toLowerCase().includes(query.toLowerCase()));
   const current = visible.find((candidate) => candidate.candidate_id === selectedId) ?? visible[0];
   return <main className="studio-page">
     <div className="page-heading"><div><p className="eyebrow">Match analysis{currentPosting ? ` / ${currentPosting.title}` : ""}</p><h1>A shortlist with a reason.</h1><p>{evaluatedAt ? `Evaluated ${new Date(evaluatedAt).toLocaleString()}` : "No saved evaluation"}</p></div><div className="match-actions">{role === "recruiter" && postings && postings.length > 0 && <label className="studio-field job-switcher">Role<select aria-label="Role to analyse" value={jobId ?? ""} onChange={(event) => selectJob(event.target.value)}>{!jobId && <option value="" disabled>Choose a role</option>}{postings.map((posting) => <option key={posting.job_id} value={posting.job_id}>{posting.title}{posting.status === "closed" ? " (closed)" : ""}</option>)}</select></label>}<Link to={role === "admin" ? "/admin/recruiters" : "/recruiter"} className="secondary-button"><ArrowLeft size={16} />{role === "admin" ? "Recruiter oversight" : "Role workspace"}</Link><button className="icon-button" aria-label="Refresh saved results" title="Refresh saved results" disabled={!jobId || loading || evaluating} onClick={() => setRetry((value) => value + 1)}><RefreshCw size={16} /></button><button className="primary-button" disabled={!jobId || loading || evaluating} onClick={() => void evaluate()}><Target size={16} />{evaluating ? "Evaluating..." : "Evaluate candidates"}</button></div></div>
@@ -90,10 +100,11 @@ export function MatchesPage() {
     {evaluating && <p className="notice" role="status">Evaluation in progress</p>}
     {loading ? <div className="empty-state" role="status"><RefreshCw size={26} className="animate-spin" /><h2>Loading saved results</h2></div> : !jobId ? <NoJobSelected role={role} postings={postings} onSelect={selectJob} /> : <>
       <div className="dashboard-stats"><div><span>Candidates evaluated</span><strong>{results.length}</strong></div><div><span>Passed eligibility</span><strong>{results.filter((item) => item.hard_rule_passed).length}</strong></div><div><span>Recommended by the model</span><strong>{results.length ? results.filter((item) => item.recommended).length : "—"}</strong></div></div>
-      {flow && jobId && <HiringFlow jobId={jobId} flow={flow} onFlow={setFlow} topN={topN} onTopN={setTopN} />}
+      {evaluatedAt && <FairnessPanel candidates={results} model={scoring} requirements={requirements} />}
+      {flow && jobId && <HiringFlow jobId={jobId} flow={flow} onFlow={setFlow} topN={topN} onTopN={setTopN} blind={blind} />}
       {flowFailed && jobId && <p className="notice error" role="alert"><CircleAlert size={18} />The hiring flow could not load.<button className="secondary-button" onClick={() => void loadFlow(jobId)}><RefreshCw size={16} />Try again</button></p>}
-      <div className="results-toolbar"><label className="search-field"><Search size={17} /><input aria-label="Search candidates" placeholder="Search candidate names" value={query} onChange={(event) => setQuery(event.target.value)} /></label>{stageOf.size > 0 && <label className="sort-control"><input type="checkbox" checked={applicantsOnly} onChange={(event) => setApplicantsOnly(event.target.checked)} />Applicants only</label>}<label className="sort-control"><input type="checkbox" checked={eligibleOnly} onChange={(event) => setEligibleOnly(event.target.checked)} />Eligible candidates only</label></div>
-      {current ? <div className="rank-layout"><section aria-label="Ranked candidates" className="rank-list">{visible.map((candidate) => <button className={`rank-item ${topPicks.has(candidate.candidate_id) ? "is-top-pick" : ""}`} key={candidate.candidate_id} aria-pressed={current.candidate_id === candidate.candidate_id} onClick={() => setSelectedId(candidate.candidate_id)}><span className="rank-number">{String(ranked.indexOf(candidate) + 1).padStart(2, "0")}</span><div><strong>{candidate.full_name}</strong><small>{!candidate.hard_rule_passed ? "Requirements not met" : candidate.recommended ? "Recommended" : "Eligible"}{stageOf.size > 0 && ` / ${STAGE_NAMES[stageOf.get(candidate.candidate_id) ?? ""] ?? "Did not apply"}`}{topPicks.has(candidate.candidate_id) && " / Top pick"}</small></div><b>{percent(candidate.final_score)}%</b></button>)}</section><section className="score-detail" aria-label="Selected candidate scores"><p className="eyebrow">Individual breakdown</p><h2>{current.full_name}</h2><div className="final-score">{percent(current.final_score)}%<small>Overall match score</small></div><p className="notice">{current.recommended ? "Recommended: at or above the model's decision threshold" : current.recommended === null ? "Scored by an earlier model version; re-evaluate for a recommendation" : current.hard_rule_passed ? "Below the model's decision threshold" : "Not scored: eligibility requirements not met"}</p><p className="match-provenance">Experimental calibration / not a hiring probability</p><Metric label="Semantic relevance" value={current.semantic_score} /><Metric label="Skill alignment" value={current.skill_overlap} tone="blue" /><Metric label="Growth potential" value={current.growth_score} tone="copper" /><div className={`rule-outcome ${current.hard_rule_passed ? "" : "fail"}`}><div>{current.hard_rule_passed ? <Check size={18} /> : <CircleAlert size={18} />}{current.hard_rule_passed ? "All eligibility requirements passed" : "Eligibility requirements not met"}</div>{!current.hard_rule_passed && <ul>{current.rule_reasons.map((reason) => <li key={reason}>{reason}</li>)}</ul>}</div><SkillBreakdown title="Matched skills" skills={current.matched_skills} />{!!current.related_skills?.length && <section className="skill-breakdown" aria-label="Related skills credited"><h3>Credited through related skills</h3><ul className="skill-tags">{current.related_skills.map((item) => <li key={item.required}><span>{item.required} via {item.via} ({percent(item.credit)}%)</span></li>)}</ul></section>}<SkillBreakdown title="Missing skills" skills={current.missing_skills} /><p className="match-provenance">Model: {current.model_version ?? "Unrecorded"}</p></section></div> : <div className="empty-state"><Search size={28} /><h2>{error ? "Results unavailable" : evaluatedAt ? "No candidates to show" : "No saved evaluation"}</h2></div>}
+      <div className="results-toolbar"><label className="search-field"><Search size={17} /><input aria-label="Search candidates" placeholder={blind ? "Search candidate codes" : "Search candidate names"} value={query} onChange={(event) => setQuery(event.target.value)} /></label><label className="sort-control" title="Hide names and locations while you shortlist"><input type="checkbox" checked={blind} onChange={(event) => toggleBlind(event.target.checked)} /><EyeOff size={14} aria-hidden="true" />Blind review</label>{stageOf.size > 0 && <label className="sort-control"><input type="checkbox" checked={applicantsOnly} onChange={(event) => setApplicantsOnly(event.target.checked)} />Applicants only</label>}<label className="sort-control"><input type="checkbox" checked={eligibleOnly} onChange={(event) => setEligibleOnly(event.target.checked)} />Eligible candidates only</label></div>
+      {current ? <div className="rank-layout"><section aria-label="Ranked candidates" className="rank-list">{visible.map((candidate) => <button className={`rank-item ${topPicks.has(candidate.candidate_id) ? "is-top-pick" : ""}`} key={candidate.candidate_id} aria-pressed={current.candidate_id === candidate.candidate_id} onClick={() => setSelectedId(candidate.candidate_id)}><span className="rank-number">{String(ranked.indexOf(candidate) + 1).padStart(2, "0")}</span><div><strong>{nameOf(candidate)}</strong><small>{!candidate.hard_rule_passed ? "Requirements not met" : candidate.recommended ? "Recommended" : "Eligible"}{stageOf.size > 0 && ` / ${STAGE_NAMES[stageOf.get(candidate.candidate_id) ?? ""] ?? "Did not apply"}`}{topPicks.has(candidate.candidate_id) && " / Top pick"}</small></div><b>{percent(candidate.final_score)}%</b></button>)}</section><section className="score-detail" aria-label="Selected candidate scores"><p className="eyebrow">Individual breakdown</p><h2>{nameOf(current)}</h2><div className="final-score">{percent(current.final_score)}%<small>Overall match score</small></div><p className="notice">{current.recommended ? "Recommended: at or above the model's decision threshold" : current.recommended === null ? "Scored by an earlier model version; re-evaluate for a recommendation" : current.hard_rule_passed ? "Below the model's decision threshold" : "Not scored: eligibility requirements not met"}</p><p className="match-provenance">Experimental calibration / not a hiring probability</p><Metric label="Semantic similarity" value={current.semantic_score} /><Metric label="Related-skill overlap" value={current.skill_overlap} tone="blue" /><Metric label="Experience readiness" value={current.growth_score} tone="copper" /><div className={`rule-outcome ${current.hard_rule_passed ? "" : "fail"}`}><div>{current.hard_rule_passed ? <Check size={18} /> : <CircleAlert size={18} />}{current.hard_rule_passed ? "All eligibility requirements passed" : "Eligibility requirements not met"}</div>{!current.hard_rule_passed && <ul>{current.rule_reasons.map((reason) => <li key={reason}>{reason}</li>)}</ul>}</div><SkillBreakdown title="Matched skills" skills={current.matched_skills} />{!!current.related_skills?.length && <section className="skill-breakdown" aria-label="Related skills credited"><h3>Credited through related skills</h3><ul className="skill-tags">{current.related_skills.map((item) => <li key={item.required}><span>{item.required} via {item.via} ({percent(item.credit)}%)</span></li>)}</ul></section>}<SkillBreakdown title="Missing skills" skills={current.missing_skills} /><p className="match-provenance">Model: {current.model_version ?? "Unrecorded"}</p><DecisionWalkthrough key={current.candidate_id} candidate={current} model={scoring} requirements={requirements} name={nameOf(current)} /></section></div> : <div className="empty-state"><Search size={28} /><h2>{error ? "Results unavailable" : evaluatedAt ? "No candidates to show" : "No saved evaluation"}</h2></div>}
       {current?.match_id && <MatchGraphView key={current.match_id} matchId={current.match_id} />}
     </>}
   </main>;
