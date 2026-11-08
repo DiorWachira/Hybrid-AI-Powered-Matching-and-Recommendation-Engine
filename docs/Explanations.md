@@ -2,7 +2,7 @@
 
 A plain-language guide to how the JobBridge matching model was built, trained and evaluated, what the results mean, and how the recruiter hiring flow treats match scores.
 
-**Last updated:** 2026-11-05
+**Last updated:** 2026-11-08
 **Model described:** `2026-10-19-epoch-combiner-v2-r001`, epoch 4, decision threshold 0.46. This is the model the live site serves.
 **Figures:** every figure number refers to `notebooks/model_visuals.ipynb`. The images are in `notebooks/figures/`.
 
@@ -20,10 +20,11 @@ A plain-language guide to how the JobBridge matching model was built, trained an
 10. [Warm test and cold test](#10-warm-test-and-cold-test)
 11. [Why the cold test scored higher than the warm test](#11-why-the-cold-test-scored-higher-than-the-warm-test)
 12. [Can a recruiter choose a low-scoring candidate?](#12-can-a-recruiter-choose-a-low-scoring-candidate)
-13. [Ranking speed on the live server](#13-ranking-speed-on-the-live-server)
-14. [What you can and cannot claim](#14-what-you-can-and-cannot-claim)
-15. [Questions an examiner may ask](#15-questions-an-examiner-may-ask)
-16. [Figures and how to reproduce them](#16-figures-and-how-to-reproduce-them)
+13. [How a recruiter sees each decision explained, and where bias could enter](#13-how-a-recruiter-sees-each-decision-explained-and-where-bias-could-enter)
+14. [Ranking speed on the live server](#14-ranking-speed-on-the-live-server)
+15. [What you can and cannot claim](#15-what-you-can-and-cannot-claim)
+16. [Questions an examiner may ask](#16-questions-an-examiner-may-ask)
+17. [Figures and how to reproduce them](#17-figures-and-how-to-reproduce-them)
 
 ---
 
@@ -549,11 +550,11 @@ A model can look good by memorising particular jobs, and a warm test alone would
 
 **Most likely chance. There is no sign that the model is better on unseen jobs.** The cold test appears to have received a slightly easier sample.
 
-These checks were a one-off analysis and are not in the notebook.
+Figure 22 in the notebook runs these checks on both populations and stops if a re-run gives different results. Its numbers are saved in `notebooks/figures/warm_cold_checks.csv`.
 
 | Check | Result | What it means |
 |---|---|---|
-| **Random groupings:** split the same test candidates into two groups at random, 5,000 times | The gap was +0.040, while random groups usually differ by up to about ±0.075. About 30% of splits gave a gap at least this big | The gap is ordinary |
+| **Random groupings:** split the same test candidates into two groups at random, 5,000 times | The gap was +0.040, while random groups usually differ by up to about ±0.075. About 31% of splits gave a gap at least this big | The gap is ordinary |
 | **Fresh population:** the same test on new synthetic data | The gap flips to -0.050, with warm higher. About 14% of random splits were this big | It does not repeat |
 | **Share of good matches:** an easier mix could inflate the score | 71.8% warm, 71.5% cold | The mix is not the cause |
 | **One unusual job:** remove each cold job in turn | Cold stays between 0.839 and 0.858 | No single job explains it |
@@ -588,23 +589,27 @@ People usually expect unseen data to score lower because a model has memorised w
 
 ## 12. Can a recruiter choose a low-scoring candidate?
 
-**Yes. A recruiter can shortlist and hire someone with any score, even 0%. The system does not warn them or notify the admin.** The move is written to an activity log the admin can read. This section describes the code as of 2026-11-05, read from the source and not tested on the live site.
+**Yes, but no longer silently.** The system warns and records; it never blocks. Recruiters keep the final say, because the model is tested only on synthetic data and a failed rule can rest on an out-of-date profile, such as a certificate earned but not yet listed. This was built on 2026-11-08 (`backend/app/core/overrides.py`).
 
 ### What the scores mean
 
 - **Score of 1 (100%):** the strongest possible match, so there is nothing to warn about.
 - **Score of 0:** usually means the candidate failed a hard rule. An eligible candidate with a very low score can also display as 0%, because scores are rounded.
 
-### What happens at each step
+### What happens when a recruiter moves someone forward
 
-| Where the recruiter acts | Can they pick a candidate with a 0 score? | What they see |
-|---|---|---|
-| **Hiring flow** (match analysis page), first step | No. Candidates who failed a hard rule are not offered, only counted in a note | Eligible candidates with low scores can still be picked by raising "Move on the top", with no warning. They just lack the "Recommended" label |
-| **Hiring flow**, later steps | Yes, if they were already moved forward | The score is shown, but the hire prompt only says "Hire [name]? This cannot be reversed." |
-| **Applicant list on the roles page** | **Yes, for any applicant** | The list shows no score, and the prompt is the same for everyone |
-| **Directly through the API** | **Yes** | The server only checks that the stage order is valid and that the recruiter owns the job. It never looks at the score or hard rules |
+| The candidate | Warning | Written reason | Recorded |
+|---|---|---|---|
+| Recommended | None | No | Score, threshold and rule result |
+| Eligible, below the 0.46 threshold | Yes, listing who and their score | No | The same, tagged `below_threshold` |
+| Failed a hard rule | Yes, listing who and which rule | **Yes, at least 10 characters** | The same plus the reason, tagged `hard_rule` |
+| Not in the latest evaluation | None | No | The status only |
 
-**Stage order is enforced:** a hire must follow a confirmed interview. The allowed moves are:
+- **Every screen.** The warning appears in the hiring flow on the match analysis page and on the roles-page applicant list, which now shows each applicant's score and rule result.
+- **Enforced on the server.** `advance_applications` (`hiring.py`) and `update_application` (`jobs.py`) refuse a move past a failed rule without a reason, so the API cannot skip it. Rejecting someone is never an override.
+- **Only failed rules need a reason.** Decided on 2026-11-08: asking for a reason on every low score would soon be clicked through without thought.
+
+**Stage order is still enforced:** a hire must follow a confirmed interview.
 
 | From | Can move to |
 |---|---|
@@ -617,23 +622,37 @@ People usually expect unseen data to score lower because a model has memorised w
 
 ### What the admin gets
 
-- **Activity log:** each move records who made it, which application and the new status, but not the score or whether the candidate passed the rules. A move on a 0% candidate looks the same as any other.
-- **Notifications:** the app has no notification system, by email or in-app. The admin would only find out by reading the log, and could not tell which entries matter.
-
-### Recommended design (not built)
-
-**Warn and record the decision, but do not block it.** Recruiters should keep the final say, because the model is only tested on synthetic data and can be wrong. A hard-rule failure can also be out of date, such as a certificate the candidate has earned but not yet listed.
-
-1. **Warning:** when a recruiter advances someone who failed a hard rule or scored below the 0.46 threshold, show why and ask them to confirm, on every screen.
-2. **Required reason:** ask for a short reason when hiring someone who failed a hard rule. This keeps a human in control and accountable.
-3. **Server check:** enforce this on the server too, so it cannot be skipped through the API.
-4. **Admin visibility:** record the score, the rule result and the reason in the log, and add an "Overrides" filter with a count on the admin dashboard. An admin can then review overrides together, instead of receiving a message for each one.
-
-**Still to decide:** whether the reason is required only for hard-rule failures, or for low scores too. Starting with hard-rule failures avoids a box people soon click through without thinking.
+- **Activity log:** each forward move records who made it, the new status, the score, the threshold and the rule result, plus any override tag and reason. An "Overrides" filter shows only those moves.
+- **Dashboard:** the attention strip counts overrides and how many were past a failed rule, with a link to the filtered log. The admin reviews them together instead of receiving a message for each one. The app still sends no email or in-app notifications.
 
 ---
 
-## 13. Ranking speed on the live server
+## 13. How a recruiter sees each decision explained, and where bias could enter
+
+After an evaluation, the match analysis page walks the recruiter through every result and names the bias risk at each step. The full reference, rule by rule and scenario by scenario, is `docs/BIAS_AND_EXPLAINABILITY.md`; the page wording lives in `frontend/src/lib/decisionGuide.ts`.
+
+**Fairness check for this evaluation** (above the ranking):
+
+- The same rules, model and threshold for every candidate, with ties ordered by a random ID.
+- How many candidates each rule removed, with the largest highlighted, so a rule doing most of the filtering is visible.
+- What the model is never given: names, contact details, gender words, age, major Kenyan town names, photos, salary and sign-up order. The platform never asks for nationality, ethnicity, religion, marital status or disability.
+
+**How this decision was reached** (under each candidate):
+
+1. **Eligibility rules.** Each rule as the posting set it when the evaluation ran, met or not met. A failed rule shows its bias risk and how it is avoided.
+2. **What the model read.** The three inputs, each with its bias risk, and the list of what was removed first.
+3. **Combining the scores.** The calculation itself: how far each input sits from the average training candidate, how much it raised or lowered the score, and the comparison with the threshold.
+4. **Your decision.** The system recommends; the recruiter decides, and overrides are recorded (section 12).
+
+Each candidate also gets a scenario summary: **Recommended**, **Eligible, below the threshold**, **Requirements not met**, or **Scored by an earlier model**. Each one gives the bias to watch, how it was avoided, and what to do next. For example, for "Requirements not met" the bias to watch is a rule stricter than the job needs. It was avoided in the sense that no score was calculated, so the model's own biases played no part, and the recruiter is told to fix the posting rather than override people one by one.
+
+**Blind review.** A switch hides names and locations behind a stable code, such as `Candidate 3F9A1C`, in the ranking, the breakdown and the hiring flow.
+
+**What this does not prove.** Fairness across groups has not been measured, because the platform collects no group data. Redaction is best effort: pronouns or school names can still hint at who someone is.
+
+---
+
+## 14. Ranking speed on the live server
 
 The project's speed target (NFR-02) is 2 to 5 seconds per matching request. `deploy/jb measure-latency` measured the live server on 2026-11-05, using the role with the most eligible candidates (170 candidates, 115 eligible):
 
@@ -650,7 +669,7 @@ The project's speed target (NFR-02) is 2 to 5 seconds per matching request. `dep
 
 ---
 
-## 14. What you can and cannot claim
+## 15. What you can and cannot claim
 
 ### Safe to claim
 
@@ -687,7 +706,7 @@ On seeded synthetic data with leakage-controlled splits, the three-input model:
 
 ---
 
-## 15. Questions an examiner may ask
+## 16. Questions an examiner may ask
 
 **Why logistic regression?**
 It is explainable and small, which suits a recruiting tool where people need to see why someone scored as they did. Random forest and gradient boosting were tested on the same data and ranked slightly better, with the same F1. The small gain does not outweigh explainability while the data is synthetic.
@@ -711,11 +730,11 @@ Permitted real hiring outcomes were not available. The gold slice is the planned
 Candidates are kept separate across splits, cold jobs are held out completely, scaling uses only training data, and the epoch and threshold were chosen on validation data. The remaining limit is that the labels come from the same generator as the data, which is why results are not presented as real-world quality.
 
 **Could the system be biased?**
-These results do not test fairness across people. Results by role are not a fairness audit. See `docs/BIAS_AND_EXPLAINABILITY.md`.
+Bias can enter through the eligibility rules, the pretrained language model and the recruiter's own judgement. Section 13 and `docs/BIAS_AND_EXPLAINABILITY.md` set out each risk and how it is handled: identifiers are removed before scoring, rules are the recruiter's own and their exclusions are shown, everyone gets the same weights and threshold, blind review is available, and overrides are recorded. What has not been done is a fairness audit across groups: the platform collects no group data, and results by role compare jobs, not people.
 
 ---
 
-## 16. Figures and how to reproduce them
+## 17. Figures and how to reproduce them
 
 | Figure | File in `notebooks/figures/` | Shows |
 |---|---|---|
@@ -740,9 +759,10 @@ These results do not test fairness across people. Results by role are not a fair
 | 19 | `19_algorithm_comparison.png` | Random forest and gradient boosting |
 | 20 | `20_overfitting_by_algorithm.png` | Overfitting and model size |
 | 21 | `21_how_to_read_roc.png` | How to read ROC-AUC |
+| 22 | `22_warm_cold_gap_checks.png` | Warm and cold gap against random groupings |
 
-The same folder holds `test_metrics.csv`, `algorithm_comparison.csv` and `epoch_history.csv`.
+The same folder holds `test_metrics.csv`, `algorithm_comparison.csv`, `warm_cold_checks.csv` and `epoch_history.csv`.
 
-**To re-run the notebook:** open `notebooks/model_visuals.ipynb` with the project's `venv` kernel on the original laptop. It reads data from git-ignored folders and from `%LOCALAPPDATA%\JobBridge`, so another machine needs `data_pipeline/compare_feature_contracts.py` run first. The saved notebook still opens anywhere with its charts.
+**To re-run the notebook:** use Python 3.14 with the backend requirements plus `ipykernel` and `nbclient`. On the original laptop this is the venv at `%LOCALAPPDATA%\JobBridge\nbenv`, last used on 2026-11-08. It reads data from git-ignored folders and from `%LOCALAPPDATA%\JobBridge`, so another machine needs `data_pipeline/compare_feature_contracts.py` run first. The saved notebook still opens anywhere with its charts.
 
 **Integrity check:** the notebook recalculates the recorded metrics and stops if they differ. ROC-AUC and F1 match exactly, and log loss is within 1e-8. The cached inputs are not byte-identical to the Colab run, because the embeddings were computed on a different machine.

@@ -57,7 +57,7 @@ export type MfaSetup = { secret: string; otpauth_uri: string; qr_svg: string };
 export type ApplicationStatus = "submitted" | "reviewing" | "shortlisted" | "interviewed" | "rejected" | "hired" | "withdrawn";
 export type RecruiterStatus = "reviewing" | "shortlisted" | "interviewed" | "rejected" | "hired";
 export type Application = { application_id: string; candidate_id: string; job_id: string; status: ApplicationStatus; created_at: string; updated_at: string };
-export type Applicant = Application & { candidate_name: string; candidate_location: string | null; years_experience: number; skills: string[]; certifications: string[] };
+export type Applicant = Application & { candidate_name: string; candidate_location: string | null; years_experience: number; skills: string[]; certifications: string[]; final_score: number | null; hard_rule_passed: boolean | null; rule_reasons: string[]; recommended: boolean | null };
 export type CandidateApplication = Application & { job_title: string; company_name: string; job_location: string | null; job_status: "open" | "closed" };
 
 const jobPayload = (job: JobInput) => ({
@@ -97,15 +97,25 @@ export type MatchCandidate = {
   recommended?: boolean | null;
 };
 
+export type ScoringModel = {
+  version: string; threshold: number; intercept: number;
+  inputs: Array<{ key: "semantic_score" | "skill_overlap" | "growth_score"; weight: number; mean: number; scale: number }>;
+};
+/** One hard rule as the posting set it when the evaluation ran. */
+export type EligibilityRequirement = { rule: "work_authorization" | "experience" | "location" | "salary" | "certifications"; applied: boolean; requirement: string | null };
+
 export type MatchEvaluation = {
   job_id: string;
   evaluated_at: string | null;
   candidates: MatchCandidate[];
+  model?: ScoringModel | null;
+  /** Missing for evaluations saved before requirements were recorded. */
+  requirements?: EligibilityRequirement[] | null;
 };
 
 export type HiringApplicant = {
   application_id: string; candidate_id: string; candidate_name: string; candidate_location: string | null; years_experience: number;
-  status: ApplicationStatus; final_score: number | null; hard_rule_passed: boolean | null; recommended: boolean | null; updated_at: string;
+  status: ApplicationStatus; final_score: number | null; hard_rule_passed: boolean | null; recommended: boolean | null; updated_at: string; rule_reasons: string[];
 };
 export type HiringFlow = { job_id: string; job_status: "open" | "closed"; evaluated_at: string | null; applicants: HiringApplicant[]; simulation: { ran_at: string; hired_name: string | null } | null };
 export type HiringSimulationStep = { stage: "selected" | "shortlisted" | "interviewed" | "hired" | "closed"; title: string; detail: string; candidates: string[] };
@@ -159,6 +169,8 @@ export type AdminOverview = {
   mfa_enabled_count: number;
   application_status_counts: Partial<Record<ApplicationStatus, number>>;
   daily_activity: DailyActivity[];
+  overrides_count?: number;
+  hard_rule_overrides_count?: number;
   recent_jobs: Array<{ job_id: string; title: string; status: string; location?: string; required_experience_years: number; salary_range_max?: number; required_skills?: string[]; mandatory_certifications?: string[]; description: string }>;
 };
 
@@ -290,7 +302,7 @@ export const api = {
   updateJob: (jobId: string, job: JobInput, status: "open" | "closed", token: string) => request<JobPosting>(`/jobs/${jobId}`, { method: "PUT", headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify({ ...jobPayload(job), status }) }),
   changeOwnJobStatus: (jobId: string, status: "open" | "closed", token: string) => request<JobPosting>(`/jobs/${jobId}/status`, { method: "PATCH", headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify({ status }) }),
   jobApplications: (jobId: string, token: string, offset = 0, limit = 6) => request<Applicant[]>(`/jobs/${jobId}/applications?${new URLSearchParams({ offset: String(offset), limit: String(limit) })}`, { headers: { Authorization: `Bearer ${token}` } }),
-  changeApplicationStatus: (jobId: string, applicationId: string, status: RecruiterStatus, token: string) => request<Application>(`/jobs/${jobId}/applications/${applicationId}`, { method: "PATCH", headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify({ status }) }),
+  changeApplicationStatus: (jobId: string, applicationId: string, status: RecruiterStatus, token: string, overrideReason?: string) => request<Application>(`/jobs/${jobId}/applications/${applicationId}`, { method: "PATCH", headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify({ status, override_reason: overrideReason || null }) }),
   withdrawApplication: (applicationId: string, token: string) => request<Application>(`/candidates/me/applications/${applicationId}/withdraw`, { method: "POST", headers: { Authorization: `Bearer ${token}` } }),
   myEmployment: (token: string) => request<CandidateApplication[]>("/candidates/me/employment", { headers: { Authorization: `Bearer ${token}` } }),
   myApplications: (token: string, offset = 0, limit = 6) => request<CandidateApplication[]>(`/candidates/me/applications?${new URLSearchParams({ offset: String(offset), limit: String(limit) })}`, { headers: { Authorization: `Bearer ${token}` } }),
@@ -357,15 +369,16 @@ export const api = {
     if (filters.status) params.set("status", filters.status);
     return request<AdminUser[]>(`/admin/users?${params}`, { headers: { Authorization: `Bearer ${token}` } });
   },
-  auditLog: (token: string, category: AuditCategory | "", offset: number, limit: number) => {
+  auditLog: (token: string, category: AuditCategory | "" | "overrides", offset: number, limit: number) => {
     const params = new URLSearchParams({ offset: String(offset), limit: String(limit) });
-    if (category) params.set("category", category);
+    if (category === "overrides") params.set("overrides", "true");
+    else if (category) params.set("category", category);
     return request<AuditEvent[]>(`/admin/activity?${params}`, { headers: { Authorization: `Bearer ${token}` } });
   },
   recruiterPipeline: (token: string) => request<RecruiterPipeline>("/jobs/mine/pipeline", { headers: { Authorization: `Bearer ${token}` } }),
   hiringFlow: (jobId: string, token: string) => request<HiringFlow>(`/jobs/${jobId}/hiring`, { headers: { Authorization: `Bearer ${token}` } }),
-  advanceApplications: (jobId: string, applicationIds: string[], status: RecruiterStatus, token: string) =>
-    request<HiringFlow>(`/jobs/${jobId}/hiring/advance`, { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify({ application_ids: applicationIds, status }) }),
+  advanceApplications: (jobId: string, applicationIds: string[], status: RecruiterStatus, token: string, overrideReason?: string) =>
+    request<HiringFlow>(`/jobs/${jobId}/hiring/advance`, { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify({ application_ids: applicationIds, status, override_reason: overrideReason || null }) }),
   completeHiring: (jobId: string, closePosting: boolean, token: string) =>
     request<HiringFlow>(`/jobs/${jobId}/hiring/complete`, { method: "POST", headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify({ close_posting: closePosting }) }),
   simulateHiring: (jobId: string, topN: number, interviewCount: number, token: string) =>

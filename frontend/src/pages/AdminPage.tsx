@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { Activity, AlertTriangle, ArrowRight, BadgeCheck, BriefcaseBusiness, CheckCircle2, Database, GitBranch, KeyRound, Network, RefreshCw, ShieldCheck, UserX, Users } from "lucide-react";
+import { Activity, AlertTriangle, ArrowRight, BadgeCheck, BriefcaseBusiness, CheckCircle2, Database, GitBranch, KeyRound, Network, RefreshCw, Scale, ShieldCheck, UserX, Users } from "lucide-react";
 import { api, type AdminOverview, type AdminUserFilters, type ApiHealth, type OversightSummary, type UserRole } from "../lib/api";
 import { OntologyEditor } from "../components/OntologyEditor";
 import { AdminAccounts } from "../components/AdminAccounts";
@@ -57,6 +57,7 @@ export function AdminPage() {
   if (servicesDown.length) attention.push({ key: "services", tone: "warn", icon: <Database size={16} />, text: `${servicesDown.join(" and ")} ${servicesDown.length > 1 ? "are" : "is"} unavailable`, action: "Check status", to: "#platform-health" });
   if (oversight?.attention_jobs) attention.push({ key: "roles", tone: "warn", icon: <AlertTriangle size={16} />, text: `${oversight.attention_jobs} open ${oversight.attention_jobs === 1 ? "role needs" : "roles need"} review`, action: "Review roles", to: "/admin/recruiters?attention=1" });
   if (overview?.suspended_users_count) attention.push({ key: "suspended", tone: "info", icon: <UserX size={16} />, text: `${overview.suspended_users_count} suspended ${overview.suspended_users_count === 1 ? "account" : "accounts"}`, action: "Show them", to: "?panel=accounts&status=suspended" });
+  if (overview?.overrides_count) attention.push({ key: "overrides", tone: overview.hard_rule_overrides_count ? "warn" : "info", icon: <Scale size={16} />, text: `${overview.overrides_count} ${overview.overrides_count === 1 ? "move" : "moves"} against the evaluation's advice${overview.hard_rule_overrides_count ? `, ${overview.hard_rule_overrides_count} past a failed eligibility rule` : ""}`, action: "Review overrides", to: "?panel=activity&log=overrides" });
   if (overview?.pending_graph_events) attention.push({ key: "graph", tone: "info", icon: <GitBranch size={16} />, text: `${overview.pending_graph_events} graph ${overview.pending_graph_events === 1 ? "update is" : "updates are"} waiting to sync`, action: "See health", to: "#platform-health" });
 
   const kpis = [
@@ -113,7 +114,7 @@ export function AdminPage() {
         }}><Icon size={15} />{label}{id === "accounts" && overview ? <span className="tab-count">{overview.users_count}</span> : null}</button>)}
       </div>
       <div id="admin-panel" role="tabpanel" aria-labelledby={`admin-tab-${panel}`}>
-        {panel === "accounts" ? <AdminAccounts initialFilters={accountFilters} onChanged={() => setRefresh((value) => value + 1)} /> : panel === "activity" ? <AdminActivityLog trend={trend} /> : <OntologyEditor />}
+        {panel === "accounts" ? <AdminAccounts initialFilters={accountFilters} onChanged={() => setRefresh((value) => value + 1)} /> : panel === "activity" ? <AdminActivityLog key={params.get("log") ?? ""} trend={trend} initialCategory={params.get("log") === "overrides" ? "overrides" : ""} /> : <OntologyEditor />}
       </div>
     </section>
   </main>;

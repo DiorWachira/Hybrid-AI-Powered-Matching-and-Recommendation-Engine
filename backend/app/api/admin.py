@@ -28,6 +28,11 @@ TREND_DAYS = 14
 AuditCategory = Literal["account", "application", "job", "matches", "ontology", "opportunity", "profile", "resume"]
 
 
+def _is_override():
+    """Status changes that moved someone forward against the evaluation's advice (see app/core/overrides.py)."""
+    return and_(AuditEvent.action == "application.status_changed", AuditEvent.details.has_key("override"))
+
+
 def _stale_cutoff() -> datetime:
     return datetime.now(UTC) - timedelta(days=STALE_AFTER_DAYS)
 
@@ -342,6 +347,8 @@ def read_admin_overview(
         mfa_enabled_count=db.scalar(select(func.count()).select_from(User).where(User.mfa_enabled_at.is_not(None))) or 0,
         application_status_counts=dict(db.execute(select(JobApplication.status, func.count()).group_by(JobApplication.status)).all()),
         daily_activity=_daily_activity(db),
+        overrides_count=db.scalar(select(func.count()).select_from(AuditEvent).where(_is_override())) or 0,
+        hard_rule_overrides_count=db.scalar(select(func.count()).select_from(AuditEvent).where(_is_override(), AuditEvent.details["override"].astext == "hard_rule")) or 0,
     )
 
 def _audit_events(db: Session, statement) -> list[AuditEventResponse]:
@@ -375,6 +382,7 @@ def _daily_activity(db: Session) -> list[DailyActivity]:
 @router.get("/activity", response_model=list[AuditEventResponse])
 def read_audit_log(
     category: AuditCategory | None = None,
+    overrides: bool = False,
     offset: int = Query(default=0, ge=0),
     limit: int = Query(default=25, ge=1, le=100),
     user: User = Depends(require_roles(UserRole.admin)),
@@ -383,4 +391,6 @@ def read_audit_log(
     statement = select(AuditEvent, User.email).outerjoin(User, User.user_id == AuditEvent.actor_user_id)
     if category is not None:
         statement = statement.where(AuditEvent.action.startswith(f"{category}.", autoescape=True))
+    if overrides:
+        statement = statement.where(_is_override())
     return _audit_events(db, statement.order_by(AuditEvent.created_at.desc(), AuditEvent.event_id).offset(offset).limit(limit))

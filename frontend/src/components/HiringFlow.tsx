@@ -2,6 +2,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { BadgeCheck, CircleAlert, FlaskConical, Play, RotateCcw, Trophy, Users } from "lucide-react";
 import { Link } from "react-router-dom";
 import { api, type HiringApplicant, type HiringFlow as Flow, type HiringSimulationStep, type RecruiterStatus } from "../lib/api";
+import { OverrideDialog, overrideFlags, type OverrideRequest } from "./OverrideDialog";
+
+/** Blind review shows a stable code instead of a name, the same code on every list. */
+export const blindLabel = (candidateId: string) => `Candidate ${candidateId.slice(0, 6).toUpperCase()}`;
 
 const percent = (score: number | null) => score === null ? "—" : `${Math.round(Math.max(0, Math.min(1, score)) * 100)}%`;
 const TOP_PRESETS = [3, 5, 10];
@@ -39,8 +43,9 @@ export function selectablePool(flow: Flow): HiringApplicant[] {
   return flow.applicants.filter((item) => item.status === "submitted" && item.hard_rule_passed && item.final_score !== null);
 }
 
-export function HiringFlow({ jobId, flow, onFlow, topN, onTopN }: { jobId: string; flow: Flow; onFlow: (flow: Flow) => void; topN: number; onTopN: (value: number) => void }) {
+export function HiringFlow({ jobId, flow, onFlow, topN, onTopN, blind = false }: { jobId: string; flow: Flow; onFlow: (flow: Flow) => void; topN: number; onTopN: (value: number) => void; blind?: boolean }) {
   const [viewing, setViewing] = useState<Stage | null>(null);
+  const [pending, setPending] = useState<OverrideRequest | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [replay, setReplay] = useState<{ steps: HiringSimulationStep[]; shown: number; result: Flow } | null>(null);
@@ -78,7 +83,16 @@ export function HiringFlow({ jobId, flow, onFlow, topN, onTopN }: { jobId: strin
     catch (reason) { setError(reason instanceof Error ? reason.message : "That step could not be completed."); }
     finally { setBusy(false); }
   };
-  const advance = (ids: string[], status: RecruiterStatus) => run(() => api.advanceApplications(jobId, ids, status, token()));
+  const nameOf = (person: HiringApplicant) => blind ? blindLabel(person.candidate_id) : person.candidate_name;
+  const flagsFor = (ids: string[]) => overrideFlags(flow.applicants.filter((item) => ids.includes(item.application_id)).map((item) => ({ ...item, id: item.application_id, name: nameOf(item) })));
+  const send = (ids: string[], status: RecruiterStatus, reason?: string) => run(() => api.advanceApplications(jobId, ids, status, token(), reason));
+  /** Moves go straight through unless someone was not recommended; then the recruiter confirms, and gives a reason for a failed rule. */
+  const advance = (ids: string[], status: RecruiterStatus, action: string, confirm?: string) => {
+    const flagged = flagsFor(ids);
+    if (flagged.length) { setPending({ action, flagged, onConfirm: (reason) => void send(ids, status, reason) }); return; }
+    if (confirm && !window.confirm(confirm)) return;
+    void send(ids, status);
+  };
   const simulate = async () => {
     if (busy || !window.confirm(`Simulate hiring for this role? The top ${topN} demo applicants move on, ${INTERVIEW_SLOTS} interview and the highest match score is hired. Real applicants are left alone, and you can undo it.`)) return;
     setBusy(true); setError(null); setReplay(null); setKept(false);
@@ -114,22 +128,27 @@ export function HiringFlow({ jobId, flow, onFlow, topN, onTopN }: { jobId: strin
     {!replaying && <>
       {!flow.evaluated_at ? <p className="hiring-empty">Evaluate candidates first. The match scores decide who moves on.</p>
         : !flow.applicants.length ? <p className="hiring-empty"><Users size={17} />Nobody has applied to this role yet. The ranking below shows who could fit.</p>
-        : stage === "select" ? <SelectStage pool={pool} topN={topN} onTopN={onTopN} busy={busy} unscored={unscored} ineligible={ineligible} onMove={(ids) => void advance(ids, "reviewing")} />
-        : stage === "shortlist" ? <PickStage key={`shortlist-${counts.reviewing}`} people={flow.applicants.filter((item) => item.status === "reviewing")} preselect={INTERVIEW_SLOTS} busy={busy} empty="Nobody is waiting here. Select your top candidates first." action={(count) => `Shortlist ${count} for interview`} hint="Those you leave unticked stay under review." onConfirm={(ids) => void advance(ids, "shortlisted")} />
-        : stage === "interview" ? <PickStage key={`interview-${counts.shortlisted}`} people={flow.applicants.filter((item) => item.status === "shortlisted")} preselect={counts.shortlisted} busy={busy} empty="Nobody is shortlisted yet." action={(count) => `Mark ${count} ${count === 1 ? "interview" : "interviews"} complete`} hint="Tick each person once their interview has happened." onConfirm={(ids) => void advance(ids, "interviewed")} />
-        : stage === "hire" ? <HireStage key={`hire-${counts.interviewed}`} people={flow.applicants.filter((item) => item.status === "interviewed")} busy={busy} onHire={(person) => { if (window.confirm(`Hire ${person.candidate_name}? This cannot be reversed.`)) void advance([person.application_id], "hired"); }} />
+        : stage === "select" ? <SelectStage pool={pool} topN={topN} onTopN={onTopN} busy={busy} unscored={unscored} ineligible={ineligible} nameOf={nameOf} onMove={(ids) => advance(ids, "reviewing", `move ${ids.length} to review`)} />
+        : stage === "shortlist" ? <PickStage key={`shortlist-${counts.reviewing}`} people={flow.applicants.filter((item) => item.status === "reviewing")} preselect={INTERVIEW_SLOTS} busy={busy} nameOf={nameOf} empty="Nobody is waiting here. Select your top candidates first." action={(count) => `Shortlist ${count} for interview`} hint="Those you leave unticked stay under review." onConfirm={(ids) => advance(ids, "shortlisted", `shortlist ${ids.length} for interview`)} />
+        : stage === "interview" ? <PickStage key={`interview-${counts.shortlisted}`} people={flow.applicants.filter((item) => item.status === "shortlisted")} preselect={counts.shortlisted} busy={busy} nameOf={nameOf} empty="Nobody is shortlisted yet." action={(count) => `Mark ${count} ${count === 1 ? "interview" : "interviews"} complete`} hint="Tick each person once their interview has happened." onConfirm={(ids) => advance(ids, "interviewed", `mark ${ids.length === 1 ? "an interview" : `${ids.length} interviews`} complete`)} />
+        : stage === "hire" ? <HireStage key={`hire-${counts.interviewed}`} people={flow.applicants.filter((item) => item.status === "interviewed")} busy={busy} nameOf={nameOf} onHire={(person) => advance([person.application_id], "hired", `hire ${nameOf(person)}, which cannot be reversed`, `Hire ${nameOf(person)}? This cannot be reversed.`)} />
         : hired.length ? <FilledStage flow={flow} hired={hired} waiting={waiting} busy={busy} kept={kept} onComplete={() => void complete()} onKeep={() => setKept(true)} onUndo={() => void undo()} />
         : <p className="hiring-empty">Nobody has been hired for this role yet.</p>}
     </>}
     {replay && <SimulationReplay steps={replay.steps} shown={replay.shown} onSkip={replaying ? () => setReplay({ ...replay, shown: replay.steps.length }) : undefined} />}
+    <OverrideDialog request={pending} onClose={() => setPending(null)} />
   </section>;
 }
 
-function Person({ person, rank }: { person: HiringApplicant; rank: number }) {
-  return <><span className="rank-number">{String(rank).padStart(2, "0")}</span><span className="hiring-person"><strong>{person.candidate_name}</strong><small>{person.candidate_location || "Location not specified"} / {person.years_experience} years{person.recommended ? " / Recommended" : ""}</small></span><b className="hiring-score">{percent(person.final_score)}</b></>;
+function Person({ person, rank, name }: { person: HiringApplicant; rank: number; name: string }) {
+  const failed = person.hard_rule_passed === false;
+  const low = !!person.hard_rule_passed && person.recommended === false;
+  // Blind review hides location too: it is a rule input, not something to judge a person by.
+  const place = name === person.candidate_name ? `${person.candidate_location || "Location not specified"} / ` : "";
+  return <><span className="rank-number">{String(rank).padStart(2, "0")}</span><span className="hiring-person"><strong>{name}</strong><small>{place}{person.years_experience} years{person.recommended ? " / Recommended" : ""}</small></span>{(failed || low) && <span className={`override-tag ${failed ? "hard_rule" : "below_threshold"}`}>{failed ? "Failed a rule" : "Below threshold"}</span>}<b className="hiring-score">{percent(person.final_score)}</b></>;
 }
 
-function SelectStage({ pool, topN, onTopN, busy, unscored, ineligible, onMove }: { pool: HiringApplicant[]; topN: number; onTopN: (value: number) => void; busy: boolean; unscored: number; ineligible: number; onMove: (ids: string[]) => void }) {
+function SelectStage({ pool, topN, onTopN, busy, unscored, ineligible, nameOf, onMove }: { pool: HiringApplicant[]; topN: number; onTopN: (value: number) => void; busy: boolean; unscored: number; ineligible: number; nameOf: (person: HiringApplicant) => string; onMove: (ids: string[]) => void }) {
   const picked = pool.slice(0, topN);
   return <div className="hiring-panel">
     <div className="hiring-panel-controls">
@@ -140,28 +159,28 @@ function SelectStage({ pool, topN, onTopN, busy, unscored, ineligible, onMove }:
       </div>
       <button className="primary-button" disabled={busy || !picked.length} onClick={() => onMove(picked.map((item) => item.application_id))}><Play size={15} />Move {picked.length ? `top ${picked.length}` : "candidates"} to review</button>
     </div>
-    {picked.length ? <ol className="hiring-people">{picked.map((person, index) => <li key={person.application_id}><Person person={person} rank={index + 1} /></li>)}</ol> : <p className="hiring-empty">No eligible applicants are waiting.</p>}
+    {picked.length ? <ol className="hiring-people">{picked.map((person, index) => <li key={person.application_id}><Person person={person} rank={index + 1} name={nameOf(person)} /></li>)}</ol> : <p className="hiring-empty">No eligible applicants are waiting.</p>}
     <p className="hiring-note">{pool.length} eligible {pool.length === 1 ? "applicant" : "applicants"} waiting.{ineligible ? ` ${ineligible} did not meet the requirements.` : ""}{unscored ? ` ${unscored} applied after this evaluation; evaluate again to include them.` : ""} Those not picked stay waiting until you finish the role.</p>
   </div>;
 }
 
-function PickStage({ people, preselect, busy, empty, action, hint, onConfirm }: { people: HiringApplicant[]; preselect: number; busy: boolean; empty: string; action: (count: number) => string; hint: string; onConfirm: (ids: string[]) => void }) {
+function PickStage({ people, preselect, busy, nameOf, empty, action, hint, onConfirm }: { people: HiringApplicant[]; preselect: number; busy: boolean; nameOf: (person: HiringApplicant) => string; empty: string; action: (count: number) => string; hint: string; onConfirm: (ids: string[]) => void }) {
   const [picked, setPicked] = useState(() => new Set(people.slice(0, preselect).map((item) => item.application_id)));
   if (!people.length) return <p className="hiring-empty">{empty}</p>;
   const toggle = (id: string) => setPicked((current) => { const next = new Set(current); if (next.has(id)) next.delete(id); else next.add(id); return next; });
   return <div className="hiring-panel">
-    <ol className="hiring-people is-pickable">{people.map((person, index) => <li key={person.application_id}><label><input type="checkbox" checked={picked.has(person.application_id)} onChange={() => toggle(person.application_id)} /><Person person={person} rank={index + 1} /></label></li>)}</ol>
+    <ol className="hiring-people is-pickable">{people.map((person, index) => <li key={person.application_id}><label><input type="checkbox" checked={picked.has(person.application_id)} onChange={() => toggle(person.application_id)} /><Person person={person} rank={index + 1} name={nameOf(person)} /></label></li>)}</ol>
     <div className="hiring-panel-controls"><p className="hiring-note">{hint}</p><button className="primary-button" disabled={busy || !picked.size} onClick={() => onConfirm([...picked])}><Play size={15} />{action(picked.size)}</button></div>
   </div>;
 }
 
-function HireStage({ people, busy, onHire }: { people: HiringApplicant[]; busy: boolean; onHire: (person: HiringApplicant) => void }) {
+function HireStage({ people, busy, nameOf, onHire }: { people: HiringApplicant[]; busy: boolean; nameOf: (person: HiringApplicant) => string; onHire: (person: HiringApplicant) => void }) {
   const [choice, setChoice] = useState(people[0]?.application_id ?? "");
   const person = people.find((item) => item.application_id === choice);
   if (!people.length) return <p className="hiring-empty">Nobody has finished an interview yet.</p>;
   return <div className="hiring-panel">
-    <ol className="hiring-people is-pickable">{people.map((item, index) => <li key={item.application_id}><label><input type="radio" name="hire-choice" checked={choice === item.application_id} onChange={() => setChoice(item.application_id)} /><Person person={item} rank={index + 1} /></label></li>)}</ol>
-    <div className="hiring-panel-controls"><p className="hiring-note">The highest match score is ticked first. Your interview decides.</p><button className="primary-button" disabled={busy || !person} onClick={() => person && onHire(person)}><BadgeCheck size={16} />Hire {person?.candidate_name}</button></div>
+    <ol className="hiring-people is-pickable">{people.map((item, index) => <li key={item.application_id}><label><input type="radio" name="hire-choice" checked={choice === item.application_id} onChange={() => setChoice(item.application_id)} /><Person person={item} rank={index + 1} name={nameOf(item)} /></label></li>)}</ol>
+    <div className="hiring-panel-controls"><p className="hiring-note">The highest match score is ticked first. Your interview decides.</p><button className="primary-button" disabled={busy || !person} onClick={() => person && onHire(person)}><BadgeCheck size={16} />Hire {person ? nameOf(person) : ""}</button></div>
   </div>;
 }
 

@@ -293,7 +293,8 @@ def test_saved_results_mark_recommendations_only_for_the_active_model(api_client
     job_id = uuid4()
     database.get.return_value = SimpleNamespace(job_id=job_id, employer_id=uuid4())
     database.scalar.return_value = SimpleNamespace(created_at=datetime.now(UTC))
-    monkeypatch.setattr(matches, "_artifact", lambda: {"model_version": "active", "decision_threshold": 0.5})
+    base = matches._artifact()
+    monkeypatch.setattr(matches, "_artifact", lambda: {**base, "model_version": "active", "decision_threshold": 0.5})
 
     def row(score, version, passed=True):
         return (SimpleNamespace(match_id=uuid4(), candidate_id=uuid4(), hard_rule_passed=passed, skill_gap_breakdown={}, skill_overlap_score=0.5, similarity_score=0.5, growth_score=0.5, final_weighted_score=score, model_version=version), "Candidate")

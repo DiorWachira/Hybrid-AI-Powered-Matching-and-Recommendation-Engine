@@ -50,12 +50,18 @@ const eventDescriptions: Record<string, string> = {
 export function describeEvent(event: AuditEvent) {
   if (event.action === "application.status_changed") {
     const status = event.details?.status;
-    return typeof status === "string" && status in STAGE_LABELS ? `moved an application to ${STAGE_LABELS[status as ApplicationStatus]}` : "updated an application";
+    const moved = typeof status === "string" && status in STAGE_LABELS ? `moved an application to ${STAGE_LABELS[status as ApplicationStatus]}` : "updated an application";
+    const override = event.details?.override;
+    const score = typeof event.details?.final_score === "number" ? ` at ${Math.round(event.details.final_score * 100)}%` : "";
+    const reason = typeof event.details?.override_reason === "string" ? `. Reason: "${event.details.override_reason}"` : "";
+    if (override === "hard_rule") return `${moved}, overriding a failed eligibility rule${reason}`;
+    if (override === "below_threshold") return `${moved}, below the recommendation threshold${score}`;
+    return moved;
   }
   return eventDescriptions[event.action] ?? event.action.replaceAll(".", " / ").replaceAll("_", " ");
 }
 
-export const eventTone = (action: string) => action === "account.suspended" || action === "account.mfa_failed" ? "warn" : action.endsWith("hired") || action === "account.registered" ? "good" : action.split(".")[0];
+export const eventTone = (action: string, details?: AuditEvent["details"]) => details?.override ? "warn" : action === "account.suspended" || action === "account.mfa_failed" ? "warn" : action.endsWith("hired") || action === "account.registered" ? "good" : action.split(".")[0];
 
 export function Sparkline({ values, label }: { values: number[]; label: string }) {
   if (values.length < 2) return null;
